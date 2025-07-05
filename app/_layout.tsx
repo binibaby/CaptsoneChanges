@@ -1,29 +1,34 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/useColorScheme';
+import React from 'react';
+import { AuthProvider } from '../src/contexts/AuthContext';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
-  }
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="pet-owner-dashboard" />
+        <Stack.Screen name="pet-sitter-dashboard" />
+        <Stack.Screen name="find-sitter-map" />
+        
+        {/* Pet Sitter Routes */}
+        <Stack.Screen name="pet-sitter-profile" />
+        <Stack.Screen name="pet-sitter-notifications" />
+        <Stack.Screen name="pet-sitter-availability" />
+        <Stack.Screen name="pet-sitter-requests" />
+        <Stack.Screen name="pet-sitter-schedule" />
+        <Stack.Screen name="pet-sitter-messages" />
+        
+        {/* Pet Owner Routes */}
+        <Stack.Screen name="pet-owner-profile" />
+        <Stack.Screen name="pet-owner-notifications" />
+        <Stack.Screen name="pet-owner-jobs" />
+        <Stack.Screen name="pet-owner-messages" />
+        
+        <Stack.Screen name="admin" />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    </AuthProvider>
   );
-}
+} 
