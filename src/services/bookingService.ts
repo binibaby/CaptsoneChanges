@@ -110,7 +110,19 @@ class BookingService {
       throw new Error('Booking not found');
     }
 
-    booking.status = status.status;
+    // Map status values to match Booking.status type
+    let mappedStatus: 'pending' | 'completed' | 'cancelled' | 'confirmed';
+    switch (status.status) {
+      case 'accepted':
+        mappedStatus = 'confirmed';
+        break;
+      case 'rejected':
+        mappedStatus = 'cancelled';
+        break;
+      default:
+        mappedStatus = status.status as 'pending' | 'completed' | 'cancelled' | 'confirmed';
+    }
+    booking.status = mappedStatus;
 
     // Send appropriate notification
     if (status.status === 'accepted') {

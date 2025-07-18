@@ -392,5 +392,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default JobsScreen; 
+
 export default JobsScreen; 
