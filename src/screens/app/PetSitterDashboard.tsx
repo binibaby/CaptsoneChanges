@@ -1,15 +1,18 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+
+const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
 
 const upcomingJobs = [
   {
@@ -32,11 +35,17 @@ const earningsData = {
 };
 
 const quickActions: { title: string; icon: any; color: string; route: string }[] = [
-  { title: 'Set Availability', icon: 'calendar', color: '#F59E0B', route: '/pet-sitter-availability' },
-  { title: 'View Requests', icon: 'clipboard', color: '#10B981', route: '/pet-sitter-requests' },
-  { title: 'My Schedule', icon: 'clock', color: '#EF4444', route: '/pet-sitter-schedule' },
-  { title: 'Messages', icon: 'message-circle', color: '#3B82F6', route: '/pet-sitter-messages' },
+  { title: 'Set Availability', icon: require('../../assets/icons/availability.png'), color: '#A7F3D0', route: '/pet-sitter-availability' },
+  { title: 'View Requests', icon: require('../../assets/icons/req.png'), color: '#DDD6FE', route: '/pet-sitter-requests' },
+  { title: 'My Schedule', icon: require('../../assets/icons/sched.png'), color: '#FDE68A', route: '/pet-sitter-schedule' },
+  { title: 'Messages', icon: require('../../assets/icons/message2.png'), color: '#BAE6FD', route: '/pet-sitter-messages' },
 ];
+
+const reflectionColors = {
+  jobs: '#10B981',
+  upcoming: '#8B5CF6',
+  week: '#F97316',
+};
 
 const PetSitterDashboard = () => {
   const router = useRouter();
@@ -47,7 +56,7 @@ const PetSitterDashboard = () => {
         {/* Header */}
         <View style={styles.headerCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../../assets/images/pawprint.png')} style={{ width: 28, height: 28, marginRight: 8 }} />
+            <Image source={require('../../assets/images/logo.png')} style={{ width: 28, height: 28, marginRight: 8 }} />
             <Text style={styles.headerTitle}>Pet Sitter Dashboard</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -60,39 +69,82 @@ const PetSitterDashboard = () => {
           </View>
         </View>
 
-        {/* Welcome Card */}
-        <View style={styles.welcomeCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.welcomeTitle}>Welcome back!</Text>
-            <Text style={styles.welcomeSubtitle}>Ready to help pets and earn money?</Text>
-          </View>
-          <TouchableOpacity style={styles.welcomeButton} onPress={() => router.push('/pet-sitter-availability')}>
-            <Text style={styles.welcomeButtonText}>Set Availability</Text>
-            <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 4 }} />
-          </TouchableOpacity>
-        </View>
+        {/* Total Income Section */}
+        <LinearGradient
+          colors={['#10B981', '#8B5CF6', '#F97316']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.totalIncomeSection}
+        >
+          <Text style={styles.totalIncomeLabel}>Total Income</Text>
+          <Text style={styles.totalIncomeAmount}>{earningsData.totalEarnings}</Text>
+        </LinearGradient>
 
-        {/* Earnings Overview */}
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Earnings Overview</Text>
-          <TouchableOpacity>
-            <Text style={styles.sectionAction}>View Details</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.earningsGrid}>
-          <View style={styles.earningsCard}><Text style={styles.earningsLabel}>This Week</Text><Text style={styles.earningsValue}>{earningsData.thisWeek}</Text></View>
-          <View style={styles.earningsCard}><Text style={styles.earningsLabel}>This Month</Text><Text style={styles.earningsValue}>{earningsData.thisMonth}</Text></View>
-          <View style={styles.earningsCard}><Text style={styles.earningsLabel}>Total</Text><Text style={styles.earningsValue}>{earningsData.totalEarnings}</Text></View>
-          <View style={styles.earningsCard}><Text style={styles.earningsLabel}>Jobs Completed</Text><Text style={styles.earningsValue}>{earningsData.completedJobs}</Text></View>
+        {/* Stats Cards */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statsCard, {
+            backgroundColor: '#10B981',
+            shadowColor: '#10B981',
+            shadowOffset: { width: 0, height: 16 },
+            shadowOpacity: 0.5,
+            shadowRadius: 24,
+            elevation: 16,
+          }]}
+          >
+            <View style={styles.statsIcon}>
+              <Ionicons name="checkmark-circle" size={24} color="#fff" />
+            </View>
+            <Text style={styles.statsValueWhite}>{earningsData.completedJobs}</Text>
+            <Text style={styles.statsLabelWhite}>Jobs Completed</Text>
+            <View style={[styles.reflection, { backgroundColor: reflectionColors.jobs }]} />
+          </View>
+
+          <View style={[styles.statsCard, {
+            backgroundColor: '#8B5CF6',
+            shadowColor: '#8B5CF6',
+            shadowOffset: { width: 0, height: 16 },
+            shadowOpacity: 0.5,
+            shadowRadius: 24,
+            elevation: 16,
+          }]}
+          >
+            <View style={styles.statsIcon}>
+              <Ionicons name="calendar" size={24} color="#fff" />
+            </View>
+            <Text style={styles.statsValueWhite}>{upcomingJobs.length}</Text>
+            <Text style={styles.statsLabelWhite}>Upcoming Jobs</Text>
+            <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
+          </View>
+
+          <View style={[styles.statsCard, {
+            backgroundColor: '#F97316',
+            shadowColor: '#F97316',
+            shadowOffset: { width: 0, height: 16 },
+            shadowOpacity: 0.5,
+            shadowRadius: 24,
+            elevation: 16,
+          }]}
+          >
+            <View style={styles.statsIcon}>
+              <Ionicons name="trending-up" size={24} color="#fff" />
+            </View>
+            <Text style={styles.statsValueWhite}>{earningsData.thisWeek}</Text>
+            <Text style={styles.statsLabelWhite}>This Week</Text>
+            <View style={[styles.reflection, { backgroundColor: reflectionColors.week }]} />
+          </View>
         </View>
 
         {/* Quick Actions */}
-        <Text style={[styles.sectionTitle, { marginTop: 28, marginBottom: 12 }]}>Quick Actions</Text>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsRow}>
           {quickActions.map((action) => (
             <TouchableOpacity key={action.title} style={styles.quickAction} onPress={() => router.push(action.route as any)}>
               <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}> 
-                <Feather name={action.icon as any} size={24} color="#fff" />
+                <Image 
+                  source={action.icon} 
+                  style={styles.quickActionImage}
+                  resizeMode="contain"
+                />
               </View>
               <Text style={styles.quickActionLabel}>{action.title}</Text>
             </TouchableOpacity>
@@ -100,33 +152,31 @@ const PetSitterDashboard = () => {
         </View>
 
         {/* Upcoming Jobs */}
-        <View style={styles.sectionRow}>
+        <View style={styles.sectionRowAligned}>
           <Text style={styles.sectionTitle}>Upcoming Jobs</Text>
           <TouchableOpacity>
             <Text style={styles.sectionAction}>View All</Text>
           </TouchableOpacity>
         </View>
-        {upcomingJobs.map((job) => (
-          <View key={job.id} style={styles.jobCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
+          {upcomingJobs.map((job, idx) => (
+            <View key={job.id} style={[styles.upcomingJobCard, { backgroundColor: upcomingJobColors[idx % upcomingJobColors.length] }]}>
               <Image source={job.petImage} style={styles.jobPetImage} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.jobPetName}>{job.petName}</Text>
-                <Text style={styles.jobOwnerName}>{job.ownerName}</Text>
+              <Text style={styles.jobPetName}>{job.petName}</Text>
+              <Text style={styles.jobOwnerName}>{job.ownerName}</Text>
+              <View style={styles.jobStatusBadge}><Text style={styles.jobStatusText}>{job.status}</Text></View>
+              <Text style={styles.jobEarnings}>{job.earnings}</Text>
+              <View style={styles.jobMetaRow}>
+                <Ionicons name="calendar-outline" size={16} color="#888" style={{ marginRight: 4 }} />
+                <Text style={styles.jobMetaText}>{job.date}</Text>
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <View style={styles.jobStatusBadge}><Text style={styles.jobStatusText}>{job.status}</Text></View>
-                <Text style={styles.jobEarnings}>{job.earnings}</Text>
+              <View style={styles.jobMetaRow}>
+                <Ionicons name="time-outline" size={16} color="#888" style={{ marginRight: 4 }} />
+                <Text style={styles.jobMetaText}>{job.time}</Text>
               </View>
             </View>
-            <View style={styles.jobMetaRow}>
-              <Ionicons name="calendar-outline" size={16} color="#888" style={{ marginRight: 4 }} />
-              <Text style={styles.jobMetaText}>{job.date}</Text>
-              <Ionicons name="time-outline" size={16} color="#888" style={{ marginLeft: 16, marginRight: 4 }} />
-              <Text style={styles.jobMetaText}>{job.time}</Text>
-            </View>
-          </View>
-        ))}
+          ))}
+        </ScrollView>
       </ScrollView>
     </SafeAreaView>
   );
@@ -154,46 +204,122 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#222',
   },
-  welcomeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  totalIncomeSection: {
     backgroundColor: '#F59E0B',
     borderRadius: 18,
     marginHorizontal: 16,
     marginTop: 18,
-    marginBottom: 18,
-    padding: 18,
+    marginBottom: 24,
+    padding: 20,
     shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 16,
   },
-  welcomeTitle: {
+  totalIncomeLabel: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  totalIncomeAmount: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 2,
+    color: '#222',
+    marginHorizontal: 20,
+    marginBottom: 16,
   },
-  welcomeSubtitle: {
-    color: '#fff',
-    fontSize: 14,
-    opacity: 0.9,
-  },
-  welcomeButton: {
+  quickActionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FBBF24',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginLeft: 12,
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 24,
   },
-  welcomeButtonText: {
-    color: '#fff',
+  quickAction: {
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  quickActionImage: {
+    width: 28,
+    height: 28,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    color: '#222',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 24,
+  },
+  statsCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  statsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  statsValue: {
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 15,
-    marginRight: 2,
+    color: '#222',
+    marginBottom: 4,
+  },
+  statsLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  statsValueWhite: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  statsLabelWhite: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+    textAlign: 'center',
+    opacity: 0.9,
   },
   sectionRow: {
     flexDirection: 'row',
@@ -203,64 +329,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#222',
-  },
   sectionAction: {
     color: '#F59E0B',
     fontWeight: '600',
     fontSize: 15,
-  },
-  earningsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: 12,
-    marginBottom: 8,
-  },
-  earningsCard: {
-    width: '48%',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 14,
-    margin: '1%',
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  earningsLabel: {
-    color: '#888',
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  earningsValue: {
-    color: '#222',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: 12,
-    marginBottom: 18,
-  },
-  quickAction: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  quickActionLabel: {
-    fontSize: 13,
-    color: '#222',
-    fontWeight: '500',
-    textAlign: 'center',
   },
   jobCard: {
     backgroundColor: '#fff',
@@ -316,6 +388,43 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 13,
     marginRight: 8,
+  },
+  reflection: {
+    position: 'absolute',
+    bottom: 8,
+    left: '10%',
+    right: '10%',
+    height: 24,
+    borderRadius: 16,
+    opacity: 0.5,
+    zIndex: 1,
+  },
+  upcomingJobsRow: {
+    flexDirection: 'row',
+    paddingLeft: 16,
+    paddingRight: 8,
+    gap: 12,
+  },
+  upcomingJobCard: {
+    width: 140,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionRowAligned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginTop: 0,
+    marginBottom: 16,
   },
 });
 

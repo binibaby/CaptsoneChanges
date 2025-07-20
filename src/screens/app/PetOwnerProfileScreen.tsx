@@ -8,9 +8,8 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 const PetOwnerProfileScreen = () => {
@@ -29,6 +28,9 @@ const PetOwnerProfileScreen = () => {
     emergencyContact: 'Sarah Davis',
     emergencyPhone: '+1 (555) 123-4567',
   });
+
+  const [selectedPet, setSelectedPet] = useState<null | typeof profile.pets[0]>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const handleBack = () => {
     router.back();
@@ -74,7 +76,6 @@ const PetOwnerProfileScreen = () => {
           <Ionicons name="log-out-outline" size={24} color="#FF4444" />
         </TouchableOpacity>
       </View>
-
       <ScrollView style={styles.content}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
@@ -85,7 +86,6 @@ const PetOwnerProfileScreen = () => {
             <Text style={styles.locationText}>📍 San Francisco, CA</Text>
           </View>
         </View>
-
         {/* Edit/Save Buttons */}
         <View style={styles.actionButtons}>
           {isEditing ? (
@@ -103,68 +103,31 @@ const PetOwnerProfileScreen = () => {
             </TouchableOpacity>
           )}
         </View>
-
         {/* Personal Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
-          
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Full Name</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profile.name}
-              onChangeText={(text) => setProfile({...profile, name: text})}
-              editable={isEditing}
-            />
+            <Text style={[styles.input, styles.disabledInput]}>{profile.name}</Text>
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Email</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profile.email}
-              onChangeText={(text) => setProfile({...profile, email: text})}
-              editable={isEditing}
-              keyboardType="email-address"
-            />
+            <Text style={[styles.input, styles.disabledInput]}>{profile.email}</Text>
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Phone</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profile.phone}
-              onChangeText={(text) => setProfile({...profile, phone: text})}
-              editable={isEditing}
-              keyboardType="phone-pad"
-            />
+            <Text style={[styles.input, styles.disabledInput]}>{profile.phone}</Text>
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Address</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profile.address}
-              onChangeText={(text) => setProfile({...profile, address: text})}
-              editable={isEditing}
-            />
+            <Text style={[styles.input, styles.disabledInput]}>{profile.address}</Text>
           </View>
         </View>
-
         {/* Bio */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About Me</Text>
-          <TextInput
-            style={[styles.bioInput, !isEditing && styles.disabledInput]}
-            value={profile.bio}
-            onChangeText={(text) => setProfile({...profile, bio: text})}
-            editable={isEditing}
-            multiline
-            numberOfLines={4}
-            placeholder="Tell pet sitters about yourself and your pets..."
-          />
+          <Text style={[styles.bioInput, styles.disabledInput]}>{profile.bio}</Text>
         </View>
-
         {/* My Pets */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -175,7 +138,6 @@ const PetOwnerProfileScreen = () => {
               </TouchableOpacity>
             )}
           </View>
-          
           {profile.pets.map((pet, index) => (
             <View key={index} style={styles.petCard}>
               <Image 
@@ -194,33 +156,18 @@ const PetOwnerProfileScreen = () => {
             </View>
           ))}
         </View>
-
         {/* Emergency Contact */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Emergency Contact</Text>
-          
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Contact Name</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profile.emergencyContact}
-              onChangeText={(text) => setProfile({...profile, emergencyContact: text})}
-              editable={isEditing}
-            />
+            <Text style={[styles.input, styles.disabledInput]}>{profile.emergencyContact}</Text>
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Contact Phone</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profile.emergencyPhone}
-              onChangeText={(text) => setProfile({...profile, emergencyPhone: text})}
-              editable={isEditing}
-              keyboardType="phone-pad"
-            />
+            <Text style={[styles.input, styles.disabledInput]}>{profile.emergencyPhone}</Text>
           </View>
         </View>
-
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -229,13 +176,11 @@ const PetOwnerProfileScreen = () => {
             <Text style={styles.actionText}>My Bookings</Text>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
-          
           <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/pet-owner-messages')}>
             <Ionicons name="chatbubbles-outline" size={24} color="#4CAF50" />
             <Text style={styles.actionText}>Messages</Text>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
-          
           <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/find-sitter-map')}>
             <Ionicons name="map-outline" size={24} color="#3B82F6" />
             <Text style={styles.actionText}>Find Pet Sitters</Text>
@@ -408,16 +353,22 @@ const styles = StyleSheet.create({
   petCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 15,
     marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   petImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    marginRight: 15,
   },
   petInfo: {
     flex: 1,
@@ -438,6 +389,7 @@ const styles = StyleSheet.create({
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
@@ -447,6 +399,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     marginLeft: 15,
+  },
+  // New styles for inline colors and margins
+  colorFF4444: {
+    color: '#FF4444',
+  },
+  marginRight15: {
+    marginRight: 15,
+  },
+  colorF59E0B: {
+    color: '#F59E0B',
+  },
+  color4CAF50: {
+    color: '#4CAF50',
+  },
+  color3B82F6: {
+    color: '#3B82F6',
   },
 });
 

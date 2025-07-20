@@ -30,6 +30,8 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleComplete = async () => {
@@ -112,20 +114,46 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.passwordToggle}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off' : 'eye'}
+                size={20}
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.passwordToggle}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <Ionicons
+                name={showConfirmPassword ? 'eye-off' : 'eye'}
+                size={20}
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.summaryContainer}>
@@ -200,6 +228,22 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
     width: '100%',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    marginBottom: 15,
+    width: '100%',
+  },
+  passwordInput: {
+    flex: 1,
+    marginBottom: 0,
+    backgroundColor: 'transparent',
+  },
+  passwordToggle: {
+    padding: 15,
   },
   summaryContainer: {
     width: '100%',

@@ -24,6 +24,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onRegisterSuccess, onLo
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -83,20 +85,46 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onRegisterSuccess, onLo
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                <Ionicons
+                  name={showConfirmPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <TouchableOpacity style={styles.termsCheckbox} onPress={() => setAgreeToTerms(!agreeToTerms)}>
@@ -178,6 +206,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
     fontSize: 16,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    marginBottom: 0,
+    backgroundColor: 'transparent',
+  },
+  passwordToggle: {
+    padding: 15,
   },
   termsCheckbox: {
     flexDirection: 'row',
