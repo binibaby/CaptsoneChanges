@@ -1,7 +1,11 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import BackIDScreen from '../src/screens/auth/BackIDScreen';
+import FrontIDScreen from '../src/screens/auth/FrontIDScreen';
 import LoginScreen from '../src/screens/auth/LoginScreen';
+import PhoneVerificationScreen from '../src/screens/auth/PhoneVerificationScreen';
 import RegisterScreen from '../src/screens/auth/RegisterScreen';
+import SelfieScreen from '../src/screens/auth/SelfieScreen';
 import SignUpScreen1_UserRole from '../src/screens/auth/SignUpScreen1_UserRole';
 import SignUpScreen2_PetType from '../src/screens/auth/SignUpScreen2_PetType';
 import SignUpScreen3_BreedPreferences from '../src/screens/auth/SignUpScreen3_BreedPreferences';
@@ -9,7 +13,7 @@ import SignUpScreen4_FinalSteps from '../src/screens/auth/SignUpScreen4_FinalSte
 import UserRoleSelectionScreen from '../src/screens/auth/UserRoleSelectionScreen';
 
 export default function Auth() {
-  const [authStep, setAuthStep] = useState<'role-selection' | 'login' | 'register' | 'signup1' | 'signup2' | 'signup3' | 'signup4'>('role-selection');
+  const [authStep, setAuthStep] = useState<'role-selection' | 'login' | 'register' | 'signup1' | 'signup2' | 'signup3' | 'signup4' | 'phone-verification' | 'front-id' | 'back-id' | 'selfie'>('role-selection');
   const [selectedUserRole, setSelectedUserRole] = useState<'Pet Owner' | 'Pet Sitter' | null>(null);
   const [signupData, setSignupData] = useState<any>({});
   const router = useRouter();
@@ -44,6 +48,24 @@ export default function Auth() {
     setAuthStep('signup4');
   };
 
+  // New multi-step registration flow (for pet sitters after breed selection)
+  const goToPhoneVerification = (userData: any) => {
+    setSignupData({ ...signupData, userData });
+    setAuthStep('phone-verification');
+  };
+  const goToFrontID = (phoneVerified: boolean) => {
+    setSignupData({ ...signupData, phoneVerified });
+    setAuthStep('front-id');
+  };
+  const goToBackID = (phoneVerified: boolean, frontImage: string) => {
+    setSignupData({ ...signupData, phoneVerified, frontImage });
+    setAuthStep('back-id');
+  };
+  const goToSelfie = (phoneVerified: boolean, frontImage: string, backImage: string) => {
+    setSignupData({ ...signupData, phoneVerified, frontImage, backImage });
+    setAuthStep('selfie');
+  };
+
   const onRoleSelected = (role: 'Pet Owner' | 'Pet Sitter') => {
     setSelectedUserRole(role);
     setSignupData({ ...signupData, userRole: role });
@@ -54,6 +76,17 @@ export default function Auth() {
       router.replace('/pet-owner-dashboard');
     } else {
       router.replace('/pet-sitter-dashboard');
+    }
+  };
+
+  // Modified completion handler for pet sitters
+  const onPetSitterComplete = (userData: any) => {
+    // After breed selection, go to phone verification for pet sitters
+    if (signupData.userRole === 'Pet Sitter') {
+      setSignupData({ ...signupData, userData });
+      setAuthStep('phone-verification');
+    } else {
+      onAuthSuccess(userData);
     }
   };
 
@@ -88,7 +121,16 @@ export default function Auth() {
     case 'signup3':
       return <SignUpScreen3_BreedPreferences userRole={signupData.userRole} selectedPetTypes={signupData.selectedPetTypes} onNext={goToSignup4} onBack={() => setAuthStep('signup2')} />;
     case 'signup4':
-      return <SignUpScreen4_FinalSteps userRole={signupData.userRole} selectedPetTypes={signupData.selectedPetTypes} selectedBreeds={signupData.selectedBreeds} onComplete={onAuthSuccess} onBack={() => setAuthStep('signup3')} />;
+      return <SignUpScreen4_FinalSteps userRole={signupData.userRole} selectedPetTypes={signupData.selectedPetTypes} selectedBreeds={signupData.selectedBreeds} onComplete={onPetSitterComplete} onBack={() => setAuthStep('signup3')} />;
+    // New multi-step registration flow (only for pet sitters)
+    case 'phone-verification':
+      return <PhoneVerificationScreen userData={signupData.userData} onPhoneVerified={goToFrontID} />;
+    case 'front-id':
+      return <FrontIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} onFrontIDComplete={goToBackID} />;
+    case 'back-id':
+      return <BackIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} onBackIDComplete={goToSelfie} />;
+    case 'selfie':
+      return <SelfieScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} backImage={signupData.backImage} onSelfieComplete={onAuthSuccess} />;
     default:
       return (
         <UserRoleSelectionScreen 

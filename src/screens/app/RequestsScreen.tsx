@@ -25,61 +25,7 @@ interface Request {
   message?: string;
 }
 
-const mockRequests: Request[] = [
-  {
-    id: '1',
-    type: 'incoming',
-    status: 'pending',
-    petName: 'Max',
-    petType: 'Golden Retriever',
-    petImage: require('../../assets/images/dog.png'),
-    sitterName: 'Sarah Johnson',
-    sitterImage: require('../../assets/images/default-avatar.png'),
-    date: 'Dec 15-17, 2024',
-    duration: '3 days',
-    rate: '$45/day',
-    message: 'Hi! I\'m available for the weekend. I have experience with large dogs and a fenced yard.',
-  },
-  {
-    id: '2',
-    type: 'outgoing',
-    status: 'accepted',
-    petName: 'Luna',
-    petType: 'Persian Cat',
-    petImage: require('../../assets/images/cat.png'),
-    sitterName: 'Mike Chen',
-    sitterImage: require('../../assets/images/default-avatar.png'),
-    date: 'Dec 20-25, 2024',
-    duration: '6 days',
-    rate: '$30/day',
-  },
-  {
-    id: '3',
-    type: 'incoming',
-    status: 'completed',
-    petName: 'Buddy',
-    petType: 'Labrador',
-    petImage: require('../../assets/images/dog.png'),
-    sitterName: 'Emily Davis',
-    sitterImage: require('../../assets/images/default-avatar.png'),
-    date: 'Dec 10-12, 2024',
-    duration: '3 days',
-    rate: '$50/day',
-  },
-  {
-    id: '4',
-    type: 'outgoing',
-    status: 'rejected',
-    petName: 'Whiskers',
-    petType: 'Siamese Cat',
-    petImage: require('../../assets/images/cat.png'),
-    sitterName: 'Alex Wilson',
-    sitterImage: require('../../assets/images/default-avatar.png'),
-    date: 'Dec 18-20, 2024',
-    duration: '3 days',
-    rate: '$35/day',
-  },
-];
+// Remove all mockRequests and only display requests from API. Show empty state if no requests.
 
 const RequestsScreen = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -91,10 +37,7 @@ const RequestsScreen = () => {
     { id: 'completed', label: 'Completed' },
   ];
 
-  const filteredRequests = mockRequests.filter(request => {
-    if (selectedFilter === 'all') return true;
-    return request.status === selectedFilter;
-  });
+  const filteredRequests = []; // No mock data, so no filtering
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -434,5 +377,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RequestsScreen; 
 export default RequestsScreen; 

@@ -29,79 +29,98 @@ interface Moment {
   isLiked: boolean;
 }
 
-const mockMoments: Moment[] = [
-  {
-    id: '1',
-    user: {
-      name: 'Sarah Johnson',
-      image: require('../../assets/images/default-avatar.png'),
-    },
-    pet: {
-      name: 'Max',
-      type: 'Golden Retriever',
-    },
-    image: require('../../assets/images/dog.png'),
-    caption: 'Max had the best time at the park today! 🐕❤️',
-    likes: 24,
-    comments: 5,
-    timeAgo: '2 hours ago',
-    isLiked: false,
-  },
-  {
-    id: '2',
-    user: {
-      name: 'Mike Chen',
-      image: require('../../assets/images/default-avatar.png'),
-    },
-    pet: {
-      name: 'Luna',
-      type: 'Persian Cat',
-    },
-    image: require('../../assets/images/cat.png'),
-    caption: 'Luna found the perfect spot for her afternoon nap 😴',
-    likes: 18,
-    comments: 3,
-    timeAgo: '4 hours ago',
-    isLiked: true,
-  },
-  {
-    id: '3',
-    user: {
-      name: 'Emily Davis',
-      image: require('../../assets/images/default-avatar.png'),
-    },
-    pet: {
-      name: 'Buddy',
-      type: 'Labrador',
-    },
-    image: require('../../assets/images/dog.png'),
-    caption: 'Training session success! Buddy learned a new trick today 🎾',
-    likes: 31,
-    comments: 8,
-    timeAgo: '6 hours ago',
-    isLiked: false,
-  },
-  {
-    id: '4',
-    user: {
-      name: 'Alex Wilson',
-      image: require('../../assets/images/default-avatar.png'),
-    },
-    pet: {
-      name: 'Whiskers',
-      type: 'Siamese Cat',
-    },
-    image: require('../../assets/images/cat.png'),
-    caption: 'Whiskers exploring the new cat tree 🐱',
-    likes: 15,
-    comments: 2,
-    timeAgo: '1 day ago',
-    isLiked: false,
-  },
-];
-
 const MomentsScreen = () => {
-  const [moments, setMoments] = useState<Moment[]>(mockMoments);
+  const [moments, setMoments] = useState<Moment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchMoments = async () => {
+    try {
+      setLoading(true);
+      // TODO: Replace with actual API call
+      // For now, simulate fetching moments
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setMoments([
+        {
+          id: '1',
+          user: {
+            name: 'Sarah Johnson',
+            image: require('../../assets/images/default-avatar.png'),
+          },
+          pet: {
+            name: 'Max',
+            type: 'Golden Retriever',
+          },
+          image: require('../../assets/images/dog.png'),
+          caption: 'Max had the best time at the park today! 🐕❤️',
+          likes: 24,
+          comments: 5,
+          timeAgo: '2 hours ago',
+          isLiked: false,
+        },
+        {
+          id: '2',
+          user: {
+            name: 'Mike Chen',
+            image: require('../../assets/images/default-avatar.png'),
+          },
+          pet: {
+            name: 'Luna',
+            type: 'Persian Cat',
+          },
+          image: require('../../assets/images/cat.png'),
+          caption: 'Luna found the perfect spot for her afternoon nap 😴',
+          likes: 18,
+          comments: 3,
+          timeAgo: '4 hours ago',
+          isLiked: true,
+        },
+        {
+          id: '3',
+          user: {
+            name: 'Emily Davis',
+            image: require('../../assets/images/default-avatar.png'),
+          },
+          pet: {
+            name: 'Buddy',
+            type: 'Labrador',
+          },
+          image: require('../../assets/images/dog.png'),
+          caption: 'Training session success! Buddy learned a new trick today 🎾',
+          likes: 31,
+          comments: 8,
+          timeAgo: '6 hours ago',
+          isLiked: false,
+        },
+        {
+          id: '4',
+          user: {
+            name: 'Alex Wilson',
+            image: require('../../assets/images/default-avatar.png'),
+          },
+          pet: {
+            name: 'Whiskers',
+            type: 'Siamese Cat',
+          },
+          image: require('../../assets/images/cat.png'),
+          caption: 'Whiskers exploring the new cat tree 🐱',
+          likes: 15,
+          comments: 2,
+          timeAgo: '1 day ago',
+          isLiked: false,
+        },
+      ]);
+    } catch (err) {
+      setError('Failed to fetch moments');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useState(() => {
+    fetchMoments();
+  }, []);
 
   const handleLike = (momentId: string) => {
     setMoments(prevMoments =>
@@ -182,6 +201,69 @@ const MomentsScreen = () => {
       </View>
     </View>
   );
+
+  if (loading && moments.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Moments</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerButton}>
+              <Ionicons name="search-outline" size={24} color="#333" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton}>
+              <Ionicons name="add-circle-outline" size={24} color="#F59E0B" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>Loading Moments...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Moments</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerButton}>
+              <Ionicons name="search-outline" size={24} color="#333" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton}>
+              <Ionicons name="add-circle-outline" size={24} color="#F59E0B" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>{error}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (moments.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Moments</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerButton}>
+              <Ionicons name="search-outline" size={24} color="#333" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton}>
+              <Ionicons name="add-circle-outline" size={24} color="#F59E0B" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>No moments yet. Be the first to add one!</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -361,7 +443,17 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 20,
   },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+  },
 });
 
-export default MomentsScreen; 
 export default MomentsScreen; 

@@ -29,76 +29,7 @@ interface Job {
   badges?: any[];
 }
 
-const mockJobs: Job[] = [
-  {
-    id: '1',
-    title: 'Weekend Dog Sitting',
-    petName: 'Max',
-    petType: 'Golden Retriever',
-    location: 'Downtown, 2.3 km away',
-    duration: '2 days',
-    rate: '$45/day',
-    ownerName: 'Sarah Johnson',
-    ownerImage: require('../../assets/images/default-avatar.png'),
-    petImage: require('../../assets/images/dog.png'),
-    description: 'Looking for a caring sitter for my energetic Golden Retriever. Max loves walks and playing fetch.',
-    requirements: ['Experience with large dogs', 'Available weekends', 'Fenced yard preferred'],
-    postedTime: '2 hours ago',
-    isVerified: true,
-    badges: [
-      {
-        id: 'verified_sitter',
-        name: 'Verified Sitter',
-        description: 'Identity and background verified',
-        icon: 'shield-checkmark',
-        color: '#10B981',
-        criteria: 'Identity verification and background check completed',
-        isActive: true,
-        earnedAt: '2024-01-15',
-      },
-      {
-        id: 'super_sitter',
-        name: 'Super Sitter',
-        description: 'Consistently excellent service',
-        icon: 'star',
-        color: '#F59E0B',
-        criteria: '4.8+ rating with 50+ bookings',
-        isActive: true,
-        earnedAt: '2024-02-01',
-      },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Cat Care Needed',
-    petName: 'Luna',
-    petType: 'Persian Cat',
-    location: 'Westside, 1.8 km away',
-    duration: '1 week',
-    rate: '$30/day',
-    ownerName: 'Mike Chen',
-    ownerImage: require('../../assets/images/default-avatar.png'),
-    petImage: require('../../assets/images/cat.png'),
-    description: 'Need someone to care for my Persian cat while I\'m on vacation. Luna is very calm and low maintenance.',
-    requirements: ['Cat experience', 'Daily visits', 'Gentle handling'],
-    postedTime: '5 hours ago',
-  },
-  {
-    id: '3',
-    title: 'Puppy Training Help',
-    petName: 'Buddy',
-    petType: 'Labrador Puppy',
-    location: 'Northside, 3.1 km away',
-    duration: 'Ongoing',
-    rate: '$60/day',
-    ownerName: 'Emily Davis',
-    ownerImage: require('../../assets/images/default-avatar.png'),
-    petImage: require('../../assets/images/dog.png'),
-    description: 'Looking for help with basic training for my 6-month-old Labrador puppy.',
-    requirements: ['Training experience', 'Patience', 'Consistent schedule'],
-    postedTime: '1 day ago',
-  },
-];
+// Remove all mockJobs and only display jobs from API. Show empty state if no jobs.
 
 const JobsScreen = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -110,13 +41,7 @@ const JobsScreen = () => {
     { id: 'urgent', label: 'Urgent' },
   ];
 
-  const filteredJobs = mockJobs.filter(job => {
-    if (selectedFilter === 'all') return true;
-    if (selectedFilter === 'dogs') return job.petType.toLowerCase().includes('dog');
-    if (selectedFilter === 'cats') return job.petType.toLowerCase().includes('cat');
-    if (selectedFilter === 'urgent') return job.postedTime.includes('hours');
-    return true;
-  });
+  const filteredJobs = []; // No mock data, so filteredJobs will be empty
 
   const handleApply = (jobId: string) => {
     console.log('Applied for job:', jobId);

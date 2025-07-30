@@ -321,6 +321,100 @@ class VerificationService {
 
     return steps;
   }
+
+  // API method to get verification status from backend
+  async getVerificationStatus(): Promise<{
+    success: boolean;
+    verification?: {
+      id: string;
+      status: string;
+      document_type: string;
+      document_number?: string;
+      document_image?: string;
+      is_philippine_id: boolean;
+      submitted_at?: string;
+      verified_at?: string;
+      rejection_reason?: string;
+      notes?: string;
+    };
+    badges: Badge[];
+    message?: string;
+  }> {
+    try {
+      // In a real implementation, this would call your backend API
+      const response = await fetch('/api/verification/status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch verification status');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching verification status:', error);
+      // Return mock data for development
+      return {
+        success: true,
+        verification: null,
+        badges: [],
+        message: 'No verification submitted yet.'
+      };
+    }
+  }
+
+  // API method to submit verification
+  async submitVerification(verificationData: {
+    document_type: string;
+    document_number?: string;
+    document_image: string;
+  }): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    try {
+      const formData = new FormData();
+      formData.append('document_type', verificationData.document_type);
+      if (verificationData.document_number) {
+        formData.append('document_number', verificationData.document_number);
+      }
+      // Handle image upload
+      if (verificationData.document_image) {
+        const response = await fetch(verificationData.document_image);
+        const blob = await response.blob();
+        formData.append('document_image', blob, 'verification.jpg');
+      }
+
+      const response = await fetch('/api/verification/submit', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getAuthToken()}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit verification');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error submitting verification:', error);
+      throw error;
+    }
+  }
+
+  private getAuthToken(): string {
+    // In a real implementation, get token from secure storage
+    // For now, return a placeholder
+    return 'your-auth-token';
+  }
 }
 
 export default VerificationService.getInstance(); 

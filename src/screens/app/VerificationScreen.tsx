@@ -1,30 +1,87 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { RootStackParamList } from '../../navigation/types';
-import verificationService, { Badge, VerificationDocument } from '../../services/verificationService';
+import verificationService from '../../services/verificationService';
 
-type VerificationScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'VerificationScreen'>;
+type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'not_submitted' | 'open' | 'in_progress' | 'resolved' | 'closed';
+
+interface VerificationData {
+  id?: string;
+  status: VerificationStatus;
+  document_type: string;
+  is_philippine_id: boolean;
+  submitted_at?: string;
+  verified_at?: string;
+  rejection_reason?: string;
+  notes?: string;
+}
+
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  earned_at?: string;
+}
+
+interface VerificationScreenNavigationProp {
+  goBack: () => void;
+}
 
 const VerificationScreen = () => {
   const navigation = useNavigation<VerificationScreenNavigationProp>();
   const { user } = useAuth();
-  const [verificationStatus, setVerificationStatus] = useState<any>(null);
-  const [documents, setDocuments] = useState<VerificationDocument[]>([]);
+  const [verification, setVerification] = useState<VerificationData | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Email verification
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  
+  // Phone verification
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneCode, setPhoneCode] = useState('');
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  
+  // ID verification
+  const [showIdVerification, setShowIdVerification] = useState(false);
+  const [selectedIdType, setSelectedIdType] = useState('');
+  const [idNumber, setIdNumber] = useState('');
+  const [idImage, setIdImage] = useState<string | null>(null);
+  
+  const philippineIdTypes = [
+    { type: 'ph_national_id', name: 'Philippine National ID', pattern: /^\d{4}-\d{7}-\d{1}$/, placeholder: '1234-5678901-2' },
+    { type: 'ph_drivers_license', name: "Philippine Driver's License", pattern: /^[A-Z]\d{2}-\d{2}-\d{6}$/, placeholder: 'A12-34-567890' },
+    { type: 'sss_id', name: 'SSS ID', pattern: /^\d{2}-\d{7}-\d{1}$/, placeholder: '12-3456789-0' },
+    { type: 'philhealth_id', name: 'PhilHealth ID', pattern: /^\d{2}-\d{9}-\d{1}$/, placeholder: '12-345678901-2' },
+    { type: 'tin_id', name: 'TIN ID', pattern: /^\d{3}-\d{3}-\d{3}-\d{3}$/, placeholder: '123-456-789-000' },
+    { type: 'postal_id', name: 'Postal ID', pattern: /^[A-Z]{3}\d{7}$/, placeholder: 'ABC1234567' },
+    { type: 'voters_id', name: "Voter's ID", pattern: /^\d{4}-\d{4}-\d{4}-\d{4}$/, placeholder: '1234-5678-9012-3456' },
+    { type: 'prc_id', name: 'PRC ID', pattern: /^\d{7}$/, placeholder: '1234567' },
+    { type: 'umid', name: 'UMID', pattern: /^\d{4}-\d{7}-\d{1}$/, placeholder: '1234-5678901-2' },
+    { type: 'owwa_id', name: 'OWWA ID', pattern: /^[A-Z]{2}\d{8}$/, placeholder: 'AB12345678' },
+  ];
 
   useEffect(() => {
     loadVerificationData();
@@ -35,251 +92,550 @@ const VerificationScreen = () => {
 
     setIsLoading(true);
     try {
-      const [status, verification] = await Promise.all([
-        verificationService.getVerificationStatus(user.id),
-        verificationService.getSitterVerification(user.id),
-      ]);
-
-      setVerificationStatus(status);
-      setDocuments(verification?.documents || []);
-      setBadges(verification?.badges || []);
+      const response = await verificationService.getVerificationStatus();
+      
+      if (response.success) {
+        // Set email and phone verification status from user data
+        setEmailVerified(user.email_verified || false);
+        setPhoneVerified(user.phone_verified || false);
+        
+        if (response.verification) {
+          // Restore existing verification data including ID image
+          setVerification({
+            status: response.verification.status as VerificationStatus,
+            document_type: response.verification.document_type,
+            is_philippine_id: response.verification.is_philippine_id,
+            submitted_at: response.verification.submitted_at,
+            verified_at: response.verification.verified_at,
+            rejection_reason: response.verification.rejection_reason,
+            notes: response.verification.notes,
+          });
+          
+          // Restore ID data if exists
+          if (response.verification.document_type) {
+            setSelectedIdType(response.verification.document_type);
+          }
+          if (response.verification.document_number) {
+            setIdNumber(response.verification.document_number);
+          }
+          if (response.verification.document_image) {
+            setIdImage(response.verification.document_image);
+          }
+        } else {
+          // No verification submitted yet
+          setVerification({
+            status: 'not_submitted',
+            document_type: '',
+            is_philippine_id: false,
+          });
+        }
+        
+        setBadges(response.badges || []);
+      }
     } catch (error) {
       console.error('Error loading verification data:', error);
+      Alert.alert('Error', 'Failed to load verification data');
+      
+      // Fallback to mock data
+      setEmailVerified(user.email_verified || false);
+      setPhoneVerified(user.phone_verified || false);
+      setVerification({
+        status: 'not_submitted',
+        document_type: '',
+        is_philippine_id: false,
+      });
+      setBadges([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmitDocument = (documentType: VerificationDocument['type']) => {
-    Alert.alert(
-      'Submit Document',
-      `Submit your ${documentType.replace('_', ' ')} document?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Submit',
-          onPress: async () => {
-            try {
-              await verificationService.submitVerificationDocument(user!.id, documentType);
-              Alert.alert('Success', 'Document submitted successfully!');
-              loadVerificationData();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to submit document. Please try again.');
-            }
-          },
-        },
-      ]
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadVerificationData();
+    setRefreshing(false);
+  };
+
+  const verifyEmail = async () => {
+    if (!emailCode || emailCode.length !== 6) {
+      Alert.alert('Error', 'Please enter a valid 6-digit code');
+      return;
+    }
+
+    try {
+      // In a real app, call the API
+      // await fetch('/api/auth/verify-email', {
+      //   method: 'POST',
+      //   headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ verification_code: emailCode })
+      // });
+      
+      setEmailVerified(true);
+      setShowEmailVerification(false);
+      setEmailCode('');
+      Alert.alert('Success', 'Email verified successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Invalid verification code');
+    }
+  };
+
+  const verifyPhone = async () => {
+    if (!phoneCode || phoneCode.length !== 4) {
+      Alert.alert('Error', 'Please enter a valid 4-digit code');
+      return;
+    }
+
+    try {
+      // In a real app, call the API
+      setPhoneVerified(true);
+      setShowPhoneVerification(false);
+      setPhoneCode('');
+      Alert.alert('Success', 'Phone number verified successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Invalid verification code');
+    }
+  };
+
+  const resendCode = async (type: 'email' | 'phone') => {
+    try {
+      // In a real app, call the API
+      Alert.alert('Success', `Verification code sent to your ${type}`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send verification code');
+    }
+  };
+
+  const validateIdNumber = (type: string, number: string) => {
+    const idType = philippineIdTypes.find(id => id.type === type);
+    if (!idType) return false;
+    return idType.pattern.test(number);
+  };
+
+  const pickIdImage = async () => {
+    // Request camera permissions first
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (cameraPermission.granted === false) {
+      Alert.alert("Camera Permission Required", "Please allow camera access to take ID photos.");
+      return;
+    }
+
+    try {
+      // Force camera mode with explicit settings
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [3, 2],
+        quality: 0.8,
+        cameraType: ImagePicker.CameraType.back,
+        allowsMultipleSelection: false,
+        selectionLimit: 1,
+        presentationStyle: Platform.OS === 'ios' ? ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN : undefined,
+        videoQuality: ImagePicker.UIImagePickerControllerQualityType.High,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setIdImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      Alert.alert('Camera Error', 'Failed to open camera. Please try again.');
+    }
+  };
+
+  const submitIdVerification = async () => {
+    if (!selectedIdType || !idImage) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    try {
+      // Call the API to submit verification
+      await verificationService.submitVerification({
+        document_type: selectedIdType,
+        document_image: idImage,
+      });
+      
+      // Update local state
+      setVerification({
+        status: 'pending',
+        document_type: selectedIdType,
+        is_philippine_id: true,
+        submitted_at: new Date().toISOString(),
+      });
+      
+      setShowIdVerification(false);
+      Alert.alert('Success', 'ID verification submitted! An admin will review it shortly.');
+      
+      // Reload verification data to get updated status
+      await loadVerificationData();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to submit verification');
+    }
+  };
+
+  const getStatusColor = (status: VerificationStatus) => {
+    switch (status) {
+      case 'approved': return '#10B981';
+      case 'rejected': return '#EF4444';
+      case 'pending': return '#F59E0B';
+      default: return '#6B7280';
+    }
+  };
+
+  const getStatusIcon = (status: VerificationStatus) => {
+    switch (status) {
+      case 'approved': return 'checkmark-circle';
+      case 'rejected': return 'close-circle';
+      case 'pending': return 'time';
+      default: return 'help-circle';
+    }
+  };
+
+  const canAcceptBookings = emailVerified && phoneVerified && verification?.status === 'approved';
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text>Loading verification data...</Text>
+        </View>
+      </SafeAreaView>
     );
-  };
-
-  const getDocumentStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return { name: 'checkmark-circle', color: '#10B981' };
-      case 'rejected':
-        return { name: 'close-circle', color: '#EF4444' };
-      case 'pending':
-        return { name: 'time', color: '#F59E0B' };
-      default:
-        return { name: 'ellipse-outline', color: '#6B7280' };
-    }
-  };
-
-  const getDocumentStatusText = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'Approved';
-      case 'rejected':
-        return 'Rejected';
-      case 'pending':
-        return 'Under Review';
-      default:
-        return 'Not Submitted';
-    }
-  };
-
-  const renderDocumentItem = ({ item }: { item: VerificationDocument }) => (
-    <View style={styles.documentItem}>
-      <View style={styles.documentHeader}>
-        <View style={styles.documentInfo}>
-          <Text style={styles.documentName}>
-            {item.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-          </Text>
-          <Text style={styles.documentDate}>
-            {item.status === 'pending' ? 'Submitted' : 'Updated'}: {new Date(item.submittedAt).toLocaleDateString()}
-          </Text>
-        </View>
-        <View style={styles.statusContainer}>
-          <Ionicons
-            name={getDocumentStatusIcon(item.status).name as any}
-            size={24}
-            color={getDocumentStatusIcon(item.status).color}
-          />
-          <Text style={[styles.statusText, { color: getDocumentStatusIcon(item.status).color }]}>
-            {getDocumentStatusText(item.status)}
-          </Text>
-        </View>
-      </View>
-      {item.notes && (
-        <Text style={styles.documentNotes}>Notes: {item.notes}</Text>
-      )}
-    </View>
-  );
-
-  const renderBadgeItem = ({ item }: { item: Badge }) => (
-    <View style={[styles.badgeItem, { borderColor: item.color }]}>
-      <View style={[styles.badgeIcon, { backgroundColor: item.color }]}>
-        <Ionicons name={item.icon as any} size={24} color="#fff" />
-      </View>
-      <View style={styles.badgeInfo}>
-        <Text style={styles.badgeName}>{item.name}</Text>
-        <Text style={styles.badgeDescription}>{item.description}</Text>
-        {item.earnedAt && (
-          <Text style={styles.badgeEarnedDate}>
-            Earned: {new Date(item.earnedAt).toLocaleDateString()}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-
-  const requiredDocuments = [
-    { type: 'identity' as const, name: 'Identity Verification', description: 'Government-issued ID' },
-    { type: 'background_check' as const, name: 'Background Check', description: 'Criminal background check' },
-    { type: 'certification' as const, name: 'Certification', description: 'Pet care certifications' },
-    { type: 'insurance' as const, name: 'Insurance', description: 'Pet sitting insurance' },
-    { type: 'references' as const, name: 'References', description: 'Professional references' },
-  ];
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="black" />
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verification & Badges</Text>
-        <View style={styles.headerSpacer} />
+        <Text style={styles.headerTitle}>Verification Center</Text>
+        <View style={styles.placeholder} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Verification Status */}
-        {verificationStatus && (
+      <ScrollView 
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+        {/* Overall Status */}
           <View style={styles.statusCard}>
-            <View style={styles.statusHeader}>
+          <Text style={styles.statusTitle}>Account Status</Text>
+          <View style={styles.statusBadge}>
+            <Ionicons 
+              name={canAcceptBookings ? "checkmark-circle" : "time"} 
+              size={20} 
+              color={canAcceptBookings ? "#10B981" : "#F59E0B"} 
+            />
+            <Text style={[styles.statusText, { color: canAcceptBookings ? "#10B981" : "#F59E0B" }]}>
+              {canAcceptBookings ? "Verified & Active" : "Verification Required"}
+            </Text>
+          </View>
+          {!canAcceptBookings && (
+            <Text style={styles.statusDescription}>
+              Complete all verification steps to start accepting bookings
+            </Text>
+          )}
+        </View>
+
+        {/* Email Verification */}
+        <View style={styles.verificationCard}>
+          <View style={styles.verificationHeader}>
+            <Ionicons 
+              name={emailVerified ? "checkmark-circle" : "mail-outline"} 
+              size={24} 
+              color={emailVerified ? "#10B981" : "#F59E0B"} 
+            />
+            <View style={styles.verificationInfo}>
+              <Text style={styles.verificationTitle}>Email Verification</Text>
+              <Text style={styles.verificationSubtitle}>
+                {emailVerified ? "Verified" : "Required"}
+              </Text>
+            </View>
+            {!emailVerified && (
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => setShowEmailVerification(true)}
+              >
+                <Text style={styles.actionButtonText}>Verify</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Phone Verification */}
+        {user?.phone && (
+          <View style={styles.verificationCard}>
+            <View style={styles.verificationHeader}>
               <Ionicons
-                name={verificationStatus.isVerified ? 'shield-checkmark' : 'shield-outline'}
-                size={32}
-                color={verificationStatus.isVerified ? '#10B981' : '#6B7280'}
+                name={phoneVerified ? "checkmark-circle" : "call-outline"} 
+                size={24} 
+                color={phoneVerified ? "#10B981" : "#F59E0B"} 
               />
-              <View style={styles.statusInfo}>
-                <Text style={styles.statusTitle}>
-                  {verificationStatus.isVerified ? 'Verified Sitter' : 'Verification Required'}
-                </Text>
-                <Text style={styles.statusScore}>
-                  Verification Score: {verificationStatus.score}%
+              <View style={styles.verificationInfo}>
+                <Text style={styles.verificationTitle}>Phone Verification</Text>
+                <Text style={styles.verificationSubtitle}>
+                  {phoneVerified ? "Verified" : "Required"}
                 </Text>
               </View>
+              {!phoneVerified && (
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => setShowPhoneVerification(true)}
+                >
+                  <Text style={styles.actionButtonText}>Verify</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ID Verification (Pet Sitters Only) */}
+        {user?.role === 'pet_sitter' && (
+          <View style={styles.verificationCard}>
+            <View style={styles.verificationHeader}>
+              <Ionicons 
+                name={getStatusIcon(verification?.status || 'not_submitted')} 
+                size={24} 
+                color={getStatusColor(verification?.status || 'not_submitted')} 
+              />
+              <View style={styles.verificationInfo}>
+                <Text style={styles.verificationTitle}>ID Verification</Text>
+                <Text style={styles.verificationSubtitle}>
+                  {verification?.status === 'approved' ? 'Approved' :
+                   verification?.status === 'pending' ? 'Under Review' :
+                   verification?.status === 'rejected' ? 'Rejected' : 'Required'}
+                </Text>
+              </View>
+              {verification?.status !== 'approved' && verification?.status !== 'pending' && (
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => setShowIdVerification(true)}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {verification?.status === 'rejected' ? 'Retry' : 'Submit'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
             
-            {!verificationStatus.isVerified && (
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                  <View 
-                    style={[
-                      styles.progressFill, 
-                      { width: `${verificationStatus.score}%` }
-                    ]} 
-                  />
-                </View>
-                <Text style={styles.progressText}>
-                  {verificationStatus.score}/100 - {verificationStatus.nextSteps.length} steps remaining
-                </Text>
+            {/* Display submitted ID details if verification exists */}
+            {verification && verification.status !== 'not_submitted' && (
+              <View style={styles.submittedVerificationDetails}>
+                {verification.document_type && (
+                  <Text style={styles.verificationDetail}>
+                    Document Type: {philippineIdTypes.find(id => id.type === verification.document_type)?.name || verification.document_type}
+                  </Text>
+                )}
+                
+                {verification.submitted_at && (
+                  <Text style={styles.verificationDetail}>
+                    Submitted: {new Date(verification.submitted_at).toLocaleDateString()}
+                  </Text>
+                )}
+                
+                {verification.verified_at && (
+                  <Text style={styles.verificationDetail}>
+                    Reviewed: {new Date(verification.verified_at).toLocaleDateString()}
+                  </Text>
+                )}
+
+                {/* Display ID image if it exists */}
+                {idImage && (
+                  <View style={styles.submittedIdContainer}>
+                    <Text style={styles.submittedIdLabel}>Submitted ID Document:</Text>
+                    <Image source={{ uri: idImage }} style={styles.submittedIdImage} />
+                    <Text style={styles.submittedIdNote}>
+                      {verification.status === 'approved' && '✓ Document verified successfully'}
+                      {verification.status === 'pending' && '⏳ Document under review'}
+                      {verification.status === 'rejected' && '✗ Document requires resubmission'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {verification?.rejection_reason && (
+              <View style={styles.rejectionBox}>
+                <Text style={styles.rejectionTitle}>Rejection Reason:</Text>
+                <Text style={styles.rejectionText}>{verification.rejection_reason}</Text>
               </View>
             )}
           </View>
         )}
 
-        {/* Required Documents */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Required Documents</Text>
-          {requiredDocuments.map((doc) => {
-            const submittedDoc = documents.find(d => d.type === doc.type);
-            return (
-              <TouchableOpacity
-                key={doc.type}
-                style={styles.documentCard}
-                onPress={() => !submittedDoc && handleSubmitDocument(doc.type)}
-                disabled={!!submittedDoc}
-              >
-                <View style={styles.documentCardHeader}>
-                  <View style={styles.documentCardInfo}>
-                    <Text style={styles.documentCardName}>{doc.name}</Text>
-                    <Text style={styles.documentCardDescription}>{doc.description}</Text>
-                  </View>
-                  {submittedDoc ? (
-                    <Ionicons
-                      name={getDocumentStatusIcon(submittedDoc.status).name as any}
-                      size={24}
-                      color={getDocumentStatusIcon(submittedDoc.status).color}
-                    />
-                  ) : (
-                    <Ionicons name="add-circle-outline" size={24} color="#F59E0B" />
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Submitted Documents */}
-        {documents.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Submitted Documents</Text>
-            <FlatList
-              data={documents}
-              renderItem={renderDocumentItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          </View>
-        )}
-
-        {/* Badges */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Badges & Achievements</Text>
-          {badges.length > 0 ? (
+        {/* Badges Section */}
+        {badges.length > 0 && (
+          <View style={styles.badgesSection}>
+            <Text style={styles.sectionTitle}>Your Badges</Text>
             <FlatList
               data={badges}
-              renderItem={renderBadgeItem}
+              horizontal
+              showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyBadges}>
-              <Ionicons name="trophy-outline" size={48} color="#6B7280" />
-              <Text style={styles.emptyBadgesText}>No badges earned yet</Text>
-              <Text style={styles.emptyBadgesSubtext}>
-                Complete verification and start booking to earn badges!
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Next Steps */}
-        {verificationStatus && verificationStatus.nextSteps.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Next Steps</Text>
-            {verificationStatus.nextSteps.map((step: string, index: number) => (
-              <View key={index} style={styles.stepItem}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>{index + 1}</Text>
+              renderItem={({ item }) => (
+                <View style={[styles.badgeCard, { borderColor: item.color }]}>
+                  <View style={[styles.badgeIcon, { backgroundColor: item.color }]}>
+                    <Ionicons name={item.icon as any} size={24} color="#fff" />
+                  </View>
+                  <Text style={styles.badgeName}>{item.name}</Text>
+                  <Text style={styles.badgeDescription}>{item.description}</Text>
                 </View>
-                <Text style={styles.stepText}>{step}</Text>
-              </View>
-            ))}
+              )}
+            />
           </View>
         )}
       </ScrollView>
+
+      {/* Email Verification Modal */}
+      <Modal visible={showEmailVerification} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Verify Email</Text>
+            <Text style={styles.modalDescription}>
+              Enter the 6-digit code sent to your email
+            </Text>
+            
+            <TextInput
+              style={styles.codeInput}
+              placeholder="000000"
+              value={emailCode}
+              onChangeText={setEmailCode}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.resendButton}
+                onPress={() => resendCode('email')}
+              >
+                <Text style={styles.resendButtonText}>Resend Code</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.verifyButton}
+                onPress={verifyEmail}
+              >
+                <Text style={styles.verifyButtonText}>Verify</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => setShowEmailVerification(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Phone Verification Modal */}
+      <Modal visible={showPhoneVerification} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Verify Phone</Text>
+            <Text style={styles.modalDescription}>
+              Enter the 4-digit code sent to your phone
+            </Text>
+            
+            <TextInput
+              style={styles.codeInput}
+              placeholder="0000"
+              value={phoneCode}
+              onChangeText={setPhoneCode}
+              keyboardType="number-pad"
+              maxLength={4}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.resendButton}
+                onPress={() => resendCode('phone')}
+              >
+                <Text style={styles.resendButtonText}>Resend Code</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.verifyButton}
+                onPress={verifyPhone}
+              >
+                <Text style={styles.verifyButtonText}>Verify</Text>
+              </TouchableOpacity>
+                </View>
+            
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => setShowPhoneVerification(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ID Verification Modal */}
+      <Modal visible={showIdVerification} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Philippine ID Verification</Text>
+              <Text style={styles.modalDescription}>
+                Select your ID type and provide the required information
+              </Text>
+
+              <Text style={styles.fieldLabel}>Select ID Type:</Text>
+              {philippineIdTypes.map((id) => (
+                <TouchableOpacity 
+                  key={id.type} 
+                  style={[styles.idTypeButton, selectedIdType === id.type && styles.selectedIdType]}
+                  onPress={() => setSelectedIdType(id.type)}
+                >
+                  <Text style={[styles.idTypeName, selectedIdType === id.type && styles.selectedIdTypeName]}>
+                    {id.name}
+                  </Text>
+                  {selectedIdType === id.type && (
+                    <Ionicons name="checkmark" size={20} color="#10B981" />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              {selectedIdType && (
+                <>
+                  <Text style={styles.fieldLabel}>Capture ID Photo:</Text>
+                  <TouchableOpacity style={styles.uploadButton} onPress={pickIdImage}>
+                    <Ionicons name="camera" size={24} color="#F59E0B" />
+                    <Text style={styles.uploadButtonText}>
+                      {idImage ? 'Capture Again' : 'Open Camera to Capture'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {idImage && (
+                    <Image source={{ uri: idImage }} style={styles.idPreview} />
+                  )}
+                </>
+        )}
+      </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowIdVerification(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.verifyButton, (!selectedIdType || !idImage) && styles.disabledButton]}
+                onPress={submitIdVerification}
+                disabled={!selectedIdType || !idImage}
+              >
+                <Text style={styles.verifyButtonText}>Submit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -307,10 +663,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  headerSpacer: {
+  placeholder: {
     width: 34,
   },
-  scrollContent: {
+  content: {
+    flex: 1,
     padding: 20,
   },
   statusCard: {
@@ -327,44 +684,96 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  statusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  statusInfo: {
-    marginLeft: 15,
-    flex: 1,
-  },
   statusTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 10,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     marginBottom: 5,
   },
-  statusScore: {
+  statusText: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '600',
+    marginLeft: 5,
   },
-  progressContainer: {
-    marginTop: 10,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#F59E0B',
-  },
-  progressText: {
-    fontSize: 12,
+  statusDescription: {
+    fontSize: 14,
     color: '#666',
     marginTop: 5,
   },
-  section: {
+  verificationCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  verificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  verificationInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  verificationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  verificationSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  actionButton: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignSelf: 'flex-start',
+    marginTop: 10,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rejectionBox: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  rejectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  rejectionText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  badgesSection: {
     marginBottom: 25,
   },
   sectionTitle: {
@@ -373,79 +782,14 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 15,
   },
-  documentCard: {
+  badgeCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 15,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  documentCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  documentCardInfo: {
-    flex: 1,
-  },
-  documentCardName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
-  },
-  documentCardDescription: {
-    fontSize: 14,
-    color: '#666',
-  },
-  documentItem: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  documentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  documentInfo: {
-    flex: 1,
-  },
-  documentName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
-  },
-  documentDate: {
-    fontSize: 12,
-    color: '#666',
-  },
-  statusContainer: {
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  documentNotes: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 10,
-    fontStyle: 'italic',
-  },
-  badgeItem: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
+    marginRight: 10,
     borderWidth: 2,
-    flexDirection: 'row',
+    borderColor: '#f0f0f0',
+    width: 150,
     alignItems: 'center',
   },
   badgeIcon: {
@@ -454,70 +798,209 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
-  },
-  badgeInfo: {
-    flex: 1,
+    marginBottom: 10,
   },
   badgeName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 5,
   },
   badgeDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-  },
-  badgeEarnedDate: {
     fontSize: 12,
-    color: '#999',
-  },
-  emptyBadges: {
-    alignItems: 'center',
-    padding: 40,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-  },
-  emptyBadgesText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#666',
-    marginTop: 15,
-  },
-  emptyBadgesSubtext: {
-    fontSize: 14,
-    color: '#999',
     textAlign: 'center',
-    marginTop: 5,
   },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-  },
-  stepNumber: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#F59E0B',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
   },
-  stepNumberText: {
-    color: '#fff',
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 25,
+    width: '80%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
-    fontSize: 14,
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 14,
     color: '#333',
+    marginBottom: 10,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  codeInput: {
+    width: '100%',
+    height: 50,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 20,
+  },
+  resendButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  resendButtonText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  verifyButton: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginTop: 10,
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    opacity: 0.7,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  idTypeButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedIdType: {
+    borderColor: '#F59E0B',
+    borderWidth: 2,
+  },
+  idTypeName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  selectedIdTypeName: {
+    color: '#F59E0B',
+  },
+  idInput: {
+    width: '100%',
+    height: 50,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    marginBottom: 15,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 5,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  uploadButtonText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+  idPreview: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  submittedVerificationDetails: {
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+  },
+  verificationDetail: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  submittedIdContainer: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  submittedIdLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  submittedIdImage: {
+    width: 280,
+    height: 180,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    resizeMode: 'cover',
+    marginBottom: 10,
+  },
+  submittedIdNote: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
   },
 });
 

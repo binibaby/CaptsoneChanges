@@ -3,11 +3,12 @@ import React, { useState } from 'react';
 import {
     Alert,
     SafeAreaView,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 interface SignUpScreen4_FinalStepsProps {
@@ -25,49 +26,34 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   onComplete, 
   onBack 
 }) => {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleComplete = async () => {
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
+    console.log('Step 4 - Phone number entered:', phone);
+    if (!phone) {
+      Alert.alert('Error', 'Please enter your phone number');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Simulate user creation
       const user = {
         id: '1',
-        firstName,
-        lastName,
-        email,
+        firstName: 'Test User', // Default values for testing
+        lastName: 'Test',
+        phone,
+        age: '25',
+        address: 'Test Address',
+        gender: 'Other',
         userRole,
         selectedPetTypes,
         selectedBreeds,
         isVerified: false,
+        verificationPending: userRole === 'Pet Sitter',
         createdAt: new Date().toISOString(),
       };
 
-      // In a real app, you would call your auth service here
-      // await authService.register(user);
-      
       onComplete(user);
     } catch (error) {
       Alert.alert('Registration Failed', 'Please try again');
@@ -83,96 +69,37 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
       )}
-      <Text style={styles.progressText}>3/4</Text>
+      <Text style={styles.progressText}>4/4</Text>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>Almost There!</Text>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Phone Verification</Text>
         <Text style={styles.description}>
-          Let's create your account and get you started on your pet journey.
+          Enter your phone number to continue with the verification process.
         </Text>
 
         <View style={styles.inputContainer}>
+          <Text style={styles.label}>Phone Number *</Text>
           <TextInput
             style={styles.input}
-            placeholder="First Name"
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Last Name"
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            placeholder="Enter your phone number (e.g., 09123456789)"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
             autoCapitalize="none"
           />
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              style={styles.passwordToggle}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-off' : 'eye'}
-                size={20}
-                color="#666"
-              />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              style={styles.passwordToggle}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-off' : 'eye'}
-                size={20}
-                color="#666"
-              />
-            </TouchableOpacity>
-          </View>
         </View>
-
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Account Summary</Text>
-          <Text style={styles.summaryText}>Role: {userRole}</Text>
-          <Text style={styles.summaryText}>Pet Types: {selectedPetTypes.join(', ')}</Text>
-          {selectedBreeds.length > 0 && (
-            <Text style={styles.summaryText}>Breeds: {selectedBreeds.join(', ')}</Text>
-          )}
-        </View>
-      </View>
+      </ScrollView>
 
       <TouchableOpacity
-        style={[styles.completeButton, isLoading && styles.disabledButton]}
+        style={[styles.continueButton, isLoading && styles.disabledButton]}
         onPress={handleComplete}
         disabled={isLoading}
       >
-        <Text style={styles.completeButtonText}>
-          {isLoading ? 'Creating Account...' : 'Create Account'}
+        <Text style={styles.continueButtonText}>
+          {isLoading 
+            ? 'Creating Account...' 
+            : 'Continue to Phone Verification'
+          }
         </Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -183,101 +110,464 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
+    paddingHorizontal: 24,
   },
   backButton: {
     position: 'absolute',
     top: 50,
     left: 20,
     zIndex: 1,
+    padding: 8,
   },
   progressText: {
-    alignSelf: 'flex-end',
-    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 60,
+    marginBottom: 20,
     color: '#666',
-    marginTop: 20,
-    marginRight: 10,
+    fontSize: 14,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 8,
     color: '#333',
   },
   description: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 40,
     color: '#666',
-    lineHeight: 24,
+    marginBottom: 32,
+    lineHeight: 22,
   },
   inputContainer: {
-    width: '100%',
+    marginBottom: 24,
   },
   input: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    width: '100%',
+    marginBottom: 16,
+    backgroundColor: '#F8F9FA',
   },
   passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    marginBottom: 15,
-    width: '100%',
+    position: 'relative',
+    marginBottom: 16,
   },
   passwordInput: {
-    flex: 1,
+    paddingRight: 50,
     marginBottom: 0,
-    backgroundColor: 'transparent',
   },
   passwordToggle: {
-    padding: 15,
+    position: 'absolute',
+    right: 16,
+    top: 14,
+    padding: 4,
   },
-  summaryContainer: {
-    width: '100%',
-    marginBottom: 20,
+  verificationSection: {
+    backgroundColor: '#FEF3E2',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
   },
-  summaryTitle: {
-    fontSize: 20,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
     color: '#333',
+    marginBottom: 8,
   },
-  summaryText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 5,
+  sectionDescription: {
+    fontSize: 14,
     color: '#666',
+    marginBottom: 16,
+    lineHeight: 20,
   },
-  completeButton: {
-    backgroundColor: '#F59E0B',
-    paddingVertical: 15,
-    borderRadius: 10,
+  verificationButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  verificationCompleted: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  verificationButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 12,
+    flex: 1,
+  },
+  verificationCompletedText: {
+    color: '#10B981',
+  },
+  continueButton: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 16,
+    borderRadius: 12,
     marginBottom: 20,
   },
-  completeButtonText: {
+  continueButtonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#E0E0E0',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    marginTop: 16,
+  },
+  idTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F8F9FA',
+  },
+  selectedIdType: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  idTypeName: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  selectedIdTypeName: {
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  idInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    backgroundColor: '#F8F9FA',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF3E2',
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 20,
+    marginBottom: 16,
+  },
+  uploadButtonText: {
+    fontSize: 16,
+    color: '#F59E0B',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  idPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 16,
+    resizeMode: 'contain',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginRight: 8,
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  verifyButton: {
+    flex: 1,
+    backgroundColor: '#10B981',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  idSection: {
+    marginBottom: 16,
+  },
+  idSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  idSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  idInstruction: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  completionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  completionText: {
+    fontSize: 16,
+    color: '#10B981',
+    marginLeft: 8,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  autoFilledInput: {
+    borderColor: '#10B981',
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#E0F2F7',
+  },
+  autoFillIcon: {
+    position: 'absolute',
+    right: 16,
+    top: 14,
+  },
+  processingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  processingText: {
+    fontSize: 14,
+    color: '#F59E0B',
+    marginLeft: 8,
+  },
+  autoFillSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  autoFillText: {
+    fontSize: 14,
+    color: '#10B981',
+    marginLeft: 8,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF3E2',
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    color: '#F59E0B',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  hintsContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  hintText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 4,
+  },
+  helperButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EBF4FF',
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  helperButtonText: {
+    fontSize: 16,
+    color: '#3B82F6',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    marginBottom: 16,
+  },
+  helperModalContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+  },
+  idHelpContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+  },
+  idHelpTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  formatExample: {
+    backgroundColor: '#EBF4FF',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+  },
+  formatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  formatText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontFamily: 'monospace',
+    marginBottom: 12,
+  },
+  tipsContainer: {
+    marginTop: 8,
+  },
+  tipsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  tipItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  closeHelperButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 32,
+  },
+  closeHelperButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 
-export default SignUpScreen4_FinalSteps; 
+export default SignUpScreen4_FinalSteps;

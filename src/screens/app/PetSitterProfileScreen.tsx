@@ -6,6 +6,7 @@ import {
     Alert,
     Image,
     Modal,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -80,14 +81,34 @@ const PetSitterProfileScreen = () => {
   };
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setIdImage(result.assets[0].uri);
+    // Request camera permissions first
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (cameraPermission.granted === false) {
+      Alert.alert("Camera Permission Required", "Please allow camera access to take ID photos.");
+      return;
+    }
+
+    try {
+      // Force camera mode with explicit settings
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+        cameraType: ImagePicker.CameraType.back,
+        allowsMultipleSelection: false,
+        selectionLimit: 1,
+        presentationStyle: Platform.OS === 'ios' ? ImagePicker.UIImagePickerPresentationStyle.FullScreen : undefined,
+        videoQuality: ImagePicker.UIImagePickerControllerQualityType.High,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setIdImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      Alert.alert('Camera Error', 'Failed to open camera. Please try again.');
     }
   };
 
@@ -296,7 +317,7 @@ const PetSitterProfileScreen = () => {
               </TouchableOpacity>
             ))}
             <TouchableOpacity style={{ marginTop: 12, backgroundColor: '#F59E0B', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, alignSelf: 'flex-start' }} onPress={pickImage}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>{idImage ? 'Change Photo' : 'Upload Photo'}</Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>{idImage ? 'Capture Again' : 'Open Camera to Capture'}</Text>
             </TouchableOpacity>
             {idImage && (
               <Image source={{ uri: idImage }} style={{ width: 120, height: 80, borderRadius: 8, marginTop: 10, alignSelf: 'center' }} />

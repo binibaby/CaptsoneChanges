@@ -5,6 +5,10 @@ export interface User {
   email: string;
   name: string;
   userRole: 'Pet Owner' | 'Pet Sitter';
+  role: 'pet_owner' | 'pet_sitter';
+  phone?: string;
+  email_verified?: boolean;
+  phone_verified?: boolean;
   selectedPetTypes?: ('dogs' | 'cats')[];
   selectedBreeds?: string[];
   profileImage?: string;
@@ -37,6 +41,10 @@ class AuthService {
       email,
       name: email.split('@')[0],
       userRole: 'Pet Owner',
+      role: 'pet_owner',
+      phone: '+1234567890',
+      email_verified: false,
+      phone_verified: false,
       selectedPetTypes: ['dogs', 'cats'],
       selectedBreeds: ['Golden Retriever', 'Persian'],
     };
@@ -62,6 +70,10 @@ class AuthService {
       email: userData.email,
       name: userData.name,
       userRole: userData.userRole,
+      role: userData.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
+      phone: '',
+      email_verified: false,
+      phone_verified: false,
       selectedPetTypes: userData.selectedPetTypes,
       selectedBreeds: userData.selectedBreeds,
     };

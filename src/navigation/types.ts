@@ -1,28 +1,40 @@
 export type RootStackParamList = {
-  SplashScreen: undefined;
-  Walkthrough: undefined; // Or specifically WalkthroughScreen1 for the first one
-  WalkthroughScreen1: undefined;
-  WalkthroughScreen2: undefined;
-  WalkthroughScreen3: undefined;
-  WelcomeScreen: undefined;
-  LoginScreen: undefined;
-  RegisterScreen: undefined;
-  SignUpScreen1_UserRole: undefined;
-  SignUpScreen2_PetType: { userRole: 'Pet Owner' | 'Pet Sitter' };
-  SignUpScreen3_BreedPreferences: { userRole: 'Pet Owner' | 'Pet Sitter'; selectedPetTypes: ('dogs' | 'cats')[] };
-  SignUpScreen4_FinalSteps: { userRole: 'Pet Owner' | 'Pet Sitter'; selectedPetTypes: ('dogs' | 'cats')[]; selectedBreeds: string[] };
-  // Dashboard screens
-  PetOwnerDashboard: undefined;
-  PetSitterDashboard: undefined;
-  // Map screen
-  FindSitterMapScreen: undefined;
-  // Verification screen
-  VerificationScreen: undefined;
-  // Admin screens
-  AdminLogin: undefined;
-  AdminTabs: undefined;
-  // Add other app screens here as we create them
-  AppTabs: undefined;
+  // Auth screens
+  'Login': undefined;
+  'Register': undefined;
+  'UserRoleSelection': undefined;
+  'SignUp1_UserRole': undefined;
+  'SignUp2_PetType': undefined;
+  'SignUp3_BreedPreferences': undefined;
+  'SignUp4_FinalSteps': undefined;
+  'PhoneVerification': { userData: any };
+  'FrontID': { userData: any; phoneVerified: boolean };
+  'BackID': { userData: any; phoneVerified: boolean; frontImage: string };
+  'Selfie': { userData: any; phoneVerified: boolean; frontImage: string; backImage: string };
+  
+  // Main app screens
+  'Home': undefined;
+  'Profile': undefined;
+  'PetOwnerDashboard': undefined;
+  'PetSitterDashboard': undefined;
+  'PetOwnerJobs': undefined;
+  'PetSitterRequests': undefined;
+  'PetSitterSchedule': undefined;
+  'PetSitterAvailability': undefined;
+  'PetOwnerMessages': undefined;
+  'PetSitterMessages': undefined;
+  'PetOwnerNotifications': undefined;
+  'PetSitterNotifications': undefined;
+  'PetOwnerProfile': undefined;
+  'PetSitterProfile': undefined;
+  'Jobs': undefined;
+  'Requests': undefined;
+  'Moments': undefined;
+  'EWallet': undefined;
+  'Payment': undefined;
+  'MyPets': undefined;
+  'FindSitterMap': undefined;
+  'Verification': undefined;
 };
 
 export type AppStackParamList = {

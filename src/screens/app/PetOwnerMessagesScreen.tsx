@@ -9,7 +9,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 interface Message {
@@ -28,6 +28,13 @@ interface ChatMessage {
   text: string;
   time: string;
   isFromMe: boolean;
+}
+
+interface SupportMessage {
+  id: string;
+  text: string;
+  time: string;
+  isFromAdmin: boolean;
 }
 
 const PetOwnerMessagesScreen = () => {
@@ -76,6 +83,9 @@ const PetOwnerMessagesScreen = () => {
   ]);
 
   const [selectedChat, setSelectedChat] = useState<Message | null>(null);
+  const [showSupportChat, setShowSupportChat] = useState(false);
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
+  const [supportTicketId, setSupportTicketId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -141,6 +151,69 @@ const PetOwnerMessagesScreen = () => {
     }
   };
 
+  const handleSupportChat = async () => {
+    setShowSupportChat(true);
+    // Initialize support chat if first time
+    if (!supportTicketId) {
+      try {
+        // In a real implementation, this would use the support service
+        // const chatSession = await supportService.startSupportChat();
+        // setSupportTicketId(chatSession.ticket.id);
+        // setSupportMessages(chatSession.messages);
+        
+        // For now, use mock data
+        setSupportTicketId('support-' + Date.now());
+        setSupportMessages([
+          {
+            id: '1',
+            text: 'Hello! How can we help you today?',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isFromAdmin: true,
+          }
+        ]);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to start support chat. Please try again.');
+        setShowSupportChat(false);
+      }
+    }
+  };
+
+  const handleSendSupportMessage = async () => {
+    if (newMessage.trim() && supportTicketId) {
+      try {
+        // In a real implementation, this would send the message via API
+        // await supportService.sendMessage(supportTicketId, newMessage);
+        
+        // For now, add the message locally
+        const message: SupportMessage = {
+          id: Date.now().toString(),
+          text: newMessage,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isFromAdmin: false,
+        };
+        setSupportMessages(prev => [...prev, message]);
+        setNewMessage('');
+        
+        // Simulate admin response after 2 seconds
+        setTimeout(() => {
+          const adminResponse: SupportMessage = {
+            id: (Date.now() + 1).toString(),
+            text: 'Thank you for reaching out. An admin will respond to you shortly. In the meantime, is there anything specific I can help you with?',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isFromAdmin: true,
+          };
+          setSupportMessages(prev => [...prev, adminResponse]);
+        }, 2000);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to send message. Please try again.');
+      }
+    }
+  };
+
+  const handleBackFromSupport = () => {
+    setShowSupportChat(false);
+  };
+
   const renderMessageItem = ({ item }: { item: Message }) => (
     <TouchableOpacity 
       style={styles.messageItem} 
@@ -188,6 +261,26 @@ const PetOwnerMessagesScreen = () => {
       <Text style={[
         styles.messageTime,
         item.isFromMe ? styles.myMessageTime : styles.theirMessageTime
+      ]}>
+        {item.time}
+      </Text>
+    </View>
+  );
+
+  const renderSupportMessage = ({ item }: { item: SupportMessage }) => (
+    <View style={[
+      styles.chatMessage,
+      item.isFromAdmin ? styles.theirMessage : styles.myMessage
+    ]}>
+      <Text style={[
+        styles.messageText,
+        item.isFromAdmin ? styles.theirMessageText : styles.myMessageText
+      ]}>
+        {item.text}
+      </Text>
+      <Text style={[
+        styles.messageTime,
+        item.isFromAdmin ? styles.theirMessageTime : styles.myMessageTime
       ]}>
         {item.time}
       </Text>
@@ -252,6 +345,61 @@ const PetOwnerMessagesScreen = () => {
     );
   }
 
+  // Support Chat Interface
+  if (showSupportChat) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {/* Support Chat Header */}
+        <View style={styles.chatHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackFromSupport}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          
+          <View style={styles.chatHeaderInfo}>
+            <View style={styles.supportAvatar}>
+              <Ionicons name="headset" size={20} color="#fff" />
+            </View>
+            <View style={styles.chatHeaderText}>
+              <Text style={styles.chatHeaderName}>Support Team</Text>
+              <Text style={styles.chatHeaderStatus}>We're here to help</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Support Messages */}
+        <FlatList
+          data={supportMessages}
+          renderItem={renderSupportMessage}
+          keyExtractor={(item) => item.id}
+          style={styles.chatContainer}
+          contentContainerStyle={styles.chatContent}
+        />
+
+        {/* Support Message Input */}
+        <View style={styles.messageInput}>
+          <TextInput
+            style={styles.input}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            placeholder="Type your message to support..."
+            multiline
+          />
+          <TouchableOpacity 
+            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
+            onPress={handleSendSupportMessage}
+            disabled={!newMessage.trim()}
+          >
+            <Ionicons 
+              name="send" 
+              size={20} 
+              color={newMessage.trim() ? '#fff' : '#ccc'} 
+            />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -260,9 +408,15 @@ const PetOwnerMessagesScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={24} color="#333" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.supportButton} onPress={handleSupportChat}>
+            <Ionicons name="headset" size={20} color="#4A90E2" />
+            <Text style={styles.supportButtonText}>Support</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.searchButton}>
+            <Ionicons name="search" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Messages List */}
@@ -298,6 +452,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  supportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f7ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  supportButtonText: {
+    color: '#4A90E2',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  supportAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4A90E2',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backButton: {
     padding: 5,
