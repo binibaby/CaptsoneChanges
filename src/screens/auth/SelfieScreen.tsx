@@ -94,50 +94,66 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
 
     setIsSubmitting(true);
     try {
-      // Create form data with all images and user data
-      const formData = new FormData();
-      
-      // Add user data from step 4
-      formData.append('first_name', userData.firstName);
-      formData.append('last_name', userData.lastName);
-      formData.append('email', userData.email);
-      formData.append('phone', userData.phone);
-      formData.append('age', userData.age || '');
-      formData.append('gender', userData.gender || '');
-      formData.append('address', userData.address || '');
-      
-      // Add images
-      const frontFilename = frontImage.split('/').pop() || 'front.jpg';
-      const backFilename = backImage.split('/').pop() || 'back.jpg';
-      const selfieFilename = selfieImage.split('/').pop() || 'selfie.jpg';
-      
-      formData.append('front_image', {
-        uri: frontImage,
-        name: frontFilename,
-        type: 'image/jpeg',
-      } as any);
-      
-      formData.append('back_image', {
-        uri: backImage,
-        name: backFilename,
-        type: 'image/jpeg',
-      } as any);
-      
-      formData.append('selfie_image', {
-        uri: selfieImage,
-        name: selfieFilename,
-        type: 'image/jpeg',
-      } as any);
+      // Convert images to base64 for JSON submission
+      const convertImageToBase64 = async (uri: string): Promise<string> => {
+        try {
+          const response = await fetch(uri);
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.error('Error converting image to base64:', error);
+          return '';
+        }
+      };
 
-      const response = await fetch('http://192.168.100.145:8001/api/verification/submit-simple', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        body: formData,
+      // Convert all images to base64
+      const frontImageBase64 = await convertImageToBase64(frontImage);
+      const backImageBase64 = await convertImageToBase64(backImage);
+      const selfieImageBase64 = await convertImageToBase64(selfieImage);
+
+      // Prepare JSON payload
+      const payload = {
+        document_type: 'ph_national_id', // Default to Philippine National ID
+        document_number: 'N/A', // Not provided in current flow
+        document_image: frontImageBase64, // Use front image as primary document
+        first_name: userData.firstName,
+        last_name: userData.lastName,
+        email: userData.email,
+        phone: userData.phone,
+        age: userData.age || '',
+        gender: userData.gender || '',
+        address: userData.address || '',
+        back_image: backImageBase64,
+        selfie_image: selfieImageBase64,
+      };
+
+      console.log('Submitting verification with payload:', {
+        document_type: payload.document_type,
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+        phone: payload.phone,
+        has_front_image: !!payload.document_image,
+        has_back_image: !!payload.back_image,
+        has_selfie_image: !!payload.selfie_image,
       });
 
+      const response = await fetch('http://192.168.100.145:8000/api/verification/submit-simple', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
       
       if (data.success) {
         Alert.alert(
@@ -167,6 +183,7 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
         Alert.alert('Verification Failed', data.message || 'Verification failed. Please try again.');
       }
     } catch (error) {
+      console.error('Verification submission error:', error);
       Alert.alert('Error', 'Failed to submit verification. Please try again.');
     } finally {
       setIsSubmitting(false);

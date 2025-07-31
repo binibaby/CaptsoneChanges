@@ -57,7 +57,7 @@ const EWalletScreen: React.FC = () => {
     setLoading(true);
     try {
       const token = await getAuthToken();
-              const response = await fetch('http://192.168.100.145:8001/api/wallet/balance', {
+              const response = await fetch('http://192.168.100.145:8000/api/wallet/balance', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -71,7 +71,7 @@ const EWalletScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to load balance.');
       }
 
-              const responseEarnings = await fetch('http://192.168.100.145:8001/api/wallet/pending_earnings', {
+              const responseEarnings = await fetch('http://192.168.100.145:8000/api/wallet/pending_earnings', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -85,7 +85,7 @@ const EWalletScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to load pending earnings.');
       }
 
-              const responseTransactions = await fetch('http://192.168.100.145:8001/api/wallet/transactions', {
+              const responseTransactions = await fetch('http://192.168.100.145:8000/api/wallet/transactions', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -133,7 +133,7 @@ const EWalletScreen: React.FC = () => {
 
     try {
       const token = await getAuthToken();
-              const response = await fetch('http://192.168.100.145:8001/api/wallet/cashout', {
+              const response = await fetch('http://192.168.100.145:8000/api/wallet/cashout', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

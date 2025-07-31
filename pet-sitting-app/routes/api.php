@@ -24,6 +24,17 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+// Test endpoint for connectivity
+Route::get('/test', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'API is running',
+        'timestamp' => now()->format('Y-m-d H:i:s'),
+        'server' => 'Laravel API Server',
+        'version' => '1.0.0'
+    ]);
+});
+
     // Auth routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);

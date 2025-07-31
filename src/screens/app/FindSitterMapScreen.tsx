@@ -3,53 +3,15 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     Image,
+    Platform,
     SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
-import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
-const PET_SITTERS = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    latlng: { latitude: 37.78825, longitude: -122.4324 },
-    avatar: require('../../assets/images/default-avatar.png'),
-    rate: 25,
-    badges: [
-      { icon: 'checkmark-circle', color: '#4CAF50', label: 'Verified' },
-      { icon: 'star', color: '#FFD700', label: '4.9' },
-    ],
-    distance: '0.5 miles',
-  },
-  {
-    id: '2',
-    name: 'Mike Chen',
-    latlng: { latitude: 37.78925, longitude: -122.4344 },
-    avatar: require('../../assets/images/default-avatar.png'),
-    rate: 30,
-    badges: [
-      { icon: 'paw', color: '#FF9800', label: 'Dog Expert' },
-      { icon: 'star', color: '#FFD700', label: '4.7' },
-    ],
-    distance: '1.2 miles',
-  },
-  {
-    id: '3',
-    name: 'Emma Davis',
-    latlng: { latitude: 37.78725, longitude: -122.4314 },
-    avatar: require('../../assets/images/default-avatar.png'),
-    rate: 28,
-    badges: [
-      { icon: 'checkmark-circle', color: '#4CAF50', label: 'Verified' },
-      { icon: 'star', color: '#FFD700', label: '5.0' },
-    ],
-    distance: '0.8 miles',
-  },
-];
-
+// Web-only version - no react-native-maps imports
 const FindSitterMapScreen = () => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const router = useRouter();
@@ -83,55 +45,13 @@ const FindSitterMapScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Map View */}
+      {/* Map View - Web Only */}
       <View style={styles.mapContainer}>
-        <MapView
-          provider={PROVIDER_GOOGLE}
-          style={StyleSheet.absoluteFill}
-          initialRegion={{
-            latitude: 37.78825,
-            longitude: -122.4324,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-        >
-          {filteredSitters.map((sitter) => (
-            <Marker
-              key={sitter.id}
-              coordinate={sitter.latlng}
-              title={sitter.name}
-              description={`$${sitter.rate}/hr`}
-            >
-              <View style={{ alignItems: 'center' }}>
-                <Image source={sitter.avatar} style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: '#fff' }} />
-                <Text style={{ backgroundColor: '#fff', paddingHorizontal: 6, borderRadius: 8, fontSize: 12, marginTop: 2 }}>
-                  ${sitter.rate}/hr
-                </Text>
-              </View>
-              <Callout tooltip>
-                <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, alignItems: 'center', minWidth: 160, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 }}>
-                  <Image source={sitter.avatar} style={{ width: 48, height: 48, borderRadius: 24, marginBottom: 6 }} />
-                  <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#222' }}>{sitter.name}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-                    {sitter.badges.map((badge, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
-                        <Ionicons name={badge.icon as any} size={14} color={badge.color} />
-                        <Text style={{ fontSize: 13, color: '#666', marginLeft: 2 }}>{badge.label}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  <Text style={{ color: '#10B981', fontWeight: 'bold', fontSize: 15 }}>${sitter.rate}/hr</Text>
-                  <TouchableOpacity
-                    style={{ marginTop: 8, backgroundColor: '#F59E0B', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 }}
-                    onPress={() => handleSitterPress(sitter.id)}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>View Profile</Text>
-                  </TouchableOpacity>
-                </View>
-              </Callout>
-            </Marker>
-          ))}
-        </MapView>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ fontSize: 18, color: '#666' }}>🗺️ Interactive Map</Text>
+          <Text style={{ fontSize: 14, color: '#999', marginTop: 8 }}>Available on mobile devices</Text>
+          <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>Tap on sitters below to view profiles</Text>
+        </View>
       </View>
 
       {/* Filter Tabs */}
@@ -198,6 +118,45 @@ const FindSitterMapScreen = () => {
     </SafeAreaView>
   );
 };
+
+const PET_SITTERS = [
+  {
+    id: '1',
+    name: 'Sarah Johnson',
+    latlng: { latitude: 37.78825, longitude: -122.4324 },
+    avatar: require('../../assets/images/default-avatar.png'),
+    rate: 25,
+    badges: [
+      { icon: 'checkmark-circle', color: '#4CAF50', label: 'Verified' },
+      { icon: 'star', color: '#FFD700', label: '4.9' },
+    ],
+    distance: '0.5 miles',
+  },
+  {
+    id: '2',
+    name: 'Mike Chen',
+    latlng: { latitude: 37.78925, longitude: -122.4344 },
+    avatar: require('../../assets/images/default-avatar.png'),
+    rate: 30,
+    badges: [
+      { icon: 'paw', color: '#FF9800', label: 'Dog Expert' },
+      { icon: 'star', color: '#FFD700', label: '4.7' },
+    ],
+    distance: '1.2 miles',
+  },
+  {
+    id: '3',
+    name: 'Emma Davis',
+    latlng: { latitude: 37.78725, longitude: -122.4314 },
+    avatar: require('../../assets/images/default-avatar.png'),
+    rate: 28,
+    badges: [
+      { icon: 'checkmark-circle', color: '#4CAF50', label: 'Verified' },
+      { icon: 'star', color: '#FFD700', label: '5.0' },
+    ],
+    distance: '0.8 miles',
+  },
+];
 
 const styles = StyleSheet.create({
   container: {

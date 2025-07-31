@@ -54,7 +54,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       console.log('LOG PhoneVerificationScreen - Sending code to:', phoneNumber);
       
       // Test connectivity first
-      const testResponse = await fetch('http://192.168.100.145:8001/api/test', {
+      const testResponse = await fetch('http://192.168.100.145:8000/api/test', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -62,11 +62,14 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       });
       console.log('Test response status:', testResponse.status);
 
-      const response = await fetch('http://192.168.100.145:8001/api/send-verification-code', {
+      const response = await fetch('http://192.168.100.145:8000/api/send-verification-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        mode: 'cors',
+        credentials: 'omit',
         body: JSON.stringify({
           phone: phoneNumber,
         }),
@@ -100,11 +103,14 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     try {
       console.log('LOG PhoneVerificationScreen - Verifying code:', verificationCode);
       
-      const response = await fetch('http://192.168.100.145:8001/api/verify-phone-code', {
+      const response = await fetch('http://192.168.100.145:8000/api/verify-phone-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        mode: 'cors',
+        credentials: 'omit',
         body: JSON.stringify({
           phone: phoneNumber,
           code: verificationCode,

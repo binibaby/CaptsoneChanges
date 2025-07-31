@@ -342,7 +342,7 @@ class VerificationService {
   }> {
     try {
       // In a real implementation, this would call your backend API
-      const response = await fetch('/api/verification/status', {
+      const response = await fetch('http://192.168.100.145:8000/api/verification/status', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -378,24 +378,18 @@ class VerificationService {
     message: string;
   }> {
     try {
-      const formData = new FormData();
-      formData.append('document_type', verificationData.document_type);
-      if (verificationData.document_number) {
-        formData.append('document_number', verificationData.document_number);
-      }
-      // Handle image upload
-      if (verificationData.document_image) {
-        const response = await fetch(verificationData.document_image);
-        const blob = await response.blob();
-        formData.append('document_image', blob, 'verification.jpg');
-      }
-
-      const response = await fetch('/api/verification/submit', {
+      // Send as JSON instead of FormData
+      const response = await fetch('http://192.168.100.145:8000/api/verification/submit-simple', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify({
+          document_type: verificationData.document_type,
+          document_number: verificationData.document_number || '',
+          document_image: verificationData.document_image, // Send as base64 or URL
+        }),
       });
 
       if (!response.ok) {

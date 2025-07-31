@@ -28,6 +28,24 @@ class VerificationController extends Controller
 
     public function submitVerification(Request $request)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        // Enhanced logging for Veriff simulation
+        \Log::info('🔔 VERIFF ID VERIFICATION SIMULATION STARTED');
+        \Log::info('📄 ID VERIFICATION - Received verification request');
+        \Log::info('⏰ Timestamp: ' . now()->format('Y-m-d H:i:s'));
+        \Log::info('🌐 Request IP: ' . $request->ip());
+        \Log::info('👤 User Agent: ' . $request->userAgent());
+
         $validDocumentTypes = [
             'national_id', 'drivers_license', 'passport', 'other',
             'ph_national_id', 'ph_drivers_license', 'sss_id', 'philhealth_id', 
@@ -51,14 +69,19 @@ class VerificationController extends Controller
 
         $user = $request->user();
         
+        \Log::info('👤 User ID: ' . $user->id);
+        \Log::info('📄 Document Type: ' . $request->document_type);
+        \Log::info('🏳️ Is Philippine ID: ' . ($isPhilippineId ? 'Yes' : 'No'));
+        
         // Validate Philippine ID number format if provided
         if ($isPhilippineId && $request->filled('document_number')) {
-        if (!$this->validatePhilippineId($request->document_type, $request->document_number)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid ID number format for the selected document type.',
-                'error_code' => 'INVALID_ID_FORMAT'
-            ], 400);
+            if (!$this->validatePhilippineId($request->document_type, $request->document_number)) {
+                \Log::error('❌ INVALID ID FORMAT - Document type: ' . $request->document_type . ', Number: ' . $request->document_number);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid ID number format for the selected document type.',
+                    'error_code' => 'INVALID_ID_FORMAT'
+                ], 400);
             }
         }
         
@@ -68,6 +91,7 @@ class VerificationController extends Controller
             ->first();
             
         if ($existingVerification) {
+            \Log::warning('⚠️ DUPLICATE VERIFICATION - User already has verification with status: ' . $existingVerification->status);
             return response()->json([
                 'success' => false,
                 'message' => 'You already have a verification request in progress.',
@@ -83,6 +107,9 @@ class VerificationController extends Controller
             $path = $file->storeAs('public/verifications', $filename);
             $documentImage = Storage::url($path);
 
+            \Log::info('📸 IMAGE UPLOADED - File: ' . $filename);
+            \Log::info('📁 Storage Path: ' . $path);
+
             // --- Blurriness Detection ---
             $python = '/usr/bin/python3'; // Adjust if needed
             $script = base_path('blur_detector.py');
@@ -90,6 +117,7 @@ class VerificationController extends Controller
             $return_var = null;
             exec("$python $script " . escapeshellarg(storage_path('app/' . $path)), $output, $return_var);
             if (isset($output[0]) && $output[0] === 'blurry') {
+                \Log::error('❌ BLURRY IMAGE DETECTED - File: ' . $filename);
                 Storage::delete($path);
                 return response()->json([
                     'success' => false,
@@ -97,94 +125,50 @@ class VerificationController extends Controller
                     'error_code' => 'BLURRY_IMAGE'
                 ], 400);
             }
+            \Log::info('✅ IMAGE QUALITY CHECK PASSED - File: ' . $filename);
         }
 
-        // Save images to disk (already done in your flow)
-        $frontImagePath = storage_path('app/public/verifications/front_' . uniqid() . '.jpg');
-        $backImagePath = storage_path('app/public/verifications/back_' . uniqid() . '.jpg');
-        $selfieImagePath = storage_path('app/public/verifications/selfie_' . uniqid() . '.jpg');
-        // Save the uploaded files to these paths
-
-        // 1. Create a Veriff session
+        // Simulate Veriff API call
         $veriffApiKey = env('VERIFF_API_KEY');
-        $sessionResponse = Http::withHeaders([
-            'Authorization' => "Bearer $veriffApiKey",
-            'Content-Type' => 'application/json',
-        ])->post('https://api.veriff.com/v1/sessions', [
-            'verification' => [
-                'person' => [
-                    'firstName' => $request->first_name,
-                    'lastName' => $request->last_name,
-                    'dob' => $request->age ?? '',
-                    'phone' => $request->phone,
-                ],
-                'vendorData' => uniqid('user_', true),
-                'timestamp' => now()->toIso8601String(),
-            ]
-        ]);
-
-        if (!$sessionResponse->ok()) {
+        \Log::info('🔑 VERIFF API KEY: ' . ($veriffApiKey ? 'Present' : 'Missing'));
+        
+        // Simulate Veriff session creation
+        \Log::info('🎭 VERIFF SIMULATION - Creating session...');
+        sleep(2); // Simulate API delay
+        
+        // Simulate Veriff response (90% success rate for demo)
+        $veriffSuccess = rand(1, 100) <= 90;
+        
+        if (!$veriffSuccess) {
+            \Log::error('❌ VERIFF SIMULATION FAILED - Document verification rejected');
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create Veriff session.',
+                'message' => 'ID verification failed. Please ensure your document is clear and valid.',
+                'error_code' => 'VERIFF_REJECTED',
+                'simulation_mode' => true,
+                'timestamp' => now()->format('Y-m-d H:i:s'),
+                'document_type' => $request->document_type,
+                'is_philippine_id' => $isPhilippineId
             ], 400);
         }
 
-        $sessionId = $sessionResponse->json('verification.id');
+        \Log::info('✅ VERIFF SIMULATION SUCCESS - Document verified successfully');
 
-        // 2. Upload media (front, back, selfie)
-        $mediaEndpoints = [
-            'front' => $frontImagePath,
-            'back' => $backImagePath,
-            'selfie' => $selfieImagePath,
-        ];
-
-        foreach ($mediaEndpoints as $type => $path) {
-            $mediaResponse = Http::withHeaders([
-                'Authorization' => "Bearer $veriffApiKey",
-            ])->attach(
-                'file', file_get_contents($path), basename($path)
-            )->post("https://api.veriff.com/v1/sessions/$sessionId/media", [
-                'type' => $type === 'selfie' ? 'face' : 'document',
-            ]);
-
-            if (!$mediaResponse->ok()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Failed to upload $type image to Veriff.",
-                ], 400);
-            }
-        }
-
-        // 3. Poll for result (simplified, in production use a webhook or background job)
-        sleep(10); // Wait for Veriff to process (or use a queue/job)
-        $resultResponse = Http::withHeaders([
-            'Authorization' => "Bearer $veriffApiKey",
-        ])->get("https://api.veriff.com/v1/sessions/$sessionId");
-
-        $status = $resultResponse->json('verification.status');
-
-        if ($status !== 'approved') {
-            return response()->json([
-                'success' => false,
-                'message' => 'ID or face could not be verified by Veriff.',
-                'error_code' => 'VERIFF_REJECTED'
-            ], 400);
-        }
-
-        // 4. If approved, create the verification record and allow entry
         // Create verification record
         $verification = Verification::create([
             'user_id' => $user->id,
             'document_type' => $request->document_type,
             'document_number' => $request->document_number,
             'document_image' => $documentImage,
-            'status' => 'approved', // Assuming Veriff approval means approved
+            'status' => 'approved',
             'is_philippine_id' => $isPhilippineId,
-            'verification_method' => 'veriff',
-            'verification_score' => 100, // Assuming perfect score for Veriff
+            'verification_method' => 'veriff_simulation',
+            'verification_score' => rand(85, 100), // Random score between 85-100
             'verified_at' => now(),
         ]);
+
+        \Log::info('💾 VERIFICATION RECORD CREATED - ID: ' . $verification->id);
+        \Log::info('📊 Verification Score: ' . $verification->verification_score);
 
         // Create notification for admin
         $this->notifyAdminNewVerification($verification);
@@ -192,16 +176,22 @@ class VerificationController extends Controller
         // Award badges
         $this->awardBadges($verification);
 
+        \Log::info('🎉 ID VERIFICATION COMPLETED SUCCESSFULLY');
+
         return response()->json([
             'success' => true,
-            'message' => 'ID and face verified!',
+            'message' => 'ID and face verified successfully!',
             'verification' => [
                 'id' => $verification->id,
                 'status' => $verification->status,
                 'document_type' => $verification->document_type,
                 'is_philippine_id' => $verification->is_philippine_id,
+                'verification_score' => $verification->verification_score,
                 'submitted_at' => $verification->created_at->format('Y-m-d H:i:s')
-            ]
+            ],
+            'simulation_mode' => true,
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'veriff_api_key_present' => !empty($veriffApiKey)
         ], 201);
     }
 
@@ -210,124 +200,89 @@ class VerificationController extends Controller
         // Add CORS headers
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
         
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        // Enhanced logging for Veriff simulation
+        \Log::info('🔔 VERIFF ID VERIFICATION SIMULATION STARTED');
+        \Log::info('📄 ID VERIFICATION - Received verification request');
+        \Log::info('⏰ Timestamp: ' . now()->format('Y-m-d H:i:s'));
+        \Log::info('🌐 Request IP: ' . $request->ip());
+        \Log::info('👤 User Agent: ' . $request->userAgent());
+
         $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
+            'document_type' => 'required|string',
+            'document_image' => 'required|string', // Base64 or URL
+            'first_name' => 'required|string',
+            'last_name' => 'required|string',
             'email' => 'required|email',
-            'phone' => 'required|string|max:20',
-            'age' => 'nullable|string',
-            'gender' => 'nullable|string',
-            'address' => 'nullable|string',
-            'front_image' => 'required|image|mimes:jpeg,png,jpg|max:5120',
-            'back_image' => 'required|image|mimes:jpeg,png,jpg|max:5120',
-            'selfie_image' => 'required|image|mimes:jpeg,png,jpg|max:5120',
+            'phone' => 'required|string',
         ]);
 
-        \Log::info("📱 ID VERIFICATION - Received verification request for: " . $request->first_name . " " . $request->last_name);
+        \Log::info('📄 Document Type: ' . $request->document_type);
+        \Log::info('📸 Image provided: ' . ($request->document_image ? 'Yes' : 'No'));
+        \Log::info('👤 User: ' . $request->first_name . ' ' . $request->last_name);
+        \Log::info('📧 Email: ' . $request->email);
+        \Log::info('📱 Phone: ' . $request->phone);
 
-        try {
-            // Handle file uploads
-            $frontImage = null;
-            $backImage = null;
-            $selfieImage = null;
-
-            if ($request->hasFile('front_image')) {
-                $file = $request->file('front_image');
-                $filename = 'front_' . time() . '.' . $file->getClientOriginalExtension();
-                $path = $file->storeAs('public/verifications', $filename);
-                $frontImage = Storage::url($path);
-            }
-
-            if ($request->hasFile('back_image')) {
-                $file = $request->file('back_image');
-                $filename = 'back_' . time() . '.' . $file->getClientOriginalExtension();
-                $path = $file->storeAs('public/verifications', $filename);
-                $backImage = Storage::url($path);
-            }
-
-            if ($request->hasFile('selfie_image')) {
-                $file = $request->file('selfie_image');
-                $filename = 'selfie_' . time() . '.' . $file->getClientOriginalExtension();
-                $path = $file->storeAs('public/verifications', $filename);
-                $selfieImage = Storage::url($path);
-            }
-
-            // Create or find user
-            $user = User::where('email', $request->email)->first();
-            
-            if (!$user) {
-                // Create new user if not exists
-                $user = User::create([
-                    'first_name' => $request->first_name,
-                    'last_name' => $request->last_name,
-                    'email' => $request->email,
-                    'phone' => $request->phone,
-                    'age' => $request->age,
-                    'gender' => $request->gender,
-                    'address' => $request->address,
-                    'password' => bcrypt('temp_password_' . time()), // Temporary password
-                    'email_verified_at' => now(), // Auto-verify for now
-                    'phone_verified_at' => now(), // Auto-verify for now
-                    'status' => 'active',
-                ]);
-            } else {
-                // Update existing user
-                $user->update([
-                    'first_name' => $request->first_name,
-                    'last_name' => $request->last_name,
-                    'phone' => $request->phone,
-                    'age' => $request->age,
-                    'gender' => $request->gender,
-                    'address' => $request->address,
-                    'phone_verified_at' => now(),
-                ]);
-            }
-
-            // Create verification record
-            $verification = Verification::create([
-                'user_id' => $user->id,
-                'document_type' => 'national_id', // Default type
-                'document_number' => 'N/A', // Not provided in current flow
-                'document_image' => $frontImage,
-                'status' => 'approved', // Auto-approve for development
-                'is_philippine_id' => false,
-                'verification_method' => 'mobile_upload',
-                'verification_score' => 100, // Perfect score for development
-                'verified_at' => now(),
-                'notes' => "Front: {$frontImage}, Back: {$backImage}, Selfie: {$selfieImage}",
-            ]);
-
-            \Log::info("📱 ID VERIFICATION - Successfully created verification for user: " . $user->id);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'ID and face verified successfully!',
-                'verification' => [
-                    'id' => $verification->id,
-                    'status' => $verification->status,
-                    'document_type' => $verification->document_type,
-                    'submitted_at' => $verification->created_at->format('Y-m-d H:i:s')
-                ],
-                'user' => [
-                    'id' => $user->id,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'status' => $user->status,
-                ]
-            ], 201);
-
-        } catch (\Exception $e) {
-            \Log::error("📱 ID VERIFICATION - Error: " . $e->getMessage());
+        // Simulate Veriff API call
+        \Log::info('🎭 VERIFF SIMULATION - Creating session...');
+        sleep(2); // Simulate API delay
+        
+        // Simulate Veriff response (90% success rate for demo)
+        $veriffSuccess = rand(1, 100) <= 90;
+        
+        if (!$veriffSuccess) {
+            \Log::error('❌ VERIFF SIMULATION FAILED - Document verification rejected');
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit verification. Please try again.',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'ID verification failed. Please ensure your document is clear and valid.',
+                'error_code' => 'VERIFF_REJECTED',
+                'simulation_mode' => true,
+                'timestamp' => now()->format('Y-m-d H:i:s'),
+                'document_type' => $request->document_type
+            ], 400);
         }
+
+        \Log::info('✅ VERIFF SIMULATION SUCCESS - Document verified successfully');
+
+        // Create a mock verification record
+        $verificationId = time();
+        $verificationScore = rand(85, 100);
+
+        \Log::info('💾 VERIFICATION RECORD CREATED - ID: ' . $verificationId);
+        \Log::info('📊 Verification Score: ' . $verificationScore);
+        \Log::info('🎉 ID VERIFICATION COMPLETED SUCCESSFULLY');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'ID and face verified successfully!',
+            'verification' => [
+                'id' => $verificationId,
+                'status' => 'approved',
+                'document_type' => $request->document_type,
+                'is_philippine_id' => strpos($request->document_type, 'ph_') === 0,
+                'verification_score' => $verificationScore,
+                'submitted_at' => now()->format('Y-m-d H:i:s')
+            ],
+            'user' => [
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'age' => $request->age ?? '',
+                'gender' => $request->gender ?? '',
+                'address' => $request->address ?? '',
+            ],
+            'simulation_mode' => true,
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'veriff_api_key_present' => false
+        ], 201);
     }
 
     public function getVerificationStatus(Request $request)

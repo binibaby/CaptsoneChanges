@@ -445,14 +445,27 @@ class AuthController extends Controller
         // Add CORS headers
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
         
         $request->validate([
             'phone' => 'required|string|max:20',
         ]);
 
         $phone = $request->phone;
+        $timestamp = now()->format('Y-m-d H:i:s');
+        
+        // Enhanced logging for phone verification simulation
+        \Log::info("🔔 PHONE VERIFICATION SIMULATION STARTED");
         \Log::info("📱 SEND SMS - Received phone verification request for: " . $phone);
+        \Log::info("⏰ Timestamp: " . $timestamp);
+        \Log::info("🌐 Request IP: " . $request->ip());
+        \Log::info("👤 User Agent: " . $request->userAgent());
 
         // Generate a 6-digit verification code
         $verificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -465,22 +478,31 @@ class AuthController extends Controller
         
         \Log::info("📱 SEND SMS - Stored code in cache with key: {$cacheKey}");
         \Log::info("📱 SEND SMS - Generated code: {$verificationCode}");
+        \Log::info("⏳ Cache expiration: 10 minutes from now");
 
         // Format phone number for international SMS
         $formattedPhone = $this->formatPhoneForSMS($phone);
+        \Log::info("📞 Original phone: {$phone}");
+        \Log::info("📞 Formatted phone: {$formattedPhone}");
         
         // Send SMS using MessageBird or simulation
         try {
             $smsResult = $this->sendSMS($formattedPhone, "Your Petsit Connect verification code is: {$verificationCode}");
+            
+            \Log::info("✅ SMS SIMULATION COMPLETED SUCCESSFULLY");
+            \Log::info("📱 SMS Result: " . json_encode($smsResult));
             
             return response()->json([
                 'success' => true,
                 'message' => 'Verification code sent successfully!',
                 'debug_code' => $smsResult['debug_code'] ?? null,
                 'note' => $smsResult['note'] ?? null,
+                'simulation_mode' => true,
+                'timestamp' => $timestamp,
             ]);
         } catch (\Exception $e) {
-            \Log::error("SMS sending failed: " . $e->getMessage());
+            \Log::error("❌ SMS sending failed: " . $e->getMessage());
+            \Log::error("🔧 Stack trace: " . $e->getTraceAsString());
             
             // Fallback for development
             return response()->json([
@@ -488,6 +510,8 @@ class AuthController extends Controller
                 'message' => 'Verification code sent successfully! (Development mode)',
                 'debug_code' => $verificationCode,
                 'note' => 'SMS service unavailable - using development mode',
+                'simulation_mode' => true,
+                'timestamp' => $timestamp,
             ]);
         }
     }
@@ -497,7 +521,13 @@ class AuthController extends Controller
         // Add CORS headers
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
         
         $request->validate([
             'phone' => 'required|string|max:20',
@@ -506,9 +536,15 @@ class AuthController extends Controller
 
         $phone = $request->phone;
         $code = $request->code;
+        $timestamp = now()->format('Y-m-d H:i:s');
         
+        // Enhanced logging for phone verification simulation
+        \Log::info("🔔 PHONE VERIFICATION CODE VERIFICATION STARTED");
         \Log::info("📱 VERIFY SMS - Received verification request for phone: {$phone}");
         \Log::info("📱 VERIFY SMS - Received code: {$code}");
+        \Log::info("⏰ Timestamp: " . $timestamp);
+        \Log::info("🌐 Request IP: " . $request->ip());
+        \Log::info("👤 User Agent: " . $request->userAgent());
 
         // Get the stored verification code using the same cache key format
         $cacheKey = "phone_verification_{$phone}";
@@ -516,26 +552,35 @@ class AuthController extends Controller
         
         \Log::info("📱 VERIFY SMS - Cache key used: {$cacheKey}");
         \Log::info("📱 VERIFY SMS - Stored code found: " . ($storedCode ? $storedCode : 'NULL'));
+        \Log::info("🔍 Code comparison: Expected='{$storedCode}' vs Received='{$code}'");
         
         if (!$storedCode) {
-            \Log::error("📱 VERIFY SMS - No stored code found for phone: {$phone}");
+            \Log::error("❌ VERIFY SMS - No stored code found for phone: {$phone}");
+            \Log::error("🔍 Possible reasons: Code expired, wrong phone number, or cache cleared");
             return response()->json([
                 'success' => false,
                 'message' => 'Verification code expired or not found.',
+                'simulation_mode' => true,
+                'timestamp' => $timestamp,
             ], 400);
         }
 
         if ($storedCode !== $code) {
-            \Log::error("📱 VERIFY SMS - Code mismatch. Expected: {$storedCode}, Received: {$code}");
+            \Log::error("❌ VERIFY SMS - Code mismatch. Expected: {$storedCode}, Received: {$code}");
+            \Log::error("🔍 Verification failed - codes do not match");
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid verification code.',
+                'simulation_mode' => true,
+                'timestamp' => $timestamp,
             ], 400);
         }
 
         // Clear the stored code
         \Cache::forget($cacheKey);
-        \Log::info("📱 VERIFY SMS - Code verified successfully for phone: {$phone}");
+        \Log::info("✅ VERIFY SMS - Code verified successfully for phone: {$phone}");
+        \Log::info("🧹 Cache cleared for key: {$cacheKey}");
+        \Log::info("🎉 PHONE VERIFICATION COMPLETED SUCCESSFULLY");
 
         return response()->json([
             'success' => true,
@@ -574,15 +619,24 @@ class AuthController extends Controller
             $originator = config('services.messagebird.originator');
             
             if (!$accessKey || $accessKey === 'your_access_key_here') {
-                // Fallback to simulation mode
+                // Enhanced simulation mode logging
+                \Log::info("🎭 SMS SIMULATION MODE ACTIVATED");
                 \Log::info("📱 SMS SIMULATION to {$phoneNumber}: {$message}");
                 \Log::info("💡 Add MessageBird credentials to .env file for real SMS");
+                \Log::info("🔧 To enable real SMS, add to .env:");
+                \Log::info("   MESSAGEBIRD_ACCESS_KEY=your_access_key_here");
+                \Log::info("   MESSAGEBIRD_ORIGINATOR=your_originator_here");
+                \Log::info("💰 Add funds to your MessageBird wallet for real SMS");
                 
                 return [
                     'success' => true,
                     'message' => 'Verification code sent successfully! (Simulation mode)',
                     'debug_code' => substr($message, -6),
-                    'note' => 'Add MessageBird credentials to .env for real SMS'
+                    'note' => 'Add MessageBird credentials to .env for real SMS',
+                    'simulation_mode' => true,
+                    'phone_number' => $phoneNumber,
+                    'message_length' => strlen($message),
+                    'timestamp' => now()->format('Y-m-d H:i:s'),
                 ];
             }
             
@@ -599,24 +653,37 @@ class AuthController extends Controller
             $response = $messageBird->messages->create($messageObj);
             
             \Log::info("📱 SMS SENT via MessageBird to {$phoneNumber}: {$message}");
+            \Log::info("📱 MessageBird Response ID: " . $response->getId());
             
             return [
                 'success' => true,
                 'message' => 'Verification code sent successfully!',
-                'message_id' => $response->getId()
+                'message_id' => $response->getId(),
+                'simulation_mode' => false,
+                'phone_number' => $phoneNumber,
+                'message_length' => strlen($message),
+                'timestamp' => now()->format('Y-m-d H:i:s'),
             ];
             
         } catch (\Exception $e) {
-            \Log::error("MessageBird SMS sending failed: " . $e->getMessage());
+            \Log::error("❌ MessageBird SMS sending failed: " . $e->getMessage());
+            \Log::error("🔧 Error details: " . $e->getTraceAsString());
             
-            // Fallback to simulation mode
-            \Log::info("📱 SMS SIMULATION (fallback) to {$phoneNumber}: {$message}");
+            // Enhanced fallback simulation mode
+            \Log::info("🎭 SMS SIMULATION (fallback) to {$phoneNumber}: {$message}");
+            \Log::info("⚠️  MessageBird service unavailable - using simulation mode");
+            \Log::info("🔧 Check MessageBird credentials and wallet balance");
             
             return [
                 'success' => true,
                 'message' => 'Verification code sent successfully! (Fallback mode)',
                 'debug_code' => substr($message, -6),
-                'note' => 'MessageBird failed - using simulation mode'
+                'note' => 'MessageBird failed - using simulation mode',
+                'simulation_mode' => true,
+                'phone_number' => $phoneNumber,
+                'message_length' => strlen($message),
+                'timestamp' => now()->format('Y-m-d H:i:s'),
+                'error' => $e->getMessage(),
             ];
         }
     }
