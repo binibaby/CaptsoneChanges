@@ -24,11 +24,18 @@ class Verification extends Model
         'confidence_level',
         'verification_method',
         'notes',
+        'verification_score',
+        'badges_earned',
+        'is_philippine_id',
+        'extracted_data',
     ];
 
     protected $casts = [
         'verified_at' => 'datetime',
         'allow_resubmission' => 'boolean',
+        'badges_earned' => 'array',
+        'extracted_data' => 'array',
+        'is_philippine_id' => 'boolean',
     ];
 
     public function user()

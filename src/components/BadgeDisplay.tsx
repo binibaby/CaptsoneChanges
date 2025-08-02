@@ -1,103 +1,118 @@
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Badge } from '../services/verificationService';
+import { View, Text, StyleSheet } from 'react-native';
+
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  earned_at: string;
+}
 
 interface BadgeDisplayProps {
   badges: Badge[];
-  maxDisplay?: number;
-  size?: 'small' | 'medium' | 'large';
-  showText?: boolean;
+  showDescription?: boolean;
 }
 
-const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
-  badges,
-  maxDisplay = 3,
-  size = 'medium',
-  showText = false,
-}) => {
-  const displayBadges = badges.slice(0, maxDisplay);
-  const remainingCount = badges.length - maxDisplay;
-
-  const getSizeConfig = () => {
-    switch (size) {
-      case 'small':
-        return { iconSize: 12, containerSize: 20, fontSize: 10 };
-      case 'large':
-        return { iconSize: 20, containerSize: 32, fontSize: 14 };
-      default:
-        return { iconSize: 16, containerSize: 24, fontSize: 12 };
-    }
+const BadgeDisplay: React.FC<BadgeDisplayProps> = ({ badges, showDescription = false }) => {
+  const getIcon = (iconName: string) => {
+    const iconMap: { [key: string]: string } = {
+      'shield-checkmark': '🛡️',
+      'flag': '🇵🇭',
+      'card': '🪪',
+      'car': '🚗',
+      'briefcase': '💼',
+      'heart': '❤️',
+      'calculator': '🧮',
+      'mail': '📮',
+      'checkmark-circle': '✅',
+      'school': '🎓',
+      'airplane': '✈️',
+      'globe': '🌍',
+      'star': '⭐',
+      'cpu': '🤖',
+    };
+    return iconMap[iconName] || '🏆';
   };
 
-  const { iconSize, containerSize, fontSize } = getSizeConfig();
+  const getBadgeStyle = (color: string) => ({
+    backgroundColor: color + '20', // Add transparency
+    borderColor: color,
+    borderWidth: 1,
+  });
 
-  if (badges.length === 0) {
+  if (!badges || badges.length === 0) {
     return null;
   }
 
   return (
     <View style={styles.container}>
-      {displayBadges.map((badge) => (
-        <View
-          key={badge.id}
-          style={[
-            styles.badge,
-            {
-              width: containerSize,
-              height: containerSize,
-              backgroundColor: badge.color,
-            },
-          ]}
-        >
-          <Ionicons name={badge.icon as any} size={iconSize} color="#fff" />
-        </View>
-      ))}
-      
-      {remainingCount > 0 && (
-        <View style={[styles.badge, styles.remainingBadge, { width: containerSize, height: containerSize }]}>
-          <Text style={[styles.remainingText, { fontSize }]}>+{remainingCount}</Text>
-        </View>
-      )}
-      
-      {showText && badges.length > 0 && (
-        <Text style={[styles.badgeText, { fontSize }]}>
-          {badges.length} {badges.length === 1 ? 'badge' : 'badges'}
-        </Text>
-      )}
+      <Text style={styles.title}>Verification Badges</Text>
+      <View style={styles.badgesContainer}>
+        {badges.map((badge, index) => (
+          <View key={badge.id} style={[styles.badge, getBadgeStyle(badge.color)]}>
+            <Text style={styles.badgeIcon}>{getIcon(badge.icon)}</Text>
+            <View style={styles.badgeContent}>
+              <Text style={[styles.badgeName, { color: badge.color }]}>
+                {badge.name}
+              </Text>
+              {showDescription && (
+                <Text style={styles.badgeDescription}>
+                  {badge.description}
+                </Text>
+              )}
+              <Text style={styles.badgeDate}>
+                {new Date(badge.earned_at).toLocaleDateString()}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    marginVertical: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#1F2937',
+  },
+  badgesContainer: {
+    gap: 8,
   },
   badge: {
-    borderRadius: 12,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 4,
   },
-  remainingBadge: {
-    backgroundColor: '#6B7280',
+  badgeIcon: {
+    fontSize: 24,
+    marginRight: 12,
   },
-  remainingText: {
-    color: '#fff',
+  badgeContent: {
+    flex: 1,
+  },
+  badgeName: {
+    fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 2,
   },
-  badgeText: {
-    color: '#666',
-    marginLeft: 4,
+  badgeDescription: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  badgeDate: {
+    fontSize: 10,
+    color: '#9CA3AF',
   },
 });
 

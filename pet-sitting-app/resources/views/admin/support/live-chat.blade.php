@@ -117,6 +117,9 @@
 
 <script>
 let currentChatId = null;
+let lastMessageId = null;
+let messagePollingInterval = null;
+let chatListPollingInterval = null;
 
 function loadChatSession(chatId) {
     currentChatId = chatId;
@@ -134,6 +137,10 @@ function loadChatSession(chatId) {
         .then(response => response.json())
         .then(data => {
             updateChatInterface(data);
+            lastMessageId = data.last_message_id;
+            
+            // Start real-time polling for new messages
+            startMessagePolling();
         })
         .catch(error => {
             console.error('Error loading chat:', error);
@@ -196,6 +203,14 @@ document.getElementById('messageForm').addEventListener('submit', function(e) {
     
     if (!message || !currentChatId) return;
     
+    // Disable input while sending
+    const sendButton = document.getElementById('sendButton');
+    const originalText = sendButton.innerHTML;
+    sendButton.disabled = true;
+    sendButton.innerHTML = `
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+    `;
+    
     // Send message
     fetch(`/admin/support/live-chat/${currentChatId}/message`, {
         method: 'POST',
@@ -209,21 +224,169 @@ document.getElementById('messageForm').addEventListener('submit', function(e) {
     .then(data => {
         if (data.success) {
             messageInput.value = '';
-            // Reload messages
-            loadChatSession(currentChatId);
+            
+            // Add message to chat immediately
+            const newMessage = {
+                id: data.message.id,
+                message: data.message.message,
+                created_at: data.message.created_at,
+                user: data.message.user
+            };
+            
+            appendNewMessages([newMessage]);
+            lastMessageId = data.message.id;
+            
+            // Show success indicator
+            showMessageSentIndicator();
+        } else {
+            showErrorMessage('Failed to send message. Please try again.');
         }
     })
     .catch(error => {
         console.error('Error sending message:', error);
+        showErrorMessage('Network error. Please check your connection.');
+    })
+    .finally(() => {
+        // Re-enable input
+        sendButton.disabled = false;
+        sendButton.innerHTML = originalText;
     });
 });
 
-// Auto-refresh chat sessions every 30 seconds
-setInterval(() => {
-    if (currentChatId) {
-        loadChatSession(currentChatId);
+function showMessageSentIndicator() {
+    const indicator = document.createElement('div');
+    indicator.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg';
+    indicator.textContent = 'Message sent ✓';
+    document.body.appendChild(indicator);
+    
+    setTimeout(() => {
+        indicator.remove();
+    }, 2000);
+}
+
+function showErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg';
+    errorDiv.textContent = message;
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => {
+        errorDiv.remove();
+    }, 3000);
+}
+
+// Real-time message polling
+function startMessagePolling() {
+    if (messagePollingInterval) {
+        clearInterval(messagePollingInterval);
     }
-}, 30000);
+    
+    messagePollingInterval = setInterval(() => {
+        if (currentChatId && lastMessageId) {
+            fetch(`/admin/support/live-chat/${currentChatId}/new-messages?last_message_id=${lastMessageId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.has_new_messages) {
+                        appendNewMessages(data.new_messages);
+                        lastMessageId = data.last_message_id;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling messages:', error);
+                });
+        }
+    }, 3000); // Poll every 3 seconds
+}
+
+function appendNewMessages(newMessages) {
+    const container = document.getElementById('messagesContainer');
+    
+    newMessages.forEach(message => {
+        const messageHtml = `
+            <div class="flex ${message.user.role === 'admin' ? 'justify-end' : 'justify-start'} mb-4">
+                <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.user.role === 'admin' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-900'}">
+                    <div class="flex items-center space-x-2 mb-1">
+                        <span class="text-xs font-medium">${message.user.name}</span>
+                        <span class="text-xs opacity-75">${new Date(message.created_at).toLocaleTimeString()}</span>
+                    </div>
+                    <p class="text-sm">${message.message}</p>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', messageHtml);
+    });
+    
+    container.scrollTop = container.scrollHeight;
+}
+
+// Real-time chat list updates
+function startChatListPolling() {
+    chatListPollingInterval = setInterval(() => {
+        fetch('/admin/support/live-chat/active-chats')
+            .then(response => response.json())
+            .then(data => {
+                updateChatList(data.active_chats);
+                updateActiveChatsBadge(data.total_active, data.total_unread);
+            })
+            .catch(error => {
+                console.error('Error polling chat list:', error);
+            });
+    }, 10000); // Poll every 10 seconds
+}
+
+function updateChatList(activeChats) {
+    const chatListContainer = document.querySelector('.divide-y.divide-gray-200');
+    if (!chatListContainer) return;
+    
+    const chatListHtml = activeChats.map(chat => `
+        <div class="p-4 hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${currentChatId === chat.id ? 'bg-indigo-50' : ''}"
+             onclick="loadChatSession(${chat.id})">
+            <div class="flex items-center space-x-3">
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <span class="text-sm font-medium text-indigo-700">${chat.user.name[0]}</span>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">${chat.user.name}</p>
+                    <p class="text-sm text-gray-500 truncate">${chat.subject}</p>
+                    <p class="text-xs text-gray-400">${new Date(chat.updated_at).toLocaleTimeString()}</p>
+                </div>
+                <div class="flex-shrink-0">
+                    ${chat.unread_count > 0 ? `
+                        <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-red-500 rounded-full">
+                            ${chat.unread_count}
+                        </span>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    chatListContainer.innerHTML = chatListHtml;
+}
+
+function updateActiveChatsBadge(totalActive, totalUnread) {
+    const badge = document.querySelector('.bg-green-100.text-green-800');
+    if (badge) {
+        badge.innerHTML = `
+            <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+            ${totalActive} Active Chats
+            ${totalUnread > 0 ? `(${totalUnread} unread)` : ''}
+        `;
+    }
+}
+
+// Initialize real-time features
+document.addEventListener('DOMContentLoaded', function() {
+    startChatListPolling();
+    
+    // Clean up intervals on page unload
+    window.addEventListener('beforeunload', function() {
+        if (messagePollingInterval) clearInterval(messagePollingInterval);
+        if (chatListPollingInterval) clearInterval(chatListPollingInterval);
+    });
+});
 </script>
 @endsection 
  

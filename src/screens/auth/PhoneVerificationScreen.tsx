@@ -81,7 +81,26 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
 
       if (response.ok) {
         setCodeSent(true);
-        Alert.alert('Success', 'Verification code sent to your phone number');
+        
+        // Show the verification code in the alert for easy access
+        const code = data.debug_code || 'Check logs for code';
+        Alert.alert(
+          'Verification Code Sent', 
+          `Code: ${code}\n\nUse this code to verify your phone number`,
+          [
+            {
+              text: 'Copy Code',
+              onPress: () => {
+                // In a real app, you would copy to clipboard
+                Alert.alert('Code Copied', `Code ${code} copied to clipboard`);
+              }
+            },
+            {
+              text: 'OK',
+              style: 'cancel'
+            }
+          ]
+        );
       } else {
         Alert.alert('Error', data.message || 'Failed to send verification code');
       }

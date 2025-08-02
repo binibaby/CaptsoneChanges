@@ -135,8 +135,9 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             @if($verification->document_image)
-                                <a href="{{ $verification->document_image }}" target="_blank">
-                                    <img src="{{ $verification->document_image }}" alt="ID Image" class="h-12 w-12 object-cover rounded" />
+                                <a href="{{ asset('storage/' . $verification->document_image) }}" target="_blank">
+                                    <img src="{{ asset('storage/' . $verification->document_image) }}" alt="ID Image" class="h-12 w-12 object-cover rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';" />
+                                    <span class="text-gray-400" style="display: none;">Image not found</span>
                                 </a>
                             @else
                                 <span class="text-gray-400">No image</span>
@@ -144,11 +145,22 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             @if($verification->status === 'pending')
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    ⏳ Veriff Processing
+                                </span>
                             @elseif($verification->status === 'approved')
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Approved</span>
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    ✅ Veriff Approved
+                                </span>
                             @else
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Rejected</span>
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                    ❌ Veriff Rejected
+                                </span>
+                            @endif
+                            @if($verification->verification_method)
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ ucfirst($verification->verification_method) }}
+                                </div>
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -157,8 +169,11 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <a href="{{ route('admin.verifications.show', $verification->id) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">View</a>
                             @if($verification->status === 'pending')
-                                <button onclick="approveVerification({{ $verification->id }})" class="text-green-600 hover:text-green-900 mr-3">Approve</button>
-                                <button onclick="rejectVerification({{ $verification->id }})" class="text-red-600 hover:text-red-900">Reject</button>
+                                <span class="text-yellow-600 text-xs">⏳ Veriff Processing</span>
+                            @elseif($verification->status === 'approved')
+                                <span class="text-green-600 text-xs">✅ Veriff Approved</span>
+                            @elseif($verification->status === 'rejected')
+                                <span class="text-red-600 text-xs">❌ Veriff Rejected</span>
                             @endif
                         </td>
                     </tr>
@@ -175,43 +190,24 @@
     </div>
 
 <script>
-function approveVerification(id) {
-    if (confirm('Are you sure you want to approve this verification?')) {
-        fetch(`/admin/verifications/${id}/approve`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Content-Type': 'application/json',
-            }
-        }).then(response => response.json())
+// Auto-refresh verification status every 30 seconds
+setInterval(function() {
+    fetch('/admin/api/verifications/status-updates')
+        .then(response => response.json())
         .then(data => {
-            if (data.success) {
+            if (data.hasUpdates) {
                 location.reload();
-            } else {
-                alert('Failed to approve verification');
             }
-        });
-    }
-}
+        })
+        .catch(error => console.log('Status check failed:', error));
+}, 30000);
 
-function rejectVerification(id) {
-    const reason = prompt('Please provide a reason for rejection:');
-    if (reason) {
-        fetch(`/admin/verifications/${id}/reject`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ reason: reason })
-        }).then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Failed to reject verification');
-            }
-        });
+// Real-time status updates
+function updateVerificationStatus(verificationId, status) {
+    const statusElement = document.querySelector(`[data-verification-id="${verificationId}"]`);
+    if (statusElement) {
+        statusElement.textContent = status === 'approved' ? '✅ Veriff Approved' : '❌ Veriff Rejected';
+        statusElement.className = status === 'approved' ? 'text-green-600 text-xs' : 'text-red-600 text-xs';
     }
 }
 </script>

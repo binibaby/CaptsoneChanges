@@ -43,12 +43,16 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanc
 // Phone verification routes
 Route::post('/send-verification-code', [AuthController::class, 'sendPhoneVerificationCode']);
 Route::post('/verify-phone-code', [AuthController::class, 'verifyPhoneCode']);
+Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationCode'])->middleware('auth:sanctum');
 
 // Verification routes
 Route::prefix('verification')->group(function () {
     Route::get('/status', [VerificationController::class, 'getVerificationStatus'])->middleware('auth:sanctum');
     Route::post('/submit', [VerificationController::class, 'submitVerification'])->middleware('auth:sanctum');
     Route::post('/submit-simple', [VerificationController::class, 'submitVerificationSimple']); // No auth required
+    Route::get('/session-status', [VerificationController::class, 'getVerificationSessionStatus'])->middleware('auth:sanctum');
+    Route::get('/philippine-ids', [VerificationController::class, 'getPhilippineIdTypes']);
+    Route::post('/webhook/veriff', [VerificationController::class, 'handleVeriffWebhook']); // Veriff webhook
 });
 
     // Booking routes

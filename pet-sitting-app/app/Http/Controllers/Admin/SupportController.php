@@ -280,7 +280,104 @@ class SupportController extends Controller
                     'role' => $ticket->user->role
                 ]
             ],
-            'messages' => $messages
+            'messages' => $messages,
+            'last_message_id' => $messages->last() ? $messages->last()['id'] : null,
+            'unread_count' => $ticket->messages()->where('user_id', '!=', auth()->id())->where('is_read', false)->count()
+        ]);
+    }
+
+    /**
+     * Get new messages since last message ID (for real-time updates)
+     */
+    public function getNewMessages(Request $request, SupportTicket $ticket)
+    {
+        $lastMessageId = $request->get('last_message_id', 0);
+        
+        $newMessages = $ticket->messages()
+            ->where('id', '>', $lastMessageId)
+            ->with('user')
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($message) {
+                return [
+                    'id' => $message->id,
+                    'message' => $message->message,
+                    'created_at' => $message->created_at,
+                    'is_read' => $message->is_read,
+                    'user' => [
+                        'id' => $message->user->id,
+                        'name' => $message->user->name,
+                        'role' => $message->user->is_admin ? 'admin' : $message->user->role
+                    ]
+                ];
+            });
+
+        // Mark new messages as read by admin
+        if ($newMessages->isNotEmpty()) {
+            $ticket->messages()
+                ->where('id', '>', $lastMessageId)
+                ->where('user_id', '!=', auth()->id())
+                ->where('is_read', false)
+                ->update(['is_read' => true]);
+        }
+
+        return response()->json([
+            'new_messages' => $newMessages,
+            'has_new_messages' => $newMessages->isNotEmpty(),
+            'last_message_id' => $newMessages->last() ? $newMessages->last()['id'] : $lastMessageId
+        ]);
+    }
+
+    /**
+     * Mark message as read
+     */
+    public function markMessageAsRead(Request $request, SupportTicket $ticket)
+    {
+        $messageId = $request->get('message_id');
+        
+        $message = $ticket->messages()->find($messageId);
+        if ($message && $message->user_id !== auth()->id()) {
+            $message->update(['is_read' => true]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Get active chat sessions with real-time updates
+     */
+    public function getActiveChats()
+    {
+        $activeChats = SupportTicket::whereIn('type', ['live_chat', 'chat'])
+            ->whereIn('status', ['open', 'in_progress'])
+            ->with(['user', 'assignedTo', 'messages' => function($query) {
+                $query->where('is_read', false)->latest();
+            }])
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->map(function ($chat) {
+                return [
+                    'id' => $chat->id,
+                    'subject' => $chat->subject,
+                    'status' => $chat->status,
+                    'updated_at' => $chat->updated_at,
+                    'unread_count' => $chat->messages->where('is_read', false)->count(),
+                    'user' => [
+                        'id' => $chat->user->id,
+                        'name' => $chat->user->name,
+                        'email' => $chat->user->email
+                    ],
+                    'assigned_to' => $chat->assignedTo ? [
+                        'id' => $chat->assignedTo->id,
+                        'name' => $chat->assignedTo->name
+                    ] : null
+                ];
+            });
+
+        return response()->json([
+            'active_chats' => $activeChats,
+            'total_active' => $activeChats->count(),
+            'total_unread' => $activeChats->sum('unread_count')
         ]);
     }
 

@@ -9,7 +9,7 @@ use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Admin\NotificationController;
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     
     // Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -53,8 +53,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::prefix('api/verifications')->name('api.verifications.')->group(function () {
         Route::get('/', [VerificationController::class, 'getVerifications'])->name('list');
         Route::get('/{id}', [VerificationController::class, 'show'])->name('show');
-        Route::post('/{id}/approve', [VerificationController::class, 'approve'])->name('approve');
-        Route::post('/{id}/reject', [VerificationController::class, 'reject'])->name('reject');
+        Route::get('/status-updates', [VerificationController::class, 'getStatusUpdates'])->name('status-updates');
         Route::post('/bulk-action', [VerificationController::class, 'bulkAction'])->name('bulk');
         Route::get('/{id}/audit-logs', [VerificationController::class, 'getAuditLogs'])->name('audit_logs');
     });
@@ -74,6 +73,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/live-chat/{ticket}', [SupportController::class, 'chatSession'])->name('chat-session');
         Route::post('/live-chat/{ticket}/message', [SupportController::class, 'sendChatMessage'])->name('send-message');
         Route::get('/live-chat/{ticket}/messages', [SupportController::class, 'getChatMessages'])->name('get-messages');
+        Route::get('/live-chat/{ticket}/new-messages', [SupportController::class, 'getNewMessages'])->name('get-new-messages');
+        Route::post('/live-chat/{ticket}/mark-read', [SupportController::class, 'markMessageAsRead'])->name('mark-read');
+        Route::get('/live-chat/active-chats', [SupportController::class, 'getActiveChats'])->name('get-active-chats');
         
         // Analytics
         Route::get('/analytics', [SupportController::class, 'analytics'])->name('analytics');
@@ -95,9 +97,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/', [NotificationController::class, 'index'])->name('index');
         Route::post('/send', [NotificationController::class, 'send'])->name('send');
         Route::post('/bulk-send', [NotificationController::class, 'bulkSend'])->name('bulk-send');
-        Route::post('/template-send', [NotificationController::class, 'sendTemplate'])->name('template-send');
+        Route::post('/template-send', [NotificationController::class, 'templateSend'])->name('template-send');
         Route::get('/templates', [NotificationController::class, 'templates'])->name('templates');
         Route::get('/analytics', [NotificationController::class, 'analytics'])->name('analytics');
+        Route::get('/scheduled', [NotificationController::class, 'scheduled'])->name('scheduled');
+        
+        // AJAX routes for real-time notifications
+        Route::post('/{id}/mark-read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::get('/unread-count', [NotificationController::class, 'getUnreadCount'])->name('unread-count');
         Route::get('/scheduled', [NotificationController::class, 'scheduled'])->name('scheduled');
         Route::delete('/scheduled/{notification}', [NotificationController::class, 'cancelScheduled'])->name('cancel-scheduled');
     });

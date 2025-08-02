@@ -70,7 +70,7 @@ const VerificationScreen = () => {
   const [idNumber, setIdNumber] = useState('');
   const [idImage, setIdImage] = useState<string | null>(null);
   
-  const philippineIdTypes = [
+  const [philippineIdTypes, setPhilippineIdTypes] = useState([
     { type: 'ph_national_id', name: 'Philippine National ID', pattern: /^\d{4}-\d{7}-\d{1}$/, placeholder: '1234-5678901-2' },
     { type: 'ph_drivers_license', name: "Philippine Driver's License", pattern: /^[A-Z]\d{2}-\d{2}-\d{6}$/, placeholder: 'A12-34-567890' },
     { type: 'sss_id', name: 'SSS ID', pattern: /^\d{2}-\d{7}-\d{1}$/, placeholder: '12-3456789-0' },
@@ -81,11 +81,31 @@ const VerificationScreen = () => {
     { type: 'prc_id', name: 'PRC ID', pattern: /^\d{7}$/, placeholder: '1234567' },
     { type: 'umid', name: 'UMID', pattern: /^\d{4}-\d{7}-\d{1}$/, placeholder: '1234-5678901-2' },
     { type: 'owwa_id', name: 'OWWA ID', pattern: /^[A-Z]{2}\d{8}$/, placeholder: 'AB12345678' },
-  ];
+  ]);
 
   useEffect(() => {
     loadVerificationData();
+    loadPhilippineIdTypes();
   }, []);
+
+  const loadPhilippineIdTypes = async () => {
+    try {
+      const response = await verificationService.getPhilippineIdTypes();
+      if (response.success) {
+        // Convert the response to match our local format
+        const formattedTypes = response.philippine_ids.map(id => ({
+          type: id.type,
+          name: id.name,
+          pattern: new RegExp(id.pattern),
+          placeholder: id.placeholder
+        }));
+        setPhilippineIdTypes(formattedTypes);
+      }
+    } catch (error) {
+      console.log('Failed to load Philippine ID types, using defaults:', error);
+      // Keep the default types if API fails
+    }
+  };
 
   const loadVerificationData = async () => {
     if (!user) return;
@@ -120,6 +140,33 @@ const VerificationScreen = () => {
           }
           if (response.verification.document_image) {
             setIdImage(response.verification.document_image);
+          }
+
+          // Check if this is a Veriff verification and get session status
+          if (response.verification.status === 'pending') {
+            try {
+              const sessionResponse = await verificationService.getVerificationSessionStatus();
+              if (sessionResponse.success && sessionResponse.session_status) {
+                // Update verification status based on Veriff session
+                const veriffStatus = sessionResponse.session_status.verification?.status;
+                if (veriffStatus === 'approved') {
+                  setVerification(prev => ({
+                    ...prev!,
+                    status: 'approved',
+                    verified_at: new Date().toISOString(),
+                  }));
+                } else if (veriffStatus === 'declined') {
+                  setVerification(prev => ({
+                    ...prev!,
+                    status: 'rejected',
+                    rejection_reason: 'Verification was declined by Veriff',
+                  }));
+                }
+              }
+            } catch (sessionError) {
+              console.log('Session status check failed:', sessionError);
+              // Continue with existing verification status
+            }
           }
         } else {
           // No verification submitted yet
@@ -198,10 +245,50 @@ const VerificationScreen = () => {
 
   const resendCode = async (type: 'email' | 'phone') => {
     try {
-      // In a real app, call the API
-      Alert.alert('Success', `Verification code sent to your ${type}`);
+      // Call the resend verification code API
+      const response = await fetch('http://192.168.100.145:8000/api/resend-verification-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          type: type
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to resend verification code');
+      }
+
+      const data = await response.json();
+      
+      // Show the verification code in the alert for easy access
+      const code = data.debug_code || 'Check logs for code';
+      Alert.alert(
+        'Verification Code Sent', 
+        `Code: ${code}\n\nUse this code to verify your ${type}`,
+        [
+          {
+            text: 'Copy Code',
+            onPress: () => {
+              // In a real app, you would copy to clipboard
+              Alert.alert('Code Copied', `Code ${code} copied to clipboard`);
+            }
+          },
+          {
+            text: 'OK',
+            style: 'cancel'
+          }
+        ]
+      );
+      
+      // Reload verification data to get updated status
+      await loadVerificationData();
     } catch (error) {
-      Alert.alert('Error', 'Failed to send verification code');
+      console.error('Resend code error:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send verification code');
     }
   };
 
@@ -250,11 +337,39 @@ const VerificationScreen = () => {
     }
 
     try {
+      // Show loading state
+      Alert.alert('Submitting Verification', 'Please wait while we process your ID verification...');
+      
       // Call the API to submit verification
-      await verificationService.submitVerification({
+      const response = await verificationService.submitVerification({
         document_type: selectedIdType,
         document_image: idImage,
       });
+      
+      if (response.veriff_enabled && response.verification_url) {
+        // Veriff is enabled - show verification URL
+        Alert.alert(
+          'Verification Session Created',
+          'Please complete your verification by clicking the link below.',
+          [
+            {
+              text: 'Open Verification',
+              onPress: () => {
+                // In a real app, you would open the verification URL
+                // For now, we'll just show a success message
+                Alert.alert('Verification Link', `Verification URL: ${response.verification_url}`);
+              }
+            },
+            {
+              text: 'OK',
+              style: 'cancel'
+            }
+          ]
+        );
+      } else {
+        // Fallback to manual verification
+        Alert.alert('Success', 'ID verification submitted! An admin will review it shortly.');
+      }
       
       // Update local state
       setVerification({
@@ -265,12 +380,12 @@ const VerificationScreen = () => {
       });
       
       setShowIdVerification(false);
-      Alert.alert('Success', 'ID verification submitted! An admin will review it shortly.');
       
       // Reload verification data to get updated status
       await loadVerificationData();
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit verification');
+      console.error('Verification submission error:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to submit verification');
     }
   };
 
@@ -438,6 +553,16 @@ const VerificationScreen = () => {
                   <Text style={styles.verificationDetail}>
                     Reviewed: {new Date(verification.verified_at).toLocaleDateString()}
                   </Text>
+                )}
+
+                {/* Veriff Status Indicator */}
+                {verification.status === 'pending' && (
+                  <View style={styles.veriffStatusContainer}>
+                    <Ionicons name="sync" size={16} color="#F59E0B" />
+                    <Text style={styles.veriffStatusText}>
+                      Veriff verification in progress...
+                    </Text>
+                  </View>
                 )}
 
                 {/* Display ID image if it exists */}
@@ -1001,6 +1126,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f8f8f8',
+  },
+  veriffStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#FFEAA7',
+  },
+  veriffStatusText: {
+    fontSize: 12,
+    color: '#856404',
+    marginLeft: 8,
+    fontWeight: '500',
   },
 });
 

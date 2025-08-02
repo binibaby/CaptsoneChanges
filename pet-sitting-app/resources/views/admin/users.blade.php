@@ -9,9 +9,12 @@
                 <th>ID</th>
                 <th>Name</th>
                 <th>Email</th>
-                <th>ID Status</th>
-                <th>ID Image</th>
+                <th>Phone</th>
+                <th>Age</th>
+                <th>Gender</th>
+                <th>Pet Breeds</th>
                 <th>Role</th>
+                <th>Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -19,19 +22,32 @@
             @foreach($users as $user)
             <tr>
                 <td>{{ $user->id }}</td>
-                <td>{{ $user->name }}</td>
-                <td>{{ $user->email }}</td>
-                <td>{{ $user->id_status }}</td>
                 <td>
-                    @if($user->id_image)
-                        <img src="{{ asset('storage/' . $user->id_image) }}" width="80"/>
+                    @if($user->first_name && $user->last_name)
+                        {{ $user->first_name }} {{ $user->last_name }}
+                    @else
+                        {{ $user->name }}
+                    @endif
+                </td>
+                <td>{{ $user->email }}</td>
+                <td>{{ $user->phone ?? 'N/A' }}</td>
+                <td>{{ $user->age ?? 'N/A' }}</td>
+                <td>{{ $user->gender ? ucfirst($user->gender) : 'N/A' }}</td>
+                <td>
+                    @if($user->pet_breeds && is_array($user->pet_breeds))
+                        {{ implode(', ', $user->pet_breeds) }}
                     @else
                         N/A
                     @endif
                 </td>
-                <td>{{ $user->is_admin ? 'Admin' : 'User' }}</td>
+                <td>{{ ucfirst(str_replace('_', ' ', $user->role)) }}</td>
                 <td>
-                    <!-- Approve/Deny actions can be added here -->
+                    <span class="badge badge-{{ $user->status === 'active' ? 'success' : ($user->status === 'pending' ? 'warning' : 'danger') }}">
+                        {{ ucfirst($user->status) }}
+                    </span>
+                </td>
+                <td>
+                    <a href="{{ route('admin.users.show', $user->id) }}" class="btn btn-sm btn-primary">View</a>
                 </td>
             </tr>
             @endforeach

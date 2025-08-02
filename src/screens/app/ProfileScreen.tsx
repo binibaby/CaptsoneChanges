@@ -83,9 +83,27 @@ const ProfileScreen = () => {
             style={styles.profileImage}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.name || 'User Name'}</Text>
+            <Text style={styles.profileName}>
+              {user?.first_name && user?.last_name 
+                ? `${user.first_name} ${user.last_name}` 
+                : user?.name || 'User Name'
+              }
+            </Text>
             <Text style={styles.profileEmail}>{user?.email || 'user@example.com'}</Text>
             <Text style={styles.profileRole}>{user?.userRole || 'Pet Owner'}</Text>
+            {user?.age && (
+              <Text style={styles.profileDetails}>{user.age} years old</Text>
+            )}
+            {user?.gender && (
+              <Text style={styles.profileDetails}>
+                {user.gender.charAt(0).toUpperCase() + user.gender.slice(1)}
+              </Text>
+            )}
+            {user?.pet_breeds && user.pet_breeds.length > 0 && (
+              <Text style={styles.profileDetails}>
+                Preferred breeds: {user.pet_breeds.join(', ')}
+              </Text>
+            )}
           </View>
           <TouchableOpacity style={styles.editButton}>
             <Ionicons name="pencil" size={20} color="#F59E0B" />
@@ -201,6 +219,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#F59E0B',
     fontWeight: '600',
+  },
+  profileDetails: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
   },
   editButton: {
     padding: 10,

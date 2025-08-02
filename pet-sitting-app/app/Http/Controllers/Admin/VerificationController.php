@@ -69,14 +69,36 @@ class VerificationController extends Controller
     }
 
     /**
+     * Get real-time status updates for verifications
+     */
+    public function getStatusUpdates()
+    {
+        $recentVerifications = Verification::where('updated_at', '>=', now()->subMinutes(5))
+            ->with('user')
+            ->get(['id', 'status', 'updated_at', 'user_id']);
+
+        $hasUpdates = $recentVerifications->isNotEmpty();
+
+        return response()->json([
+            'success' => true,
+            'hasUpdates' => $hasUpdates,
+            'verifications' => $recentVerifications->map(function($v) {
+                return [
+                    'id' => $v->id,
+                    'status' => $v->status,
+                    'user_name' => $v->user->name ?? 'Unknown',
+                    'updated_at' => $v->updated_at->format('Y-m-d H:i:s')
+                ];
+            })
+        ]);
+    }
+
+    /**
      * Get single verification details
      */
     public function show($id)
     {
-        $verification = Verification::with(['user', 'verifiedBy', 'auditLogs.admin'])
-            ->select('*')
-            ->addSelect(DB::raw('TIMESTAMPDIFF(MINUTE, created_at, NOW()) as minutes_ago'))
-            ->find($id);
+        $verification = Verification::with(['user', 'verifiedBy', 'auditLogs.admin'])->find($id);
 
         if (!$verification) {
             return response()->json([
@@ -85,14 +107,17 @@ class VerificationController extends Controller
             ], 404);
         }
 
-        $verification->time_ago = $this->formatTimeAgo($verification->minutes_ago);
-        $verification->is_urgent = $verification->minutes_ago > 60;
-        $verification->is_critical = $verification->minutes_ago > 1440;
+        // Calculate minutes ago using Carbon (works with SQLite)
+        $minutesAgo = $verification->created_at->diffInMinutes(now());
+        $verification->minutes_ago = $minutesAgo;
+        $verification->time_ago = $this->formatTimeAgo($minutesAgo);
+        $verification->is_urgent = $minutesAgo > 60;
+        $verification->is_critical = $minutesAgo > 1440;
 
         // Check if document image exists and is accessible
         if ($verification->document_image) {
-            $verification->document_image_url = Storage::url($verification->document_image);
-            $verification->document_exists = Storage::exists($verification->document_image);
+            $verification->document_image_url = asset('storage/' . $verification->document_image);
+            $verification->document_exists = file_exists(public_path('storage/' . $verification->document_image));
         }
 
         return response()->json([

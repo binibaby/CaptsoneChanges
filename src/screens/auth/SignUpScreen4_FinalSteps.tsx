@@ -26,13 +26,24 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   onComplete, 
   onBack 
 }) => {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | 'other'>('other');
+  const [address, setAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleComplete = async () => {
-    console.log('Step 4 - Phone number entered:', phone);
-    if (!phone) {
-      Alert.alert('Error', 'Please enter your phone number');
+    console.log('Step 4 - Final registration data:', { firstName, lastName, phone, age, gender, address });
+    
+    if (!firstName || !lastName || !phone || !age || !address) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (parseInt(age) < 1 || parseInt(age) > 120) {
+      Alert.alert('Error', 'Please enter a valid age (1-120)');
       return;
     }
 
@@ -40,12 +51,12 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
     try {
       const user = {
         id: '1',
-        firstName: 'Test User', // Default values for testing
-        lastName: 'Test',
+        firstName,
+        lastName,
         phone,
-        age: '25',
-        address: 'Test Address',
-        gender: 'Other',
+        age: parseInt(age),
+        address,
+        gender,
         userRole,
         selectedPetTypes,
         selectedBreeds,
@@ -72,10 +83,32 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
       <Text style={styles.progressText}>4/4</Text>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Phone Verification</Text>
+        <Text style={styles.title}>Complete Your Profile</Text>
         <Text style={styles.description}>
-          Enter your phone number to continue with the verification process.
+          Please provide your personal information to complete your registration.
         </Text>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>First Name *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your first name"
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Last Name *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your last name"
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+          />
+        </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Phone Number *</Text>
@@ -86,6 +119,59 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
             onChangeText={setPhone}
             keyboardType="phone-pad"
             autoCapitalize="none"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Age *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your age"
+            value={age}
+            onChangeText={setAge}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Gender *</Text>
+          <View style={styles.genderContainer}>
+            <TouchableOpacity
+              style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
+              onPress={() => setGender('male')}
+            >
+              <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>
+                Male
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
+              onPress={() => setGender('female')}
+            >
+              <Text style={[styles.genderButtonText, gender === 'female' && styles.genderButtonTextActive]}>
+                Female
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.genderButton, gender === 'other' && styles.genderButtonActive]}
+              onPress={() => setGender('other')}
+            >
+              <Text style={[styles.genderButtonText, gender === 'other' && styles.genderButtonTextActive]}>
+                Other
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Address *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Enter your address"
+            value={address}
+            onChangeText={setAddress}
+            multiline
+            numberOfLines={3}
           />
         </View>
       </ScrollView>
@@ -567,6 +653,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  genderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  genderButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  genderButtonActive: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#F59E0B',
+  },
+  genderButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  genderButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
   },
 });
 

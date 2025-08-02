@@ -20,12 +20,19 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'first_name',
+        'last_name',
         'email',
         'password',
         'role',
         'status',
         'phone',
         'address',
+        'gender',
+        'age',
+        'pet_breeds',
+        'bio',
+        'profile_image',
         'rating',
         'is_admin',
         'admin_role',
@@ -62,6 +69,7 @@ class User extends Authenticatable
         'phone_verified_at' => 'datetime',
         'password' => 'hashed',
         'admin_permissions' => 'array',
+        'pet_breeds' => 'array',
         'approved_at' => 'datetime',
         'last_active_at' => 'datetime',
         'is_admin' => 'boolean',
@@ -71,6 +79,11 @@ class User extends Authenticatable
     public function bookings()
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasManyThrough(Payment::class, Booking::class);
     }
 
     public function notifications()

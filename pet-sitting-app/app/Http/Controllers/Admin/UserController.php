@@ -25,13 +25,19 @@ class UserController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            $query->where('users.status', $request->status);
+        }
+
+        if ($request->filled('verification_status')) {
+            $query->where('verification_status', $request->verification_status);
         }
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%");
             });
@@ -45,11 +51,76 @@ class UserController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $users = $query->withCount(['bookings'])
+        $users = $query->withCount(['bookings', 'verifications'])
+                      ->with(['verifications' => function($q) {
+                          $q->latest()->limit(1);
+                      }])
                       ->orderBy('created_at', 'desc')
                       ->paginate(20);
 
+        // Add verification status to each user
+        $users->getCollection()->transform(function ($user) {
+            $user->verification_badge = $this->getVerificationBadge($user);
+            $user->verification_summary = $this->getVerificationSummary($user);
+            return $user;
+        });
+
         return view('admin.users.index', compact('users'));
+    }
+
+    private function getVerificationBadge($user)
+    {
+        if ($user->id_verified && $user->verification_status === 'verified') {
+            return [
+                'status' => 'verified',
+                'label' => 'Verified',
+                'color' => 'success',
+                'icon' => 'check-circle'
+            ];
+        } elseif ($user->verification_status === 'rejected') {
+            return [
+                'status' => 'rejected',
+                'label' => 'Rejected',
+                'color' => 'danger',
+                'icon' => 'x-circle'
+            ];
+        } elseif ($user->verifications->count() > 0) {
+            return [
+                'status' => 'pending',
+                'label' => 'Pending',
+                'color' => 'warning',
+                'icon' => 'clock'
+            ];
+        } else {
+            return [
+                'status' => 'not_submitted',
+                'label' => 'Not Submitted',
+                'color' => 'secondary',
+                'icon' => 'document'
+            ];
+        }
+    }
+
+    private function getVerificationSummary($user)
+    {
+        $latestVerification = $user->verifications->first();
+        
+        if (!$latestVerification) {
+            return 'No verification submitted';
+        }
+
+        $summary = "Document: " . ucfirst(str_replace('_', ' ', $latestVerification->document_type));
+        
+        if ($latestVerification->status === 'approved') {
+            $summary .= " | Score: {$latestVerification->verification_score}%";
+            $summary .= " | Verified: " . $latestVerification->verified_at->format('M d, Y');
+        } elseif ($latestVerification->status === 'rejected') {
+            $summary .= " | Rejected: " . $latestVerification->rejection_reason;
+        } else {
+            $summary .= " | Status: Pending";
+        }
+
+        return $summary;
     }
 
     public function show(User $user)
@@ -58,10 +129,22 @@ class UserController extends Controller
         
         $stats = [
             'total_bookings' => $user->bookings()->count(),
-            'completed_bookings' => $user->bookings()->where('status', 'completed')->count(),
-            'total_spent' => $user->payments()->where('status', 'completed')->sum('amount'),
+            'completed_bookings' => $user->bookings()->where('bookings.status', 'completed')->count(),
+            'total_spent' => $user->payments()->where('payments.status', 'completed')->sum('amount'),
             'average_rating' => $user->bookings()->avg('rating') ?? 0,
             'verification_status' => $user->verifications()->latest()->first(),
+            'id_verified' => $user->id_verified,
+            'id_verified_at' => $user->id_verified_at,
+            'verification_status' => $user->verification_status,
+            'can_accept_bookings' => $user->can_accept_bookings,
+            'profile_info' => [
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'gender' => $user->gender,
+                'age' => $user->age,
+                'pet_breeds' => $user->pet_breeds,
+                'bio' => $user->bio,
+            ],
         ];
 
         return view('admin.users.show', compact('user', 'stats'));
@@ -137,7 +220,7 @@ class UserController extends Controller
         ]);
 
         // Cancel all active bookings
-        $user->bookings()->where('status', 'active')->update([
+        $user->bookings()->where('bookings.status', 'active')->update([
             'status' => 'cancelled',
             'cancellation_reason' => 'User banned by admin',
         ]);
@@ -233,7 +316,7 @@ class UserController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            $query->where('users.status', $request->status);
         }
 
         if ($request->filled('date_from')) {

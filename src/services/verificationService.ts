@@ -41,6 +41,32 @@ export interface VerificationCriteria {
   responseTime: number; // in hours
 }
 
+export interface VerificationStatus {
+  id: number;
+  status: 'pending' | 'approved' | 'rejected';
+  document_type: string;
+  document_number: string;
+  is_philippine_id: boolean;
+  verification_score?: number;
+  rejection_reason?: string;
+  submitted_at: string;
+  verified_at?: string;
+  badges_earned?: Badge[];
+  veriff_session_id?: string;
+  verification_url?: string;
+  notes?: string;
+  document_image?: string;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  earned_at: string;
+}
+
 class VerificationService {
   private static instance: VerificationService;
   private verifications: Map<string, SitterVerification> = new Map();
@@ -325,18 +351,7 @@ class VerificationService {
   // API method to get verification status from backend
   async getVerificationStatus(): Promise<{
     success: boolean;
-    verification?: {
-      id: string;
-      status: string;
-      document_type: string;
-      document_number?: string;
-      document_image?: string;
-      is_philippine_id: boolean;
-      submitted_at?: string;
-      verified_at?: string;
-      rejection_reason?: string;
-      notes?: string;
-    };
+    verification?: VerificationStatus;
     badges: Badge[];
     message?: string;
   }> {
@@ -376,14 +391,18 @@ class VerificationService {
   }): Promise<{
     success: boolean;
     message: string;
+    verification?: any;
+    veriff_enabled?: boolean;
+    verification_url?: string;
   }> {
     try {
       // Send as JSON instead of FormData
-      const response = await fetch('http://192.168.100.145:8000/api/verification/submit-simple', {
+      const response = await fetch('http://192.168.100.145:8000/api/verification/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           document_type: verificationData.document_type,
@@ -393,13 +412,74 @@ class VerificationService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit verification');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit verification');
       }
 
       const data = await response.json();
       return data;
     } catch (error) {
       console.error('Error submitting verification:', error);
+      throw error;
+    }
+  }
+
+  // API method to get verification session status
+  async getVerificationSessionStatus(): Promise<{
+    success: boolean;
+    session_status?: any;
+    verification?: any;
+    message?: string;
+  }> {
+    try {
+      const response = await fetch('http://192.168.100.145:8000/api/verification/session-status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to get session status');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error getting session status:', error);
+      throw error;
+    }
+  }
+
+  // API method to get Philippine ID types
+  async getPhilippineIdTypes(): Promise<{
+    success: boolean;
+    philippine_ids: Array<{
+      type: string;
+      name: string;
+      description: string;
+      pattern: string;
+      placeholder: string;
+    }>;
+  }> {
+    try {
+      const response = await fetch('http://192.168.100.145:8000/api/verification/philippine-ids', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get Philippine ID types');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error getting Philippine ID types:', error);
       throw error;
     }
   }

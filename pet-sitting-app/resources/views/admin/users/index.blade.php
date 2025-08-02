@@ -7,12 +7,155 @@
             <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
             <p class="mt-2 text-sm text-gray-700">Manage and monitor all users on the platform.</p>
         </div>
+        <div class="flex space-x-3">
+            <a href="{{ route('admin.users.export') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                Export Users
+            </a>
+        </div>
     </div>
 
-    <div class="bg-white shadow rounded-lg">
-        <div class="px-6 py-4">
-            <h3 class="text-lg font-medium text-gray-900">Users List</h3>
-            <p class="mt-1 text-sm text-gray-600">User management features will be available here.</p>
+    <!-- Filters -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Search</label>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Name, email, phone..." class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Role</label>
+                <select name="role" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Roles</option>
+                    <option value="pet_owner" {{ request('role') == 'pet_owner' ? 'selected' : '' }}>Pet Owner</option>
+                    <option value="pet_sitter" {{ request('role') == 'pet_sitter' ? 'selected' : '' }}>Pet Sitter</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Status</label>
+                <select name="status" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Status</option>
+                    <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
+                    <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                    <option value="suspended" {{ request('status') == 'suspended' ? 'selected' : '' }}>Suspended</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Filter</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-white shadow overflow-hidden sm:rounded-md">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role & Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verification</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @forelse($users as $user)
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                                            <span class="text-sm font-medium text-gray-700">
+                                                {{ $user->first_name ? substr($user->first_name, 0, 1) : substr($user->name, 0, 1) }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">
+                                            @if($user->first_name && $user->last_name)
+                                                {{ $user->first_name }} {{ $user->last_name }}
+                                            @else
+                                                {{ $user->name }}
+                                            @endif
+                                        </div>
+                                        <div class="text-sm text-gray-500">{{ $user->email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">{{ $user->phone ?? 'N/A' }}</div>
+                                <div class="text-sm text-gray-500">{{ $user->address ?? 'N/A' }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    @if($user->age)
+                                        {{ $user->age }} years old
+                                    @else
+                                        N/A
+                                    @endif
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    @if($user->gender)
+                                        {{ ucfirst($user->gender) }}
+                                    @else
+                                        N/A
+                                    @endif
+                                </div>
+                                @if($user->pet_breeds && is_array($user->pet_breeds))
+                                <div class="text-xs text-gray-400 mt-1">
+                                    Breeds: {{ implode(', ', $user->pet_breeds) }}
+                                </div>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                        {{ $user->role === 'pet_sitter' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' }}">
+                                        {{ ucfirst(str_replace('_', ' ', $user->role)) }}
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-500 mt-1">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                        {{ $user->status === 'active' ? 'bg-green-100 text-green-800' : 
+                                           ($user->status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
+                                        {{ ucfirst($user->status) }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                @if($user->verification_badge)
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                    {{ $user->verification_badge['color'] === 'success' ? 'bg-green-100 text-green-800' : 
+                                       ($user->verification_badge['color'] === 'warning' ? 'bg-yellow-100 text-yellow-800' : 
+                                       ($user->verification_badge['color'] === 'danger' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')) }}">
+                                    {{ $user->verification_badge['label'] }}
+                                </span>
+                                @else
+                                <span class="text-gray-400">N/A</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a href="{{ route('admin.users.show', $user->id) }}" class="text-indigo-600 hover:text-indigo-900">View Details</a>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                No users found.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            @if($users->hasPages())
+            <div class="px-4 py-3 border-t border-gray-200 sm:px-6">
+                {{ $users->links() }}
+            </div>
+            @endif
         </div>
     </div>
 </div>

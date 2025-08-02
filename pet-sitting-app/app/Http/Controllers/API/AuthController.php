@@ -18,32 +18,42 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'first_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role' => 'required|in:pet_owner,pet_sitter',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
+            'gender' => 'nullable|in:male,female,other',
+            'age' => 'nullable|integer|min:1|max:120',
+            'pet_breeds' => 'nullable|array',
+            'bio' => 'nullable|string|max:1000',
             // ID verification fields (required for pet sitters)
             'id_type' => 'nullable|string',
             'id_number' => 'nullable|string',
             'id_image' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
         ]);
 
-        // Generate verification codes
-        $emailVerificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        // Generate phone verification code only
         $phoneVerificationCode = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
 
         $user = User::create([
             'name' => $request->name,
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
             'status' => $request->role === 'pet_sitter' ? 'pending_verification' : 'pending',
             'phone' => $request->phone,
             'address' => $request->address,
-            'email_verification_code' => $emailVerificationCode,
+            'gender' => $request->gender,
+            'age' => $request->age,
+            'pet_breeds' => $request->pet_breeds,
+            'bio' => $request->bio,
             'phone_verification_code' => $phoneVerificationCode,
-            'email_verified_at' => null,
+            'email_verified_at' => now(), // Auto-verify email
             'phone_verified_at' => null,
         ]);
 
@@ -52,8 +62,7 @@ class AuthController extends Controller
             $this->submitIdVerification($request, $user);
         }
 
-        // Send verification emails/SMS
-        $this->sendVerificationCode($user, 'email');
+        // Send phone verification SMS only
         if ($user->phone) {
             $this->sendVerificationCode($user, 'phone');
         }
@@ -63,23 +72,29 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => $request->role === 'pet_sitter' 
-                ? 'Registration successful! Please verify your email and phone, then complete ID verification to start accepting bookings.'
-                : 'Registration successful! Please verify your email to complete your account setup.',
+                ? 'Registration successful! Please verify your phone number, then complete ID verification to start accepting bookings.'
+                : 'Registration successful! Please verify your phone number to complete your account setup.',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
                 'email' => $user->email,
                 'role' => $user->role,
                 'status' => $user->status,
                 'phone' => $user->phone,
                 'address' => $user->address,
+                'gender' => $user->gender,
+                'age' => $user->age,
+                'pet_breeds' => $user->pet_breeds,
+                'bio' => $user->bio,
                 'email_verified' => $user->email_verified_at !== null,
                 'phone_verified' => $user->phone_verified_at !== null,
                 'requires_id_verification' => $request->role === 'pet_sitter',
             ],
             'token' => $token,
             'verification_required' => [
-                'email' => true,
+                'email' => false, // Email is auto-verified
                 'phone' => !empty($user->phone),
                 'id_verification' => $request->role === 'pet_sitter',
             ]
@@ -138,39 +153,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function verifyEmail(Request $request)
-    {
-        $request->validate([
-            'verification_code' => 'required|string|size:6',
-        ]);
 
-        $user = $request->user();
-
-        if ($user->email_verification_code !== $request->verification_code) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid verification code.',
-            ], 400);
-        }
-
-        $user->update([
-            'email_verified_at' => now(),
-            'email_verification_code' => null,
-        ]);
-
-        // Check if user can be activated
-        $this->checkAndUpdateUserStatus($user);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Email verified successfully!',
-            'user' => [
-                'id' => $user->id,
-                'email_verified' => true,
-                'status' => $user->fresh()->status,
-            ]
-        ]);
-    }
 
     public function verifyPhone(Request $request)
     {
@@ -209,18 +192,11 @@ class AuthController extends Controller
     public function resendVerificationCode(Request $request)
     {
         $request->validate([
-            'type' => 'required|in:email,phone',
+            'type' => 'required|in:phone',
         ]);
 
         $user = $request->user();
         
-        if ($request->type === 'email' && $user->email_verified_at) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Email is already verified.',
-            ], 400);
-        }
-
         if ($request->type === 'phone' && $user->phone_verified_at) {
             return response()->json([
                 'success' => false,
@@ -228,14 +204,13 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // Generate new code
-        if ($request->type === 'email') {
-            $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $user->update(['email_verification_code' => $code]);
-        } else {
-            $code = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-            $user->update(['phone_verification_code' => $code]);
-        }
+        // Generate new phone verification code
+        $code = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $user->update(['phone_verification_code' => $code]);
+        \Log::info("📱 RESEND PHONE VERIFICATION CODE: {$code}");
+        \Log::info("📱 RESEND PHONE VERIFICATION CODE: {$code}");
+        \Log::info("📱 RESEND PHONE VERIFICATION CODE: {$code}");
+        \Log::info("📱 Use this code to verify phone: {$user->phone}");
 
         $this->sendVerificationCode($user, $request->type);
 
@@ -247,17 +222,16 @@ class AuthController extends Controller
 
     private function sendVerificationCode(User $user, string $type)
     {
-        if ($type === 'email') {
-            // In a real app, you would send actual email
-            // Mail::to($user->email)->send(new EmailVerificationCode($user->email_verification_code));
-            \Log::info("Email verification code for {$user->email}: {$user->email_verification_code}");
-        } elseif ($type === 'phone') {
+        if ($type === 'phone') {
             // Send SMS using the SMS service
             try {
                 $this->sendSMS($user->phone, "Your Petsit Connect verification code is: {$user->phone_verification_code}");
             } catch (\Exception $e) {
                 \Log::error("SMS sending failed: " . $e->getMessage());
-                \Log::info("Phone verification code for {$user->phone}: {$user->phone_verification_code}");
+                \Log::info("📱 PHONE VERIFICATION CODE: {$user->phone_verification_code}");
+                \Log::info("📱 PHONE VERIFICATION CODE: {$user->phone_verification_code}");
+                \Log::info("📱 PHONE VERIFICATION CODE: {$user->phone_verification_code}");
+                \Log::info("📱 Use this code to verify phone: {$user->phone}");
             }
         }
     }
@@ -267,25 +241,25 @@ class AuthController extends Controller
         $user = $user->fresh();
         
         if ($user->role === 'pet_owner') {
-            // Pet owners only need email verification
-            if ($user->email_verified_at) {
+            // Pet owners only need phone verification (email is auto-verified)
+            $hasPhoneVerified = $user->phone_verified_at !== null || empty($user->phone);
+            if ($hasPhoneVerified) {
                 $user->update(['status' => 'active']);
             }
         } elseif ($user->role === 'pet_sitter') {
-            // Pet sitters need email + phone + ID verification
-            $hasEmailVerified = $user->email_verified_at !== null;
+            // Pet sitters need phone + ID verification (email is auto-verified)
             $hasPhoneVerified = $user->phone_verified_at !== null || empty($user->phone);
             
             $idVerification = Verification::where('user_id', $user->id)
                 ->where('status', 'approved')
                 ->first();
             
-            if ($hasEmailVerified && $hasPhoneVerified && $idVerification) {
+            if ($hasPhoneVerified && $idVerification) {
                 $user->update(['status' => 'active']);
                 
                 // Award verification badges
                 $this->awardVerificationBadges($idVerification);
-            } elseif ($hasEmailVerified && $hasPhoneVerified) {
+            } elseif ($hasPhoneVerified) {
                 $user->update(['status' => 'pending_id_verification']);
             }
         }
@@ -355,11 +329,17 @@ class AuthController extends Controller
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
                 'email' => $user->email,
                 'role' => $user->role,
                 'status' => $user->status,
                 'phone' => $user->phone,
                 'address' => $user->address,
+                'gender' => $user->gender,
+                'age' => $user->age,
+                'pet_breeds' => $user->pet_breeds,
+                'bio' => $user->bio,
                 'email_verified' => $user->email_verified_at !== null,
                 'phone_verified' => $user->phone_verified_at !== null,
             ],
@@ -389,10 +369,7 @@ class AuthController extends Controller
                 $status['id_verification_status'] = 'not_submitted';
             }
 
-            // Determine next steps
-            if (!$status['email_verified']) {
-                $status['next_steps'][] = 'Verify your email address';
-            }
+            // Determine next steps (email is auto-verified)
             if (!$status['phone_verified'] && !empty($user->phone)) {
                 $status['next_steps'][] = 'Verify your phone number';
             }
@@ -428,11 +405,17 @@ class AuthController extends Controller
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
                 'email' => $user->email,
                 'role' => $user->role,
                 'status' => $user->status,
                 'phone' => $user->phone,
                 'address' => $user->address,
+                'gender' => $user->gender,
+                'age' => $user->age,
+                'pet_breeds' => $user->pet_breeds,
+                'bio' => $user->bio,
                 'email_verified' => $user->email_verified_at !== null,
                 'phone_verified' => $user->phone_verified_at !== null,
             ],
@@ -479,6 +462,12 @@ class AuthController extends Controller
         \Log::info("📱 SEND SMS - Stored code in cache with key: {$cacheKey}");
         \Log::info("📱 SEND SMS - Generated code: {$verificationCode}");
         \Log::info("⏳ Cache expiration: 10 minutes from now");
+        
+        // Make the verification code very visible in logs
+        \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
+        \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
+        \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
+        \Log::info("📱 Use this code to verify phone: {$phone}");
 
         // Format phone number for international SMS
         $formattedPhone = $this->formatPhoneForSMS($phone);
