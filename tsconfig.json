@@ -1,7 +1,18 @@
 {
-  "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "jsx": "react-jsx",
     "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "Bundler",
+    "types": [
+      "react",
+      "react-native"
+    ],
     "paths": {
       "@/*": [
         "./*"
@@ -13,5 +24,9 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+  ],
+  "exclude": [
+    "pet-sitting-app/**"
+  ],
+  "extends": "expo/tsconfig.base"
 }

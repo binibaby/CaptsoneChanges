@@ -34,7 +34,7 @@ const UserRoleSelectionScreen: React.FC<UserRoleSelectionScreenProps> = ({
       <View style={styles.content}>
         <View style={styles.header}>
           <Image
-            source={require('../../assets/images/icon.png')}
+            source={require('../../assets/images/logo.png')}
             style={styles.logo}
           />
           <Text style={styles.title}>Welcome to Petsit Connect</Text>
@@ -45,57 +45,23 @@ const UserRoleSelectionScreen: React.FC<UserRoleSelectionScreenProps> = ({
 
         <View style={styles.roleContainer}>
           <TouchableOpacity
-            style={[styles.roleCard, selectedRole === 'Pet Owner' && styles.selectedRoleCard]}
+            style={[styles.roleButton, selectedRole === 'Pet Owner' && styles.selectedRoleButton]}
             onPress={() => handleRoleSelect('Pet Owner')}
           >
-            <View style={styles.roleIcon}>
-              <Ionicons name="person" size={48} color="#4CAF50" />
-            </View>
-            <Text style={styles.roleTitle}>Pet Owner</Text>
-            <Text style={styles.roleDescription}>
-              Find trusted pet sitters to care for your beloved pets
+            <Ionicons name="person" size={50} color={selectedRole === 'Pet Owner' ? '#F59E0B' : '#4CAF50'} />
+            <Text style={[styles.roleButtonText, selectedRole === 'Pet Owner' && styles.selectedRoleButtonText]}>
+              Pet Owner
             </Text>
-            <View style={styles.roleFeatures}>
-              <View style={styles.feature}>
-                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={styles.featureText}>Find verified sitters</Text>
-              </View>
-              <View style={styles.feature}>
-                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={styles.featureText}>Book appointments</Text>
-              </View>
-              <View style={styles.feature}>
-                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={styles.featureText}>Track your pets</Text>
-              </View>
-            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.roleCard, selectedRole === 'Pet Sitter' && styles.selectedRoleCard]}
+            style={[styles.roleButton, selectedRole === 'Pet Sitter' && styles.selectedRoleButton]}
             onPress={() => handleRoleSelect('Pet Sitter')}
           >
-            <View style={styles.roleIcon}>
-              <Ionicons name="paw" size={48} color="#FF9800" />
-            </View>
-            <Text style={styles.roleTitle}>Pet Sitter</Text>
-            <Text style={styles.roleDescription}>
-              Offer your pet care services and earn money doing what you love
+            <Ionicons name="paw" size={50} color={selectedRole === 'Pet Sitter' ? '#F59E0B' : '#FF9800'} />
+            <Text style={[styles.roleButtonText, selectedRole === 'Pet Sitter' && styles.selectedRoleButtonText]}>
+              Pet Sitter
             </Text>
-            <View style={styles.roleFeatures}>
-              <View style={styles.feature}>
-                <Ionicons name="checkmark-circle" size={16} color="#FF9800" />
-                <Text style={styles.featureText}>Set your rates</Text>
-              </View>
-              <View style={styles.feature}>
-                <Ionicons name="checkmark-circle" size={16} color="#FF9800" />
-                <Text style={styles.featureText}>Manage bookings</Text>
-              </View>
-              <View style={styles.feature}>
-                <Ionicons name="checkmark-circle" size={16} color="#FF9800" />
-                <Text style={styles.featureText}>Build your profile</Text>
-              </View>
-            </View>
           </TouchableOpacity>
         </View>
 
@@ -113,12 +79,14 @@ const UserRoleSelectionScreen: React.FC<UserRoleSelectionScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#fff',
+    padding: 20,
   },
   content: {
     flex: 1,
-    padding: 20,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   header: {
     alignItems: 'center',
@@ -132,70 +100,57 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1A1A1A',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666666',
     textAlign: 'center',
+    marginBottom: 40,
+    color: '#666',
   },
   roleContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     marginBottom: 40,
   },
-  roleCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 16,
+  roleButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 10,
+    backgroundColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 5,
+    elevation: 3,
   },
-  selectedRoleCard: {
-    borderWidth: 2,
+  selectedRoleButton: {
     borderColor: '#F59E0B',
     backgroundColor: '#FFFBEB',
   },
-  roleIcon: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  roleTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  roleDescription: {
+  roleButtonText: {
     fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
   },
-  roleFeatures: {
-    gap: 8,
-  },
-  feature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  featureText: {
-    fontSize: 14,
-    color: '#666666',
-    marginLeft: 8,
+  selectedRoleButtonText: {
+    color: '#F59E0B',
   },
   authOptions: {
     alignItems: 'center',
   },
   authText: {
     fontSize: 16,
-    color: '#666666',
+    color: '#666',
     marginBottom: 16,
   },
   signInButton: {

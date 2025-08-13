@@ -2,15 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import {
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 // @ts-ignore
 import FindIcon from '../../assets/icons/find.png';
 // @ts-ignore
@@ -20,131 +12,152 @@ import PetsHeartIcon from '../../assets/icons/petsheart.png';
 // @ts-ignore
 import MessageIcon from '../../assets/icons/message.png';
 
-const pets = [
-  { name: 'Mochi', breed: 'Abyssinian', age: '2 years', image: require('../../assets/images/cat.png') },
-  { name: 'Luna', breed: 'Chihuahua', age: '3 years', image: require('../../assets/images/dog.png') },
+const upcomingBookings = [
+  {
+    id: 'b1',
+    sitterName: 'Sarah Johnson',
+    petName: 'Mochi',
+    date: 'Dec 15, 2024',
+    time: '2:00 PM - 6:00 PM',
+    status: 'Confirmed',
+    petImage: require('../../assets/images/cat.png'),
+    cost: '$45',
+  },
 ];
 
+const ownerStats = {
+  totalSpent: '$1,240',
+  activeBookings: 2,
+  thisWeek: '$120',
+};
+
 const quickActions = [
-  { title: 'Find Sitter', icon: FindIcon, color: '#5AC8C8', route: '/find-sitter-map' },
-  { title: 'Book Service', icon: BookIcon, color: '#DEE2E6', route: '/pet-owner-jobs' },
-  { title: 'My Pets', icon: PetsHeartIcon, color: '#5AC8C8', route: '/my-pets' },
-  { title: 'Messages', icon: MessageIcon, color: '#DEE2E6', route: '/pet-owner-messages' },
+  { title: 'Find Sitter', icon: FindIcon, color: '#A7F3D0', route: '/find-sitter-map' },
+  { title: 'Book Service', icon: BookIcon, color: '#DDD6FE', route: '/pet-owner-jobs' },
+  { title: 'My Pets', icon: PetsHeartIcon, color: '#FDE68A', route: '/my-pets' },
+  { title: 'Messages', icon: MessageIcon, color: '#BAE6FD', route: '/pet-owner-messages' },
 ];
+
+const reflectionColors = {
+  bookings: '#10B981',
+  upcoming: '#8B5CF6',
+  week: '#F97316',
+};
 
 const PetOwnerDashboard = () => {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 110, zIndex: 0 }}>
-        <LinearGradient colors={['#1976D2', '#FFD600']} style={{ flex: 1 }} />
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         {/* Header */}
-      <LinearGradient colors={['#1976D2', '#FFD600']} style={styles.headerGradient}>
-        <View style={[styles.headerCard, { backgroundColor: 'transparent', shadowOpacity: 0 }]}>
+        <View style={styles.headerCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../../assets/images/logo.png')} style={styles.logoImage} />
+            <Image source={require('../../assets/images/logo.png')} style={{ width: 28, height: 28, marginRight: 8 }} />
             <Text style={styles.headerTitle}>Pet Owner Dashboard</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => router.push('/pet-owner-notifications')} style={styles.iconButtonLeft}>
-              <View style={[styles.iconCircle, styles.iconCircleBlue]}><Ionicons name="notifications-outline" size={22} color="#1976D2" /></View>
+            <TouchableOpacity onPress={() => router.push('/pet-owner-notifications')} style={{ marginRight: 16 }}>
+              <Ionicons name="notifications-outline" size={24} color="#222" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/pet-owner-profile')} style={styles.iconButtonRight}>
-              <View style={[styles.iconCircle, styles.iconCircleBlue]}><Ionicons name="person-circle" size={26} color="#1976D2" /></View>
+            <TouchableOpacity onPress={() => router.push('/pet-owner-profile')}>
+              <Ionicons name="person-circle" size={28} color="#222" />
             </TouchableOpacity>
           </View>
         </View>
-      </LinearGradient>
-        {/* Welcome Card */}
-      <LinearGradient colors={['#FFD600', '#FAFAFA']} style={styles.welcomeCardAlt}>
-          <View style={{ flex: 1 }}>
-          <Text style={styles.welcomeTitleAlt}>Hi there! 🐾</Text>
-          <Text style={styles.welcomeSubtitleAlt}>Let’s make your pet’s day amazing.</Text>
+
+        {/* Spending Summary (mirrors Total Income card) */}
+        <LinearGradient colors={['#10B981', '#8B5CF6', '#F97316']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.totalIncomeSection}>
+          <Text style={styles.totalIncomeLabel}>Total Spent</Text>
+          <Text style={styles.totalIncomeAmount}>{ownerStats.totalSpent}</Text>
+        </LinearGradient>
+
+        {/* Stats Cards (mirrors sitter) */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statsCard, { backgroundColor: '#10B981', shadowColor: '#10B981', shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.5, shadowRadius: 24, elevation: 16 }]}> 
+            <View style={styles.statsIcon}>
+              <Ionicons name="briefcase" size={24} color="#fff" />
+            </View>
+            <Text style={styles.statsValueWhite}>{ownerStats.activeBookings}</Text>
+            <Text style={styles.statsLabelWhite}>Active Bookings</Text>
+            <View style={[styles.reflection, { backgroundColor: reflectionColors.bookings }]} />
+          </View>
+
+          <View style={[styles.statsCard, { backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.5, shadowRadius: 24, elevation: 16 }]}> 
+            <View style={styles.statsIcon}>
+              <Ionicons name="calendar" size={24} color="#fff" />
+            </View>
+            <Text style={styles.statsValueWhite}>{upcomingBookings.length}</Text>
+            <Text style={styles.statsLabelWhite}>Upcoming</Text>
+            <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
+          </View>
+
+          <View style={[styles.statsCard, { backgroundColor: '#F97316', shadowColor: '#F97316', shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.5, shadowRadius: 24, elevation: 16 }]}> 
+            <View style={styles.statsIcon}>
+              <Ionicons name="trending-up" size={24} color="#fff" />
+            </View>
+            <Text style={styles.statsValueWhite}>{ownerStats.thisWeek}</Text>
+            <Text style={styles.statsLabelWhite}>This Week</Text>
+            <View style={[styles.reflection, { backgroundColor: reflectionColors.week }]} />
+          </View>
         </View>
-        <TouchableOpacity style={[styles.welcomeButtonAlt, { backgroundColor: '#1976D2' }]} onPress={() => router.push('/find-sitter-map')}>
-          <Ionicons name="search" size={18} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.welcomeButtonTextAlt}>Find Sitter</Text>
-        </TouchableOpacity>
-      </LinearGradient>
-        {/* Quick Actions */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.quickActionsRowAlt}>
+
+        {/* Quick Actions (owner routes) */}
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsRow}>
           {quickActions.map((action) => (
-          <TouchableOpacity key={action.title} style={styles.quickActionAlt} onPress={() => router.push(action.route as any)}>
-            <View style={[styles.quickActionIconAlt, styles.quickActionIconYellow]}>
-              <Image source={action.icon} style={{ width: 28, height: 26 }} resizeMode="contain" />
+            <TouchableOpacity key={action.title} style={styles.quickAction} onPress={() => router.push(action.route as any)}>
+              <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}> 
+                <Image source={action.icon} style={styles.quickActionImage} resizeMode="contain" />
               </View>
-            <Text style={styles.quickActionLabelAlt}>{action.title}</Text>
+              <Text style={styles.quickActionLabel}>{action.title}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        {/* My Pets */}
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>My Pets</Text>
-          <TouchableOpacity>
-            <Text style={styles.sectionAction}>View All</Text>
-          </TouchableOpacity>
-        </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petsRow} contentContainerStyle={{ paddingRight: 12 }}>
-          {pets.map((pet) => (
-          <View key={pet.name} style={[styles.petCardAlt, styles.petCardYellow]}>
-            <Image source={pet.image} style={[styles.petImageAlt, styles.petImageBorder]} />
-            <Text style={styles.petNameAlt}>{pet.name}</Text>
-            <Text style={styles.petBreedAlt}>{pet.breed}</Text>
-            <Text style={styles.petAgeAlt}>{pet.age}</Text>
-            </View>
-          ))}
-      </ScrollView>
-        {/* Upcoming Bookings */}
-        <View style={styles.sectionRow}>
+
+        {/* Upcoming Bookings (mirrors sitter Upcoming Jobs) */}
+        <View style={styles.sectionRowAligned}>
           <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
           <TouchableOpacity>
             <Text style={styles.sectionAction}>View All</Text>
           </TouchableOpacity>
         </View>
-      <LinearGradient colors={['#FFD600', '#FAFAFA']} style={styles.bookingCardAlt}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={[styles.bookingStatusDot, { backgroundColor: '#1976D2' }]} />
-          <Ionicons name="person-circle" size={36} color="#1976D2" style={{ marginRight: 10 }} />
-            <View style={{ flex: 1 }}>
-            <Text style={styles.bookingNameAlt}>Sarah Johnson</Text>
-            <Text style={styles.bookingPetAlt}>Mochi</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <View style={[styles.bookingStatusBadgeAlt, { backgroundColor: '#1976D2' }]}><Text style={styles.bookingStatusTextAlt}>Confirmed</Text></View>
-          </View>
-        </View>
-        <View style={styles.bookingMetaRow}>
-          <Ionicons name="calendar-outline" size={16} color="#1976D2" style={{ marginRight: 4 }} />
-          <Text style={styles.bookingMetaTextAlt}>Dec 15, 2024</Text>
-          <Ionicons name="time-outline" size={16} color="#1976D2" style={{ marginLeft: 16, marginRight: 4 }} />
-          <Text style={styles.bookingMetaTextAlt}>2:00 PM - 6:00 PM</Text>
-        </View>
-      </LinearGradient>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
+          {upcomingBookings.map((b, idx) => (
+            <View key={b.id} style={[styles.upcomingJobCard, { backgroundColor: ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'][idx % 4] }]}> 
+              <Image source={b.petImage} style={styles.jobPetImage} />
+              <Text style={styles.jobPetName}>{b.petName}</Text>
+              <Text style={styles.jobOwnerName}>{b.sitterName}</Text>
+              <View style={styles.jobStatusBadge}><Text style={styles.jobStatusText}>{b.status}</Text></View>
+              <Text style={styles.jobEarnings}>{b.cost}</Text>
+              <View style={styles.jobMetaRow}>
+                <Ionicons name="calendar-outline" size={16} color="#888" style={{ marginRight: 4 }} />
+                <Text style={styles.jobMetaText}>{b.date}</Text>
+              </View>
+              <View style={styles.jobMetaRow}>
+                <Ionicons name="time-outline" size={16} color="#888" style={{ marginRight: 4 }} />
+                <Text style={styles.jobMetaText}>{b.time}</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  headerGradient: {
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    minHeight: 90, // ensure enough height for icons
-    paddingBottom: 0,
-  },
+  // Reuse sitter layout styles for a consistent look-and-feel
   headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'transparent',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     paddingHorizontal: 20,
-    paddingTop: 18, // add top padding for status bar
+    paddingTop: 24,
     paddingBottom: 12,
-    minHeight: 90, // match gradient
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -152,462 +165,200 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#222',
   },
-  logoImage: {
-    width: 30,
-    height: 46,
-    marginRight: 8,
-  },
-  iconButtonLeft: {
-    marginLeft: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 40,
-    width: 40,
-  },
-  iconButtonRight: {
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 40,
-    width: 40,
-  },
-  iconCircle: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: '#1976D2',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  welcomeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 22,
+  totalIncomeSection: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 18,
     marginHorizontal: 16,
     marginTop: 18,
-    marginBottom: 18,
-    padding: 22,
-    shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 3,
-    overflow: 'hidden',
-    position: 'relative',
+    marginBottom: 24,
+    padding: 20,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 16,
   },
-  welcomeTitle: {
+  totalIncomeLabel: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  totalIncomeAmount: {
+    color: '#fff',
+    fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  welcomeSubtitle: {
-    color: '#fff',
-    fontSize: 14,
-    opacity: 0.9,
-  },
-  welcomeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FBBF24',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginLeft: 12,
-  },
-  welcomeButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
-    marginRight: 2,
-  },
-  welcomePaw: {
-    position: 'absolute',
-    right: 18,
-    bottom: 10,
-    width: 48,
-    height: 48,
-    opacity: 0.12,
-    zIndex: 0,
-  },
-  sectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#222',
-    letterSpacing: 0.3,
-  },
-  sectionAction: {
-    color: '#F59E0B',
-    fontWeight: '700',
-    fontSize: 15,
-    letterSpacing: 0.2,
+    marginHorizontal: 20,
+    marginBottom: 16,
   },
   quickActionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: 12,
-    marginBottom: 18,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 18,
-    padding: 8,
-    shadowColor: '#5AC8C8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 24,
   },
   quickAction: {
     alignItems: 'center',
     flex: 1,
+    marginHorizontal: 4,
   },
   quickActionIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-    shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
+    elevation: 4,
+  },
+  quickActionImage: {
+    width: 28,
+    height: 28,
   },
   quickActionLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#222',
     fontWeight: '600',
     textAlign: 'center',
-    letterSpacing: 0.2,
   },
-  petsRow: {
-    flexDirection: 'row',
-    marginHorizontal: 12,
-    marginBottom: 18,
-  },
-  petCard: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    marginHorizontal: 8,
-    padding: 16,
-    width: 120,
-    shadowColor: '#5AC8C8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 2,
-    borderColor: '#FBBF24',
-  },
-  petImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#FBBF24',
-  },
-  petName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#222',
-    marginTop: 2,
-  },
-  petBreed: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 2,
-  },
-  petAge: {
-    fontSize: 13,
-    color: '#F59E0B',
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  bookingCard: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 20,
-    shadowColor: '#5AC8C8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 2,
-    borderLeftWidth: 6,
-    borderLeftColor: '#FBBF24',
-  },
-  bookingStatusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#10B981',
-    marginRight: 10,
-  },
-  bookingName: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#222',
-  },
-  bookingPet: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 2,
-  },
-  bookingStatusBadge: {
-    backgroundColor: '#10B981',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginBottom: 4,
-  },
-  bookingStatusText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-  bookingMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16, // more space for clarity
-    justifyContent: 'flex-start',
-    gap: 12, // add spacing between items if supported
-  },
-  bookingMetaText: {
-    color: '#888',
-    fontSize: 13,
-    marginRight: 8,
-  },
-  welcomeCardAlt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 24,
-    marginHorizontal: 16,
-    marginTop: 32, // increased margin to move it further down from the header
-    marginBottom: 18,
-    padding: 22,
-    shadowColor: '#A7E3F4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  welcomeTitleAlt: {
-    color: '#1A374D',
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  welcomeSubtitleAlt: {
-    color: '#406882',
-    fontSize: 15,
-    opacity: 0.9,
-  },
-  welcomeButtonAlt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#5AC8C8',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginLeft: 12,
-    shadowColor: '#5AC8C8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  welcomeButtonTextAlt: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginLeft: 2,
-  },
-  quickActionsRowAlt: {
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: 12,
-    marginBottom: 18,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 18,
-    padding: 8,
-    shadowColor: '#A7E3F4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 24,
   },
-  quickActionAlt: {
-    alignItems: 'center',
+  statsCard: {
     flex: 1,
-  },
-  quickActionIconAlt: {
-    width: 50,
-    height: 50,
     borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  statsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-    shadowColor: '#A7E3F4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  quickActionLabelAlt: {
-    fontSize: 13,
-    color: '#1A374D',
-    fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  petCardAlt: {
-    alignItems: 'center',
-    backgroundColor: '#FAFAFA',
-    borderRadius: 20,
-    marginHorizontal: 8,
-    padding: 12,
-    width: 120,
-    height: 150, // less tall
-    shadowColor: '#FFD600',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 2,
-    borderColor: '#FFD600',
-  },
-  petImageAlt: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#FFD600',
-  },
-  petNameAlt: {
-    fontSize: 16,
+  statsValueWhite: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#1A374D',
-    marginTop: 2,
-  },
-  petBreedAlt: {
-    fontSize: 13,
-    color: '#406882',
-    marginTop: 2,
-  },
-  petAgeAlt: {
-    fontSize: 13,
-    color: '#5AC8C8',
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  bookingCardAlt: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 22,
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 20,
-    shadowColor: '#A7E3F4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 2,
-    borderLeftWidth: 6,
-    borderLeftColor: '#5AC8C8',
-  },
-  bookingNameAlt: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#1A374D',
-  },
-  bookingPetAlt: {
-    fontSize: 14,
-    color: '#406882',
-    marginTop: 2,
-  },
-  bookingStatusBadgeAlt: {
-    backgroundColor: '#5AC8C8',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    color: '#fff',
     marginBottom: 4,
   },
-  bookingStatusTextAlt: {
+  statsLabelWhite: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+    textAlign: 'center',
+    opacity: 0.9,
+  },
+  sectionAction: {
+    color: '#F59E0B',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  jobPetImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F8F8F8',
+  },
+  jobPetName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#222',
+  },
+  jobOwnerName: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 2,
+  },
+  jobStatusBadge: {
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    marginBottom: 4,
+  },
+  jobStatusText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 12,
   },
-
-  bookingMetaTextAlt: {
-    color: '#00B8A9', // modern teal accent
+  jobEarnings: {
+    color: '#10B981',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  jobMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  jobMetaText: {
+    color: '#888',
     fontSize: 13,
     marginRight: 8,
-    fontWeight: '600',
   },
-  sectionTitleBlue: {
-    color: '#1976D2',
-  },
-  quickActionLabelBlue: {
-    color: '#1976D2',
-  },
-  petNameBlue: {
-    color: '#1976D2',
-  },
-  petBreedDark: {
-    color: '#333',
-  },
-  petAgeYellow: {
-    color: '#FFD600',
-  },
-  iconCircleBlue: {
-    backgroundColor: '#fff',
-    borderColor: '#1976D2',
-    borderWidth: 1,
-  },
-  petCardYellow: {
-    backgroundColor: '#FAFAFA',
-    borderColor: '#FFD600',
-  },
-  petImageBorder: {
-    borderColor: '#FFD600',
-  },
-  quickActionIconSize: {
-    width: 50,
-    height: 50,
+  reflection: {
+    position: 'absolute',
+    bottom: 8,
+    left: '10%',
+    right: '10%',
+    height: 24,
     borderRadius: 16,
+    opacity: 0.5,
+    zIndex: 1,
   },
-  marginRight4: {
-    marginRight: 4,
+  upcomingJobsRow: {
+    flexDirection: 'row',
+    paddingLeft: 16,
+    paddingRight: 8,
+    gap: 12,
   },
-  marginLeft16Right4: {
-    marginLeft: 16,
-    marginRight: 4,
-  },
-  flex1: {
-    flex: 1,
-  },
-  marginRight10: {
-    marginRight: 10,
-  },
-  quickActionIconYellow: {
-    borderColor: '#FFD600',
-    borderWidth: 2,
+  upcomingJobCard: {
+    width: 140,
     backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionRowAligned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginTop: 0,
+    marginBottom: 16,
   },
 });
 
-export default PetOwnerDashboard; 
+export default PetOwnerDashboard;

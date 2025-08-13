@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { getApiUrl, getAuthHeaders } from '../../constants/config';
 
 interface FrontIDScreenProps {
   userData?: any;
@@ -83,6 +84,67 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
     }
   };
 
+  const handleSkip = async () => {
+    Alert.alert(
+      'Skip ID Verification',
+      'You can skip ID verification for now and complete it later. Your account will be created but ID verification will be marked as pending.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Skip for Now',
+          onPress: async () => {
+            try {
+              // Always use public endpoint to avoid Sanctum in onboarding
+              const response = await fetch(getApiUrl('/api/verification/skip-public'), {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                  user_id: userData?.user?.id || userData?.id,
+                  phone: userData?.phone,
+                }),
+              });
+
+              const data = await response.json();
+              
+              if (data.success) {
+                Alert.alert(
+                  'Skipped for now',
+                  'You can use the app but please complete your ID verification later from your profile.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Navigate to dashboard without completing ID verification
+                        if (onFrontIDComplete) {
+                          // Pass empty front image to indicate skipped
+                          onFrontIDComplete(phoneVerified, '');
+                        } else {
+                          // Navigate to dashboard
+                          navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'PetSitterDashboard' }],
+                          });
+                        }
+                      },
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Error', data.message || 'Failed to skip verification');
+              }
+            } catch (error) {
+              console.error('Skip verification error:', error);
+              Alert.alert('Error', 'Failed to skip verification. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleBack = () => {
     if (onFrontIDComplete) {
       // Go back to previous step in auth flow
@@ -123,6 +185,13 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
               {frontImage ? 'Retake Photo' : 'Take Photo'}
             </Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.skipButton} 
+          onPress={handleSkip}
+        >
+          <Text style={styles.skipButtonText}>Skip for Now</Text>
         </TouchableOpacity>
 
         <View style={styles.buttonContainer}>
@@ -205,6 +274,18 @@ const styles = StyleSheet.create({
   cameraButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  skipButton: {
+    backgroundColor: '#F59E0B',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   buttonContainer: {

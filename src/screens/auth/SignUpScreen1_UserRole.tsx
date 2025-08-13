@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 interface SignUpScreen1_UserRoleProps {
@@ -40,19 +40,27 @@ const SignUpScreen1_UserRole: React.FC<SignUpScreen1_UserRoleProps> = ({ onNext,
           Are you a Pet Owner or a Pet Sitter ready to find matches for pets?
         </Text>
 
-        <TouchableOpacity
-          style={[styles.roleButton, selectedRole === 'Pet Owner' && styles.selectedRoleButton]}
-          onPress={() => setSelectedRole('Pet Owner')}
-        >
-          <Text style={[styles.roleButtonText, selectedRole === 'Pet Owner' && styles.selectedRoleButtonText]}>Pet Owner</Text>
-        </TouchableOpacity>
+        <View style={styles.roleContainer}>
+          <TouchableOpacity
+            style={[styles.roleButton, selectedRole === 'Pet Owner' && styles.selectedRoleButton]}
+            onPress={() => setSelectedRole('Pet Owner')}
+          >
+            <Ionicons name="person" size={50} color={selectedRole === 'Pet Owner' ? '#F59E0B' : '#4CAF50'} />
+            <Text style={[styles.roleButtonText, selectedRole === 'Pet Owner' && styles.selectedRoleButtonText]}>
+              Pet Owner
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.roleButton, selectedRole === 'Pet Sitter' && styles.selectedRoleButton]}
-          onPress={() => setSelectedRole('Pet Sitter')}
-        >
-          <Text style={[styles.roleButtonText, selectedRole === 'Pet Sitter' && styles.selectedRoleButtonText]}>Pet Sitter</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.roleButton, selectedRole === 'Pet Sitter' && styles.selectedRoleButton]}
+            onPress={() => setSelectedRole('Pet Sitter')}
+          >
+            <Ionicons name="paw" size={50} color={selectedRole === 'Pet Sitter' ? '#F59E0B' : '#FF9800'} />
+            <Text style={[styles.roleButtonText, selectedRole === 'Pet Sitter' && styles.selectedRoleButtonText]}>
+              Pet Sitter
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -105,14 +113,21 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 24,
   },
+  roleContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
   roleButton: {
-    width: '100%',
-    paddingVertical: 20,
+    width: 120,
+    height: 120,
     borderRadius: 15,
     borderWidth: 2,
     borderColor: '#E0E0E0',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    margin: 10,
     backgroundColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -122,12 +137,13 @@ const styles = StyleSheet.create({
   },
   selectedRoleButton: {
     borderColor: '#F59E0B',
-    backgroundColor: '#FFFBEB', // Light orange background for selected
+    backgroundColor: '#FFFBEB',
   },
   roleButtonText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
+    marginTop: 8,
   },
   selectedRoleButtonText: {
     color: '#F59E0B',
@@ -137,11 +153,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: 'center',
-    width: '100%',
+    width: '75%',
     marginBottom: 20,
   },
   disabledButton: {
-    backgroundColor: '#FFD7A0', // Lighter orange when disabled
+    backgroundColor: '#FFD7A0',
   },
   continueButtonText: {
     color: '#fff',

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Image,
     Platform,
@@ -10,6 +10,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import MapView, { Marker, Region } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 // Web-only version - no react-native-maps imports
 const FindSitterMapScreen = () => {
@@ -32,6 +34,49 @@ const FindSitterMapScreen = () => {
   // Filter sitters if needed (for now, show all)
   const filteredSitters = PET_SITTERS;
 
+  // Compute a sensible initial region around the first sitter
+  const initialRegion: Region = useMemo(() => {
+    const first = PET_SITTERS[0];
+    return {
+      latitude: first.latlng.latitude,
+      longitude: first.latlng.longitude,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    };
+  }, []);
+
+  const [userRegion, setUserRegion] = useState<Region | null>(null);
+  const mapRef = useRef<MapView | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (!isMounted) return;
+        const region: Region = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        };
+        setUserRegion(region);
+        // Smoothly move map when available
+        requestAnimationFrame(() => {
+          mapRef.current?.animateToRegion(region, 600);
+        });
+      } catch (_) {
+        // Ignore; map will use fallback region
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -45,14 +90,47 @@ const FindSitterMapScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Map View - Web Only */}
+      {/* Map View */}
       <View style={styles.mapContainer}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ fontSize: 18, color: '#666' }}>🗺️ Interactive Map</Text>
-          <Text style={{ fontSize: 14, color: '#999', marginTop: 8 }}>Available on mobile devices</Text>
-          <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>Tap on sitters below to view profiles</Text>
-        </View>
+        {Platform.OS === 'web' ? (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ fontSize: 18, color: '#666' }}>🗺️ Interactive Map</Text>
+            <Text style={{ fontSize: 14, color: '#999', marginTop: 8 }}>Available on mobile devices</Text>
+            <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>Tap on sitters below to view profiles</Text>
+          </View>
+        ) : (
+          <MapView
+            style={StyleSheet.absoluteFill}
+            initialRegion={initialRegion}
+            showsUserLocation
+            showsPointsOfInterest={false}
+            ref={(r) => (mapRef.current = r)}
+          >
+            {filteredSitters.map((sitter) => (
+              <Marker
+                key={sitter.id}
+                coordinate={sitter.latlng}
+                title={sitter.name}
+                description={`${sitter.distance} • $${sitter.rate}/hr`}
+                onPress={() => handleSitterPress(sitter.id)}
+              />
+            ))}
+          </MapView>
+        )}
       </View>
+
+      {/* Recenter button */}
+      {Platform.OS !== 'web' && (
+        <TouchableOpacity
+          onPress={() => {
+            const target = userRegion ?? initialRegion;
+            mapRef.current?.animateToRegion(target, 600);
+          }}
+          style={{ position: 'absolute', right: 20, top: 160, backgroundColor: '#fff', borderRadius: 20, padding: 10, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8 }}
+        >
+          <Ionicons name="locate" size={20} color="#333" />
+        </TouchableOpacity>
+      )}
 
       {/* Filter Tabs */}
       <View style={styles.filterContainer}>

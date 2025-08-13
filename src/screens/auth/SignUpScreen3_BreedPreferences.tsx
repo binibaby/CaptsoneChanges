@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Breed {
@@ -77,13 +77,13 @@ const SignUpScreen3_BreedPreferences: React.FC<SignUpScreen3_BreedPreferencesPro
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
       )}
-      <Text style={styles.progressText}>2/4</Text>
+      <Text style={styles.progressText}>3/4</Text>
 
       <View style={styles.content}>
         <Text style={styles.title}>Breed Preferences</Text>
         <Text style={styles.description}>
           Select the breeds you {userRole === 'Pet Owner' ? 'have or prefer' : 'are comfortable with'}.
-          You can select multiple breeds or skip this step.
+          You can select multiple breeds 
         </Text>
 
         <View style={styles.breedContainer}>
@@ -109,9 +109,15 @@ const SignUpScreen3_BreedPreferences: React.FC<SignUpScreen3_BreedPreferencesPro
         </View>
       </View>
 
-      <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-        <Text style={styles.continueButtonText}>Continue</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={[styles.continueButton, selectedBreeds.length === 0 && styles.disabledButton]}
+          onPress={handleContinue}
+          disabled={selectedBreeds.length === 0}
+        >
+          <Text style={styles.continueButtonText}>Continue</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -181,18 +187,25 @@ const styles = StyleSheet.create({
   selectedBreedButtonText: {
     color: '#fff',
   },
+  buttonContainer: {
+    width: '75%',
+    marginBottom: 30,
+    alignSelf: 'center',
+  },
   continueButton: {
     backgroundColor: '#F59E0B',
     paddingVertical: 15,
-    borderRadius: 10,
+    borderRadius: 15,
     alignItems: 'center',
     width: '100%',
-    marginBottom: 20,
   },
   continueButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#FFD7A0',
   },
 });
 

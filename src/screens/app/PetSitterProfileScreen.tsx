@@ -99,7 +99,7 @@ const PetSitterProfileScreen = () => {
         cameraType: ImagePicker.CameraType.back,
         allowsMultipleSelection: false,
         selectionLimit: 1,
-        presentationStyle: Platform.OS === 'ios' ? ImagePicker.UIImagePickerPresentationStyle.FullScreen : undefined,
+        presentationStyle: Platform.OS === 'ios' ? ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN : undefined,
         videoQuality: ImagePicker.UIImagePickerControllerQualityType.High,
       });
 

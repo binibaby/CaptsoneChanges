@@ -43,17 +43,20 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanc
 // Phone verification routes
 Route::post('/send-verification-code', [AuthController::class, 'sendPhoneVerificationCode']);
 Route::post('/verify-phone-code', [AuthController::class, 'verifyPhoneCode']);
-Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationCode'])->middleware('auth:sanctum');
+Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationCode']);
 
 // Verification routes
-Route::prefix('verification')->group(function () {
-    Route::get('/status', [VerificationController::class, 'getVerificationStatus'])->middleware('auth:sanctum');
-    Route::post('/submit', [VerificationController::class, 'submitVerification'])->middleware('auth:sanctum');
-    Route::post('/submit-simple', [VerificationController::class, 'submitVerificationSimple']); // No auth required
-    Route::get('/session-status', [VerificationController::class, 'getVerificationSessionStatus'])->middleware('auth:sanctum');
-    Route::get('/philippine-ids', [VerificationController::class, 'getPhilippineIdTypes']);
-    Route::post('/webhook/veriff', [VerificationController::class, 'handleVeriffWebhook']); // Veriff webhook
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/verification/submit', [VerificationController::class, 'submitVerification']);
+    Route::post('/verification/submit-simple', [VerificationController::class, 'submitSimpleVerification']);
+    Route::post('/verification/skip', [VerificationController::class, 'skipVerification']);
+    Route::get('/verification/status', [VerificationController::class, 'getVerificationStatus']);
+    Route::get('/verification/session-status', [VerificationController::class, 'getVerificationSessionStatus']);
 });
+
+// Public fallback route to allow skipping ID verification right after phone verification
+// This is intended for development/testing mobile flows where auth token may not yet be persisted
+Route::post('/verification/skip-public', [VerificationController::class, 'skipVerificationPublic']);
 
     // Booking routes
 Route::prefix('bookings')->middleware('auth:sanctum')->group(function () {

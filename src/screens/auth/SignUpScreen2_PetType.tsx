@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Image,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface PetType {
@@ -52,7 +52,7 @@ const SignUpScreen2_PetType: React.FC<SignUpScreen2_PetTypeProps> = ({ userRole,
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
       )}
-      <Text style={styles.progressText}>1/4</Text>
+      <Text style={styles.progressText}>2/4</Text>
 
       <View style={styles.content}>
         <Text style={styles.title}>Tell us about your pets</Text>
@@ -85,13 +85,15 @@ const SignUpScreen2_PetType: React.FC<SignUpScreen2_PetTypeProps> = ({ userRole,
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.continueButton, selectedPetTypes.length === 0 && styles.disabledButton]}
-        onPress={handleContinue}
-        disabled={selectedPetTypes.length === 0}
-      >
-        <Text style={styles.continueButtonText}>Continue</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.continueButton, selectedPetTypes.length === 0 && styles.disabledButton]}
+          onPress={handleContinue}
+          disabled={selectedPetTypes.length === 0}
+        >
+          <Text style={styles.continueButtonText}>Continue</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -174,13 +176,17 @@ const styles = StyleSheet.create({
   selectedPetTypeButtonText: {
     color: '#F59E0B',
   },
+  buttonContainer: {
+    width: '75%',
+    marginBottom: 30,
+    alignSelf: 'center',
+  },
   continueButton: {
     backgroundColor: '#F59E0B',
     paddingVertical: 15,
-    borderRadius: 10,
+    borderRadius: 15,
     alignItems: 'center',
     width: '100%',
-    marginBottom: 20,
   },
   disabledButton: {
     backgroundColor: '#FFD7A0',

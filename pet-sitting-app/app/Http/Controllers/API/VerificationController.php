@@ -593,7 +593,179 @@ class VerificationController extends Controller
         ]);
     }
 
+    public function skipVerification(Request $request)
+    {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
 
+        \Log::info('🔔 ID VERIFICATION SKIP REQUEST');
+        \Log::info('📄 ID VERIFICATION - User chose to skip verification');
+        \Log::info('⏰ Timestamp: ' . now()->format('Y-m-d H:i:s'));
+        \Log::info('🌐 Request IP: ' . $request->ip());
+
+        $user = $request->user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+
+        \Log::info('👤 User ID: ' . $user->id);
+        \Log::info('👤 User Email: ' . $user->email);
+
+        // Check if user already has a verification record
+        $existingVerification = Verification::where('user_id', $user->id)->first();
+        
+        if ($existingVerification) {
+            \Log::info('⚠️ User already has verification record - ID: ' . $existingVerification->id);
+            return response()->json([
+                'success' => true,
+                'message' => 'Verification status already recorded',
+                'verification' => [
+                    'id' => $existingVerification->id,
+                    'status' => $existingVerification->status,
+                    'document_type' => $existingVerification->document_type,
+                    'submitted_at' => $existingVerification->created_at->format('Y-m-d H:i:s')
+                ]
+            ]);
+        }
+
+        // Create a verification record with 'skipped' status
+        $verification = Verification::create([
+            'user_id' => $user->id,
+            'document_type' => 'skipped',
+            'document_number' => null,
+            'document_image' => null,
+            'status' => 'skipped',
+            'is_philippine_id' => false,
+            'verification_method' => 'manual_skip',
+            'verification_score' => null,
+            'extracted_data' => json_encode([
+                'skipped_at' => now()->toISOString(),
+                'skip_reason' => 'User chose to skip during registration',
+                'can_complete_later' => true
+            ]),
+            'notes' => 'User skipped ID verification during registration. Can complete later.'
+        ]);
+
+        \Log::info('💾 SKIPPED VERIFICATION RECORD CREATED - ID: ' . $verification->id);
+        \Log::info('✅ ID VERIFICATION SKIP COMPLETED SUCCESSFULLY');
+
+        // Create notification for admin
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'verification_skipped',
+            'title' => 'ID Verification Skipped',
+            'message' => 'User ' . $user->name . ' skipped ID verification during registration.',
+            'data' => json_encode([
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'verification_id' => $verification->id,
+                'skipped_at' => now()->toISOString()
+            ])
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Registration completed successfully! You can complete ID verification later.',
+            'verification' => [
+                'id' => $verification->id,
+                'status' => 'skipped',
+                'document_type' => 'skipped',
+                'submitted_at' => $verification->created_at->format('Y-m-d H:i:s'),
+                'can_complete_later' => true
+            ],
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role
+            ],
+            'timestamp' => now()->format('Y-m-d H:i:s')
+        ], 200);
+    }
+
+    // Public helper to allow skip without Sanctum for onboarding/dev only
+    public function skipVerificationPublic(Request $request)
+    {
+        // Mirror CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        // Try to resolve user either from sanctum or provided identifiers
+        $user = $request->user();
+        if (!$user && $request->filled('user_id')) {
+            $user = User::find($request->integer('user_id'));
+        }
+        if (!$user && $request->filled('phone')) {
+            $user = User::where('phone', $request->input('phone'))->first();
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        // If already has a verification, return it
+        $existingVerification = Verification::where('user_id', $user->id)->first();
+        if ($existingVerification) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Verification status already recorded',
+                'verification' => [
+                    'id' => $existingVerification->id,
+                    'status' => $existingVerification->status,
+                    'document_type' => $existingVerification->document_type,
+                    'submitted_at' => $existingVerification->created_at->format('Y-m-d H:i:s')
+                ]
+            ]);
+        }
+
+        $verification = Verification::create([
+            'user_id' => $user->id,
+            'document_type' => 'skipped',
+            'status' => 'skipped',
+            'is_philippine_id' => false,
+            'verification_method' => 'manual_skip',
+            'extracted_data' => json_encode([
+                'skipped_at' => now()->toISOString(),
+                'skip_reason' => 'User chose to skip (public endpoint)',
+                'can_complete_later' => true,
+            ]),
+            'notes' => 'User skipped via public endpoint during onboarding.',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'ID verification marked as skipped. You can complete it later.',
+            'verification' => [
+                'id' => $verification->id,
+                'status' => $verification->status,
+                'document_type' => $verification->document_type,
+                'submitted_at' => $verification->created_at->format('Y-m-d H:i:s')
+            ],
+        ]);
+    }
 
     private function awardBadges($verification)
     {

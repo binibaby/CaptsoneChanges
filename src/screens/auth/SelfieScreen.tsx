@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { getApiUrl, getAuthHeaders } from '../../constants/config';
 
 interface SelfieScreenProps {
   userData?: any;
@@ -24,10 +25,10 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
   const route = useRoute();
   
   // Get data from either props or route params
-  const userData = propUserData || route.params?.userData;
-  const phoneVerified = propPhoneVerified ?? route.params?.phoneVerified;
-  const frontImage = propFrontImage || route.params?.frontImage;
-  const backImage = propBackImage || route.params?.backImage;
+  const userData = propUserData || (route.params as any)?.userData;
+  const phoneVerified = propPhoneVerified ?? (route.params as any)?.phoneVerified;
+  const frontImage = propFrontImage || (route.params as any)?.frontImage;
+  const backImage = propBackImage || (route.params as any)?.backImage;
   
   console.log('SelfieScreen - propUserData:', propUserData);
   console.log('SelfieScreen - propPhoneVerified:', propPhoneVerified);
@@ -101,53 +102,39 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
           const blob = await response.blob();
           return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1]); // Remove data:image/jpeg;base64, prefix
+            };
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
         } catch (error) {
           console.error('Error converting image to base64:', error);
-          return '';
+          throw new Error('Failed to process image');
         }
       };
 
       // Convert all images to base64
-      const frontImageBase64 = await convertImageToBase64(frontImage);
-      const backImageBase64 = await convertImageToBase64(backImage);
+      const frontImageBase64 = frontImage ? await convertImageToBase64(frontImage) : '';
+      const backImageBase64 = backImage ? await convertImageToBase64(backImage) : '';
       const selfieImageBase64 = await convertImageToBase64(selfieImage);
 
-      // Prepare JSON payload
       const payload = {
-        document_type: 'ph_national_id', // Default to Philippine National ID
-        document_number: 'N/A', // Not provided in current flow
-        document_image: frontImageBase64, // Use front image as primary document
-        first_name: userData.firstName,
-        last_name: userData.lastName,
-        email: userData.email,
-        phone: userData.phone,
-        age: userData.age || '',
-        gender: userData.gender || '',
-        address: userData.address || '',
+        user_id: userData?.id || '1',
+        document_type: 'ph_national_id',
+        document_number: '123456789',
+        front_image: frontImageBase64,
         back_image: backImageBase64,
         selfie_image: selfieImageBase64,
+        has_front_image: !!frontImageBase64,
+        has_back_image: !!backImageBase64,
+        has_selfie_image: !!selfieImageBase64,
       };
 
-      console.log('Submitting verification with payload:', {
-        document_type: payload.document_type,
-        first_name: payload.first_name,
-        last_name: payload.last_name,
-        phone: payload.phone,
-        has_front_image: !!payload.document_image,
-        has_back_image: !!payload.back_image,
-        has_selfie_image: !!payload.selfie_image,
-      });
-
-      const response = await fetch('http://192.168.100.145:8000/api/verification/submit-simple', {
+      const response = await fetch(getApiUrl('/api/verification/submit-simple'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -183,11 +170,73 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
         Alert.alert('Verification Failed', data.message || 'Verification failed. Please try again.');
       }
     } catch (error) {
-      console.error('Verification submission error:', error);
+      console.error('Verification error:', error);
       Alert.alert('Error', 'Failed to submit verification. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSkip = async () => {
+    Alert.alert(
+      'Skip ID Verification',
+      'You can skip ID verification for now and complete it later. Your account will be created but ID verification will be marked as pending.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Skip for Now',
+          onPress: async () => {
+            try {
+              // Call the public skip verification API (no token required during onboarding)
+              const response = await fetch(getApiUrl('/api/verification/skip-public'), {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                  user_id: (userData as any)?.user?.id || (userData as any)?.id,
+                  phone: (userData as any)?.phone,
+                }),
+              });
+
+              const data = await response.json();
+              
+              if (data.success) {
+                Alert.alert(
+                  'Skipped for now',
+                  'You can use the app but please complete your ID verification later from your profile.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Complete registration without ID verification
+                        if (onSelfieComplete) {
+                          console.log('Using callback for completion without verification');
+                          onSelfieComplete(userData);
+                        } else {
+                          console.log('Using navigation reset without verification');
+                          // Navigate to the main app
+                          navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'PetSitterDashboard' }],
+                          });
+                        }
+                      },
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Error', data.message || 'Failed to skip verification');
+              }
+            } catch (error) {
+              console.error('Skip verification error:', error);
+              Alert.alert('Error', 'Failed to skip verification. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleBack = () => {
@@ -230,6 +279,13 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
               {selfieImage ? 'Retake Selfie' : 'Take Selfie'}
             </Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.skipButton} 
+          onPress={handleSkip}
+        >
+          <Text style={styles.skipButtonText}>Skip for Now</Text>
         </TouchableOpacity>
 
         <View style={styles.buttonContainer}>
@@ -319,6 +375,18 @@ const styles = StyleSheet.create({
   cameraButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  skipButton: {
+    backgroundColor: '#F59E0B',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   buttonContainer: {

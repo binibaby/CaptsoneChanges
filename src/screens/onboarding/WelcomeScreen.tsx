@@ -17,7 +17,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Image
-          source={require('../../assets/images/icon.png')}
+          source={require('../../assets/images/logo.png')}
           style={styles.logo}
         />
         <Text style={styles.title}>Welcome to Petsit Connect</Text>
@@ -67,15 +67,17 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   buttonContainer: {
-    width: '100%',
+    width: '75%',
     marginBottom: 30,
   },
   getStartedButton: {
     backgroundColor: '#F59E0B',
     paddingVertical: 15,
-    borderRadius: 10,
+    borderRadius: 10000,
     alignItems: 'center',
     width: '100%',
+    
+    
   },
   getStartedButtonText: {
     color: '#fff',

@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { getApiUrl, getAuthHeaders } from '../../constants/config';
 import { RootStackParamList } from '../../navigation/types';
 
 type PhoneVerificationScreenNavigationProp = StackNavigationProp<RootStackParamList, 'PhoneVerification'>;
@@ -53,21 +54,11 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     try {
       console.log('LOG PhoneVerificationScreen - Sending code to:', phoneNumber);
       
-      // Test connectivity first
-      const testResponse = await fetch('http://192.168.100.145:8000/api/test', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      console.log('Test response status:', testResponse.status);
-
-      const response = await fetch('http://192.168.100.145:8000/api/send-verification-code', {
+      console.log('Using API URL:', getApiUrl('/api/send-verification-code'));
+      
+      const response = await fetch(getApiUrl('/api/send-verification-code'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: getAuthHeaders(),
         mode: 'cors',
         credentials: 'omit',
         body: JSON.stringify({
@@ -76,6 +67,8 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       });
 
       console.log('API Response Status:', response.status);
+      console.log('API Response Headers:', response.headers);
+      
       const data = await response.json();
       console.log('API Response Data:', data);
 
@@ -102,11 +95,17 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
           ]
         );
       } else {
+        console.error('API Error Response:', data);
         Alert.alert('Error', data.message || 'Failed to send verification code');
       }
     } catch (error) {
       console.error('Error sending verification code:', error);
-      Alert.alert('Error', 'Network error. Please check your connection.');
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      Alert.alert('Error', `Network error: ${error.message}. Please check your connection.`);
     } finally {
       setIsLoading(false);
     }
@@ -122,12 +121,11 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     try {
       console.log('LOG PhoneVerificationScreen - Verifying code:', verificationCode);
       
-      const response = await fetch('http://192.168.100.145:8000/api/verify-phone-code', {
+      console.log('Using API URL:', getApiUrl('/api/verify-phone-code'));
+      
+      const response = await fetch(getApiUrl('/api/verify-phone-code'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: getAuthHeaders(),
         mode: 'cors',
         credentials: 'omit',
         body: JSON.stringify({
@@ -150,13 +148,10 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
           onPhoneVerified(true);
         } else {
           console.log('Using navigation prop');
-          // Navigate to ID verification with user data
-          console.log('Attempting to navigate to FrontID with data:', { userData, phoneVerified: true });
-          
-          // Use proper navigation without any casting
+          // Navigate to front ID screen with all collected data
           navigation.navigate('FrontID', {
             userData: userData,
-            phoneVerified: true
+            phoneVerified: true,
           });
         }
       } else {

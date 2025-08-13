@@ -1,6 +1,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
+import { getApiUrl, getAuthHeaders } from '../../constants/config';
 import {
     ActivityIndicator,
     Alert,
@@ -88,6 +89,67 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
     }
   };
 
+  const handleSkip = async () => {
+    Alert.alert(
+      'Skip Back ID Photo',
+      'You can skip the back ID photo for now and complete it later.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Skip for Now',
+          onPress: async () => {
+            try {
+              // Call the public skip verification API to avoid token requirement during onboarding
+              const response = await fetch(getApiUrl('/api/verification/skip-public'), {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                  user_id: (userData as any)?.user?.id || (userData as any)?.id,
+                  phone: (userData as any)?.phone,
+                }),
+              });
+
+              const data = await response.json();
+              
+              if (data.success) {
+                Alert.alert(
+                  'Skipped for now',
+                  'You can use the app but please complete your ID verification later from your profile.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Navigate to selfie screen without back image
+                        if (onBackIDComplete) {
+                          onBackIDComplete(phoneVerified, frontImage, '');
+                        } else {
+                          navigation.navigate('Selfie', {
+                            userData: userData,
+                            phoneVerified: phoneVerified,
+                            frontImage: frontImage,
+                            backImage: '',
+                          });
+                        }
+                      },
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Error', data.message || 'Failed to skip verification');
+              }
+            } catch (error) {
+              console.error('Skip verification error:', error);
+              Alert.alert('Error', 'Failed to skip verification. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleBack = () => {
     if (onBackIDComplete) {
       // Go back to previous step in auth flow
@@ -128,6 +190,13 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
               {backImage ? 'Retake Photo' : 'Take Photo'}
             </Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.skipButton} 
+          onPress={handleSkip}
+        >
+          <Text style={styles.skipButtonText}>Skip for Now</Text>
         </TouchableOpacity>
 
         <View style={styles.buttonContainer}>
@@ -210,6 +279,18 @@ const styles = StyleSheet.create({
   cameraButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  skipButton: {
+    backgroundColor: '#F59E0B',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   buttonContainer: {
