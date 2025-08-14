@@ -1,0 +1,60 @@
+==== Wed Aug 13 18:45:24 PST 2025 - Starting Phone Code Monitor ====
+==== Wed Aug 13 18:46:02 PST 2025 - Starting Phone Code Monitor ====
+📱 PHONE VERIFICATION CODE MONITOR
+===================================
+🔍 Monitoring verification codes in real-time...
+💡 This will show all SMS codes, verification requests, and phone-related logs
+
+🔍 Starting real-time phone verification monitoring...
+📊 Watching logs for: verification codes, SMS, OTP, phone numbers
+
+📋 Monitoring Laravel logs...
+📋 Monitoring verification audit logs...
+📋 Monitoring general application logs...
+
+🎯 Phone verification codes will appear here in real-time!
+💡 Keep this terminal open to see all verification activities
+🛑 Press Ctrl+C to stop monitoring
+
+#38 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#39 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(🔐 1219 🔐): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#40 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/public/index.php(20): Illuminate\Foundation\Application->handleRequest(Object(Illuminate\Http\Request))
+#41 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('/Users/jassy/De...')
+#42 {main}  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: 🎭 SMS SIMULATION (fallback) to +🔐 639639 🔐🔐 283365 🔐: Your Petsit Connect 🔄 VERIFICATION 🔑 CODE is: 🔐 942423 🔐  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: ⚠️  MessageBird service unavailable - using simulation mode  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: 🔧 Check MessageBird credentials and wallet balance  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: ✅ SMS SIMULATION COMPLETED SUCCESSFULLY  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: 📱 SMS Result: {"success":true,"message":"Verification 🔑 CODE sent successfully! (Fallback mode)","debug_🔑 CODE":"🔐 942423 🔐","note":"MessageBird failed - using simulation mode","simulation_mode":true,"📞 PHONE_number":"+🔐 639639 🔐🔐 283365 🔐","message_length":48,"timestamp":"🔐 2025 🔐-08-12 03:29:51","error":"Got error response from the server: Request not allowed (incorrect access_key)"}  
+==== Thu Aug 14 09:05:00 PST 2025 - Starting Phone Code Monitor ====
+📱 PHONE VERIFICATION CODE MONITOR
+===================================
+🔍 Monitoring verification codes in real-time...
+💡 This will show all SMS codes, verification requests, and phone-related logs
+
+🔍 Starting real-time phone verification monitoring...
+📊 Watching logs for: verification codes, SMS, OTP, phone numbers
+
+📋 Monitoring Laravel logs...
+📋 Monitoring verification audit logs...
+📋 Monitoring general application logs...
+
+🎯 Phone verification codes will appear here in real-time!
+💡 Keep this terminal open to see all verification activities
+🛑 Press Ctrl+C to stop monitoring
+
+#38 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#39 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(🔐 1219 🔐): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#40 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/public/index.php(20): Illuminate\Foundation\Application->handleRequest(Object(Illuminate\Http\Request))
+#41 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('/Users/jassy/De...')
+#42 {main}  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: 🎭 SMS SIMULATION (fallback) to +🔐 639639 🔐🔐 283365 🔐: Your Petsit Connect 🔄 VERIFICATION 🔑 CODE is: 🔐 942423 🔐  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: ⚠️  MessageBird service unavailable - using simulation mode  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: 🔧 Check MessageBird credentials and wallet balance  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: ✅ SMS SIMULATION COMPLETED SUCCESSFULLY  
+[🔐 2025 🔐-08-12 03:29:51] local.INFO: 📱 SMS Result: {"success":true,"message":"Verification 🔑 CODE sent successfully! (Fallback mode)","debug_🔑 CODE":"🔐 942423 🔐","note":"MessageBird failed - using simulation mode","simulation_mode":true,"📞 PHONE_number":"+🔐 639639 🔐🔐 283365 🔐","message_length":48,"timestamp":"🔐 2025 🔐-08-12 03:29:51","error":"Got error response from the server: Request not allowed (incorrect access_key)"}  
+==== Thu Aug 14 09:11:39 PST 2025 - NEW PHONE VERIFICATION CODE GENERATED ====
+📱 NEW VERIFICATION CODE: 394754
+📞 Phone: +639123456789
+⏰ Time: Thu Aug 14 09:11:39 PST 2025
+

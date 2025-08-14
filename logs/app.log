@@ -1,0 +1,88 @@
+==== Wed Aug 13 18:45:24 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+==== Wed Aug 13 18:46:02 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+==== Thu Aug 14 09:05:00 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules/expo-router/entry.js ▓▓▓░░░░░░░░░░░░░ 21.3% ( 6/13)
+λ node_modules/expo-router/node/render.js ▓░░░░░░░░░░░░░░░  6.3% (11/45)
+Web node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.3% (17/33)
+λ node_modules/expo-router/node/render.js ▓░░░░░░░░░░░░░░░  9.7% ( 74/238)
+Web node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.3% ( 54/148)
+λ node_modules/expo-router/node/render.js ▓▓░░░░░░░░░░░░░░ 16.8% (122/302)
+Web node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.3% ( 89/187)
+λ node_modules/expo-router/node/render.js ▓▓▓▓░░░░░░░░░░░░ 29.9% (186/340)
+Web node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.3% ( 95/190)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓░░░░░░░░░░ 38.4% (270/438)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 49.4% (187/266)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓░░░░░░░░░░ 39.7% (305/484)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 50.1% (189/267)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓░░░░░░░░ 53.6% (386/527)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 50.1% (196/321)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 63.0% (458/577)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 50.1% (274/390)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.0% (501/599)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 50.7% (315/483)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.6% (572/686)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 54.2% (388/527)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.8% (610/735)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 59.0% (421/562)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.9% (674/825)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 66.2% (520/639)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.9% (718/839)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 66.3% (530/651)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 81.1% (815/905)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.2% (620/740)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.0% (836/946)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.2% (679/812)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.0% ( 929/1095)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.9% (762/892)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.0% (1041/1186)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 81.0% (875/981)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.2% (1179/1285)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 83.1% ( 930/1020)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 88.8% (1263/1340)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 83.6% (1016/1112)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 93.9% (1336/1379)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 93.1% (1184/1227)
+λ node_modules/expo-router/node/render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.1% (1385/1391)
+λ Bundling failed 74140ms node_modules/expo-router/node/render.js (1404 modules)
+
+Metro error: Importing native-only module "react-native/Libraries/Utilities/codegenNativeCommands" on web from: /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/react-native-maps/lib/MapMarkerNativeComponent.js
+
+  Error: Importing native-only module "react-native/Libraries/Utilities/codegenNativeCommands" on web from: /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/react-native-maps/lib/MapMarkerNativeComponent.js
+    at resolver (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/@expo/cli/src/start/server/metro/withMetroMultiPlatform.ts:633:19)
+    at firstResolver (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/@expo/cli/src/start/server/metro/withMetroResolvers.ts:76:29)
+    at firstResolver (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/@expo/cli/src/start/server/metro/withMetroResolvers.ts:108:16)
+    at resolveRequest (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/@expo/cli/src/start/server/metro/withMetroResolvers.ts:137:16)
+    at Object.resolve (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/metro-resolver/src/resolve.js:36:12)
+    at ModuleResolver.resolveDependency (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/metro/src/node-haste/DependencyGraph/ModuleResolution.js:74:31)
+    at DependencyGraph.resolveDependency (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/metro/src/node-haste/DependencyGraph.js:239:43)
+    at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/metro/src/lib/transformHelpers.js:165:21
+    at resolveDependencies (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/metro/src/DeltaBundler/buildSubgraph.js:42:25)
+    at visit (/Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/node_modules/metro/src/DeltaBundler/buildSubgraph.js:83:30)
+Web node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 97.0% (1221/1240)
+Error: Premature close
+    at new NodeError (node:internal/errors:405:5)
+    at onclose (node:internal/streams/end-of-stream:159:30)
+    at processTicksAndRejections (node:internal/process/task_queues:77:11)
+Web Bundling failed 74646ms node_modules/expo-router/entry.js (1251 modules)
