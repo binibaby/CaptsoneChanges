@@ -54,17 +54,25 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     try {
       console.log('LOG PhoneVerificationScreen - Sending code to:', phoneNumber);
       
-      console.log('Using API URL:', getApiUrl('/api/send-verification-code'));
+      const apiUrl = getApiUrl('/api/send-verification-code');
+      console.log('Using API URL:', apiUrl);
       
-      const response = await fetch(getApiUrl('/api/send-verification-code'), {
+      // Add timeout to the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: getAuthHeaders(),
         mode: 'cors',
         credentials: 'omit',
+        signal: controller.signal,
         body: JSON.stringify({
           phone: phoneNumber,
         }),
       });
+      
+      clearTimeout(timeoutId);
 
       console.log('API Response Status:', response.status);
       console.log('API Response Headers:', response.headers);
@@ -103,9 +111,21 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       console.error('Error details:', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
+        type: error.constructor.name
       });
-      Alert.alert('Error', `Network error: ${error.message}. Please check your connection.`);
+      
+      let errorMessage = 'Network error occurred. Please check your connection.';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.message.includes('Network request failed')) {
+        errorMessage = 'Unable to connect to server. Please check your internet connection.';
+      } else if (error.message.includes('JSON')) {
+        errorMessage = 'Invalid response from server. Please try again.';
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }

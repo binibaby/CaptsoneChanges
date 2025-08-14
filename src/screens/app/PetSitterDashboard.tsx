@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
 import {
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
@@ -70,15 +69,26 @@ const PetSitterDashboard = () => {
         </View>
 
         {/* Total Income Section */}
-        <LinearGradient
-          colors={['#10B981', '#8B5CF6', '#F97316']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.totalIncomeSection}
-        >
-          <Text style={styles.totalIncomeLabel}>Total Income</Text>
-          <Text style={styles.totalIncomeAmount}>{earningsData.totalEarnings}</Text>
-        </LinearGradient>
+        <TouchableOpacity onPress={() => router.push('/e-wallet' as any)}>
+          <LinearGradient
+            colors={['#10B981', '#8B5CF6', '#F97316']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.totalIncomeSection}
+          >
+            <View style={styles.totalIncomeContent}>
+              <View style={styles.totalIncomeHeader}>
+                <Ionicons name="wallet" size={24} color="#fff" />
+                <Text style={styles.totalIncomeLabel}>Total Income</Text>
+              </View>
+              <Text style={styles.totalIncomeAmount}>{earningsData.totalEarnings}</Text>
+              <View style={styles.totalIncomeHint}>
+                <Ionicons name="arrow-forward" size={16} color="#fff" />
+                <Text style={styles.totalIncomeHintText}>Tap to view E-Wallet</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* Stats Cards */}
         <View style={styles.statsRow}>
@@ -221,12 +231,32 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    marginLeft: 8,
   },
   totalIncomeAmount: {
     color: '#fff',
     fontSize: 32,
     fontWeight: 'bold',
+  },
+  totalIncomeContent: {
+    alignItems: 'center',
+  },
+  totalIncomeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  totalIncomeHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    opacity: 0.9,
+  },
+  totalIncomeHintText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   sectionTitle: {
     fontSize: 20,

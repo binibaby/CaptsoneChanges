@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // For local development - use your computer's IP address
   // Find your IP with: ifconfig | grep "inet " | grep -v 127.0.0.1
   BASE_URL: __DEV__ 
-    ? 'https://capstoneapp-1754969275.loca.lt'  // Public tunnel for mobile data access
+    ? 'http://172.20.10.2:8000'  // Local Laravel server (your computer's IP)
     : 'https://your-production-domain.com',
   
   // API endpoints

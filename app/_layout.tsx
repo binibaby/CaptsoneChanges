@@ -1,5 +1,4 @@
 import { Stack } from 'expo-router';
-import React from 'react';
 import { AuthProvider } from '../src/contexts/AuthContext';
 
 export default function RootLayout() {
@@ -20,6 +19,7 @@ export default function RootLayout() {
         <Stack.Screen name="pet-sitter-requests" />
         <Stack.Screen name="pet-sitter-schedule" />
         <Stack.Screen name="pet-sitter-messages" />
+        <Stack.Screen name="e-wallet" />
         
         {/* Pet Owner Routes */}
         <Stack.Screen name="pet-owner-profile" />

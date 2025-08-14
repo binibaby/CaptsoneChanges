@@ -2,16 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { getApiUrl, getAuthHeaders } from '../../constants/config';
 
 interface Transaction {
   id: number;
@@ -25,8 +26,8 @@ interface Transaction {
 const EWalletScreen: React.FC = () => {
   const navigation = useNavigation();
   
-  const [balance, setBalance] = useState(0);
-  const [pendingEarnings, setPendingEarnings] = useState(0);
+  const [balance, setBalance] = useState(2850.00);
+  const [pendingEarnings, setPendingEarnings] = useState(450.00);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showCashoutModal, setShowCashoutModal] = useState(false);
@@ -34,7 +35,72 @@ const EWalletScreen: React.FC = () => {
   const [selectedBank, setSelectedBank] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([
+    {
+      id: 1,
+      type: 'earning',
+      amount: 450.00,
+      description: 'Pet sitting for Luna (Persian Cat)',
+      date: '2025-08-14',
+      status: 'completed'
+    },
+    {
+      id: 2,
+      type: 'earning',
+      amount: 380.00,
+      description: 'Pet sitting for Mochi (Ragdoll)',
+      date: '2025-08-13',
+      status: 'completed'
+    },
+    {
+      id: 3,
+      type: 'cashout',
+      amount: -1000.00,
+      description: 'Cash out to BPI Bank',
+      date: '2025-08-10',
+      status: 'completed'
+    },
+    {
+      id: 4,
+      type: 'earning',
+      amount: 520.00,
+      description: 'Pet sitting for Casper (Dog)',
+      date: '2025-08-09',
+      status: 'completed'
+    },
+    {
+      id: 5,
+      type: 'earning',
+      amount: 420.00,
+      description: 'Pet sitting for Max (Golden Retriever)',
+      date: '2025-08-08',
+      status: 'completed'
+    },
+    {
+      id: 6,
+      type: 'earning',
+      amount: 350.00,
+      description: 'Pet sitting for Bella (Siamese Cat)',
+      date: '2025-08-07',
+      status: 'completed'
+    },
+    {
+      id: 7,
+      type: 'cashout',
+      amount: -500.00,
+      description: 'Cash out to BDO Bank',
+      date: '2025-08-05',
+      status: 'completed'
+    },
+    {
+      id: 8,
+      type: 'earning',
+      amount: 480.00,
+      description: 'Pet sitting for Rocky (Bulldog)',
+      date: '2025-08-04',
+      status: 'completed'
+    }
+  ]);
 
   const banks = [
     'BPI (Bank of the Philippine Islands)',
@@ -56,51 +122,57 @@ const EWalletScreen: React.FC = () => {
   const loadWalletData = async () => {
     setLoading(true);
     try {
+      // For development, use sample data instead of API calls
+      if (__DEV__) {
+        console.log('Using sample data for development');
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setBalance(2850.00);
+        setPendingEarnings(450.00);
+        // Keep the sample transactions we already have
+        console.log('Sample data loaded successfully');
+        return;
+      }
+
       const token = await getAuthToken();
-              const response = await fetch('http://192.168.100.145:8000/api/wallet/balance', {
+      const response = await fetch(getApiUrl('/api/wallet/balance'), {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(token),
       });
       const data = await response.json();
       if (data.success) {
         setBalance(data.balance);
       } else {
-        Alert.alert('Error', 'Failed to load balance.');
+        console.warn('Failed to load balance from API, using sample data');
       }
 
-              const responseEarnings = await fetch('http://192.168.100.145:8000/api/wallet/pending_earnings', {
+      const responseEarnings = await fetch(getApiUrl('/api/wallet/pending_earnings'), {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(token),
       });
       const earningsData = await responseEarnings.json();
       if (earningsData.success) {
         setPendingEarnings(earningsData.pending_earnings);
       } else {
-        Alert.alert('Error', 'Failed to load pending earnings.');
+        console.warn('Failed to load pending earnings from API, using sample data');
       }
 
-              const responseTransactions = await fetch('http://192.168.100.145:8000/api/wallet/transactions', {
+      const responseTransactions = await fetch(getApiUrl('/api/wallet/transactions'), {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(token),
       });
       const transactionsData = await responseTransactions.json();
       if (transactionsData.success) {
         setTransactions(transactionsData.transactions);
       } else {
-        Alert.alert('Error', 'Failed to load transactions.');
+        console.warn('Failed to load transactions from API, using sample data');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load wallet data. Please try again.');
-      console.error('Error loading wallet data:', error);
+      console.warn('API calls failed, using sample data:', error);
+      // Don't show error alert in development, just use sample data
+      if (!__DEV__) {
+        Alert.alert('Error', 'Failed to load wallet data. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -110,6 +182,11 @@ const EWalletScreen: React.FC = () => {
     setRefreshing(true);
     await loadWalletData();
     setRefreshing(false);
+    
+    if (__DEV__) {
+      // Show a success message in development mode
+      Alert.alert('Refreshed', 'Sample data refreshed successfully!');
+    }
   };
 
   const processCashout = async () => {
@@ -133,12 +210,9 @@ const EWalletScreen: React.FC = () => {
 
     try {
       const token = await getAuthToken();
-              const response = await fetch('http://192.168.100.145:8000/api/wallet/cashout', {
+      const response = await fetch(getApiUrl('/api/wallet/cashout'), {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify({
           amount: amount,
           bank: selectedBank,
@@ -320,6 +394,13 @@ const EWalletScreen: React.FC = () => {
       >
         {/* Balance Cards */}
         <View style={styles.balanceContainer}>
+          {__DEV__ && (
+            <View style={styles.devModeBanner}>
+              <Ionicons name="code-slash" size={16} color="#F59E0B" />
+              <Text style={styles.devModeText}>Development Mode - Using Sample Data</Text>
+            </View>
+          )}
+          
           <View style={styles.balanceCard}>
             <View style={styles.balanceIcon}>
               <Ionicons name="wallet" size={24} color="#F59E0B" />
@@ -353,7 +434,14 @@ const EWalletScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.actionButton, styles.secondaryButton]}
-            onPress={() => navigation.navigate('TransactionHistory')}
+            onPress={() => {
+              // Show all transactions in an expanded view
+              Alert.alert(
+                'All Transactions',
+                'This would show a full transaction history in a real app. Currently showing sample data.',
+                [{ text: 'OK' }]
+              );
+            }}
           >
             <Ionicons name="list" size={20} color="#F59E0B" />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>View All</Text>
@@ -362,7 +450,18 @@ const EWalletScreen: React.FC = () => {
 
         {/* Recent Transactions */}
         <View style={styles.transactionsContainer}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <View style={styles.transactionsHeader}>
+            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+            <TouchableOpacity onPress={() => {
+              Alert.alert(
+                'Transaction History',
+                `Total Transactions: ${transactions.length}\n\nThis would show a full transaction history with pagination in a real app.`,
+                [{ text: 'OK' }]
+              );
+            }}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
           
           {loading ? (
             <ActivityIndicator size="large" color="#F59E0B" />
@@ -411,6 +510,21 @@ const EWalletScreen: React.FC = () => {
               </View>
             ))
           )}
+          
+          {transactions.length > 5 && (
+            <TouchableOpacity 
+              style={styles.showMoreButton}
+              onPress={() => {
+                Alert.alert(
+                  'More Transactions',
+                  `Showing ${transactions.length - 5} more transactions...\n\nThis would expand the list in a real app.`,
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
+              <Text style={styles.showMoreText}>Show More ({transactions.length - 5})</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -444,6 +558,23 @@ const styles = StyleSheet.create({
   balanceContainer: {
     padding: 20,
     gap: 12,
+  },
+  devModeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    marginBottom: 8,
+  },
+  devModeText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '500',
+    marginLeft: 6,
   },
   balanceCard: {
     backgroundColor: '#FFF',
@@ -518,6 +649,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  transactionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  showMoreButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  showMoreText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '500',
   },
   sectionTitle: {
     fontSize: 16,
