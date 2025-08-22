@@ -26,8 +26,8 @@ interface Transaction {
 const EWalletScreen: React.FC = () => {
   const navigation = useNavigation();
   
-  const [balance, setBalance] = useState(2850.00);
-  const [pendingEarnings, setPendingEarnings] = useState(450.00);
+  const [balance, setBalance] = useState(0.00);
+  const [pendingEarnings, setPendingEarnings] = useState(0.00);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showCashoutModal, setShowCashoutModal] = useState(false);
@@ -35,72 +35,7 @@ const EWalletScreen: React.FC = () => {
   const [selectedBank, setSelectedBank] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: 1,
-      type: 'earning',
-      amount: 450.00,
-      description: 'Pet sitting for Luna (Persian Cat)',
-      date: '2025-08-14',
-      status: 'completed'
-    },
-    {
-      id: 2,
-      type: 'earning',
-      amount: 380.00,
-      description: 'Pet sitting for Mochi (Ragdoll)',
-      date: '2025-08-13',
-      status: 'completed'
-    },
-    {
-      id: 3,
-      type: 'cashout',
-      amount: -1000.00,
-      description: 'Cash out to BPI Bank',
-      date: '2025-08-10',
-      status: 'completed'
-    },
-    {
-      id: 4,
-      type: 'earning',
-      amount: 520.00,
-      description: 'Pet sitting for Casper (Dog)',
-      date: '2025-08-09',
-      status: 'completed'
-    },
-    {
-      id: 5,
-      type: 'earning',
-      amount: 420.00,
-      description: 'Pet sitting for Max (Golden Retriever)',
-      date: '2025-08-08',
-      status: 'completed'
-    },
-    {
-      id: 6,
-      type: 'earning',
-      amount: 350.00,
-      description: 'Pet sitting for Bella (Siamese Cat)',
-      date: '2025-08-07',
-      status: 'completed'
-    },
-    {
-      id: 7,
-      type: 'cashout',
-      amount: -500.00,
-      description: 'Cash out to BDO Bank',
-      date: '2025-08-05',
-      status: 'completed'
-    },
-    {
-      id: 8,
-      type: 'earning',
-      amount: 480.00,
-      description: 'Pet sitting for Rocky (Bulldog)',
-      date: '2025-08-04',
-      status: 'completed'
-    }
-  ]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const banks = [
     'BPI (Bank of the Philippine Islands)',
@@ -122,15 +57,15 @@ const EWalletScreen: React.FC = () => {
   const loadWalletData = async () => {
     setLoading(true);
     try {
-      // For development, use sample data instead of API calls
+      // For new users, start with $0 balance and no transactions
       if (__DEV__) {
-        console.log('Using sample data for development');
+        console.log('New user - starting with $0 balance');
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000));
-        setBalance(2850.00);
-        setPendingEarnings(450.00);
-        // Keep the sample transactions we already have
-        console.log('Sample data loaded successfully');
+        setBalance(0.00);
+        setPendingEarnings(0.00);
+        setTransactions([]);
+        console.log('New user data loaded successfully');
         return;
       }
 
@@ -143,7 +78,8 @@ const EWalletScreen: React.FC = () => {
       if (data.success) {
         setBalance(data.balance);
       } else {
-        console.warn('Failed to load balance from API, using sample data');
+        console.warn('Failed to load balance from API, starting with $0');
+        setBalance(0.00);
       }
 
       const responseEarnings = await fetch(getApiUrl('/api/wallet/pending_earnings'), {
@@ -154,7 +90,8 @@ const EWalletScreen: React.FC = () => {
       if (earningsData.success) {
         setPendingEarnings(earningsData.pending_earnings);
       } else {
-        console.warn('Failed to load pending earnings from API, using sample data');
+        console.warn('Failed to load pending earnings from API, starting with $0');
+        setPendingEarnings(0.00);
       }
 
       const responseTransactions = await fetch(getApiUrl('/api/wallet/transactions'), {
@@ -165,13 +102,17 @@ const EWalletScreen: React.FC = () => {
       if (transactionsData.success) {
         setTransactions(transactionsData.transactions);
       } else {
-        console.warn('Failed to load transactions from API, using sample data');
+        console.warn('Failed to load transactions from API, starting with empty list');
+        setTransactions([]);
       }
     } catch (error) {
-      console.warn('API calls failed, using sample data:', error);
-      // Don't show error alert in development, just use sample data
+      console.warn('API calls failed, starting with $0 balance:', error);
+      // Start with $0 for new users
+      setBalance(0.00);
+      setPendingEarnings(0.00);
+      setTransactions([]);
       if (!__DEV__) {
-        Alert.alert('Error', 'Failed to load wallet data. Please try again.');
+        Alert.alert('Error', 'Failed to load wallet data. Starting with $0 balance.');
       }
     } finally {
       setLoading(false);
@@ -184,8 +125,8 @@ const EWalletScreen: React.FC = () => {
     setRefreshing(false);
     
     if (__DEV__) {
-      // Show a success message in development mode
-      Alert.alert('Refreshed', 'Sample data refreshed successfully!');
+      // Show a success message in development mode for new users
+      Alert.alert('Refreshed', 'New user data refreshed successfully! Starting with $0 balance.');
     }
   };
 
@@ -397,7 +338,7 @@ const EWalletScreen: React.FC = () => {
           {__DEV__ && (
             <View style={styles.devModeBanner}>
               <Ionicons name="code-slash" size={16} color="#F59E0B" />
-              <Text style={styles.devModeText}>Development Mode - Using Sample Data</Text>
+              <Text style={styles.devModeText}>New User - Starting with $0 Balance</Text>
             </View>
           )}
           

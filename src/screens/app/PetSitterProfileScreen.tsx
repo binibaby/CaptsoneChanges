@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -15,21 +15,23 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PetSitterProfileScreen = () => {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@email.com',
-    phone: '+1 (555) 123-4567',
-    bio: 'Experienced pet sitter with 3 years of experience. I love all animals and provide personalized care for your beloved pets.',
-    hourlyRate: '25',
-    location: 'San Francisco, CA',
-    specialties: ['Dogs', 'Cats', 'Small Pets'],
-    experience: '3 years',
-    rating: 4.9,
-    reviews: 24,
+    name: '',
+    email: '',
+    phone: '',
+    bio: '',
+    hourlyRate: '',
+    location: '',
+    specialties: [] as string[],
+    experience: '',
+    rating: 0,
+    reviews: 0,
   });
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
   const [selectedIDType, setSelectedIDType] = useState('');
@@ -40,6 +42,25 @@ const PetSitterProfileScreen = () => {
     { type: 'student', label: 'Student ID', icon: 'school', color: '#9C27B0', verified: false },
     { type: 'passport', label: 'Passport', icon: 'airplane', color: '#FF9800', verified: false },
   ]);
+
+  // Update profile data when user changes
+  useEffect(() => {
+    if (user) {
+      console.log('PetSitterProfileScreen: Loading user data from auth context:', user);
+      setProfile({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        bio: user.aboutMe || '',
+        hourlyRate: user.hourlyRate || '',
+        location: user.address || '',
+        specialties: user.specialties || [],
+        experience: user.experience || '',
+        rating: 0, // New user starts with 0 rating
+        reviews: 0, // New user starts with 0 reviews
+      });
+    }
+  }, [user]);
 
   const handleBack = () => {
     router.back();

@@ -1,9 +1,9 @@
 // API Configuration
 export const API_CONFIG = {
-  // For local development - use your computer's IP address
+  // For local development - use your computer's network IP address
   // Find your IP with: ifconfig | grep "inet " | grep -v 127.0.0.1
   BASE_URL: __DEV__ 
-    ? 'http://172.20.10.2:8000'  // Local Laravel server (your computer's IP)
+    ? 'http://192.168.100.164:8000'  // Local Laravel server (your computer's network IP)
     : 'https://your-production-domain.com',
   
   // API endpoints
@@ -25,7 +25,7 @@ export const API_CONFIG = {
   },
   
   // Timeouts
-  TIMEOUT: 5000, // 5 seconds (faster failure on bad networks)
+  TIMEOUT: 30000, // 30 seconds (increased for better reliability)
   
   // Headers
   DEFAULT_HEADERS: {

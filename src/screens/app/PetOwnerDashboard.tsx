@@ -13,22 +13,13 @@ import PetsHeartIcon from '../../assets/icons/petsheart.png';
 import MessageIcon from '../../assets/icons/message.png';
 
 const upcomingBookings = [
-  {
-    id: 'b1',
-    sitterName: 'Sarah Johnson',
-    petName: 'Mochi',
-    date: 'Dec 15, 2024',
-    time: '2:00 PM - 6:00 PM',
-    status: 'Confirmed',
-    petImage: require('../../assets/images/cat.png'),
-    cost: '$45',
-  },
+  // New users start with no bookings
 ];
 
 const ownerStats = {
-  totalSpent: '$1,240',
-  activeBookings: 2,
-  thisWeek: '$120',
+  totalSpent: '$0', // New users start with $0 spent
+  activeBookings: 0, // New users start with 0 active bookings
+  thisWeek: '$0', // New users start with $0 spent this week
 };
 
 const quickActions = [

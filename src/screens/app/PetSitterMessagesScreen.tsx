@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    FlatList,
-    Image,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 interface Message {
@@ -39,81 +40,18 @@ interface SupportMessage {
 const PetSitterMessagesScreen = () => {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      senderName: 'John Davis',
-      lastMessage: 'Hi Sarah! I need someone to watch Max while I\'m at work. He\'s very friendly and loves to play fetch.',
-      time: '2 min ago',
-      unreadCount: 2,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: true,
-    },
-    {
-      id: '2',
-      senderName: 'Emma Wilson',
-      lastMessage: 'Luna is a bit shy at first but warms up quickly. She loves to be brushed and will follow you around.',
-      time: '15 min ago',
-      unreadCount: 0,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: false,
-    },
-    {
-      id: '3',
-      senderName: 'Mike Chen',
-      lastMessage: 'Thanks for taking care of Buddy yesterday! He had a great time.',
-      time: '1 hour ago',
-      unreadCount: 0,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: true,
-    },
-    {
-      id: '4',
-      senderName: 'Sarah Johnson',
-      lastMessage: 'Can you also feed Mochi at 6 PM? She gets hungry around that time.',
-      time: '2 hours ago',
-      unreadCount: 1,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: false,
-    },
+    // New users start with no messages
   ]);
 
   const [selectedChat, setSelectedChat] = useState<Message | null>(null);
   const [showSupportChat, setShowSupportChat] = useState(false);
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
   const [supportTicketId, setSupportTicketId] = useState<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      text: 'Hi Sarah! I need someone to watch Max while I\'m at work.',
-      time: '2:30 PM',
-      isFromMe: false,
-    },
-    {
-      id: '2',
-      text: 'Hi John! I\'d be happy to help with Max. What time do you need me?',
-      time: '2:32 PM',
-      isFromMe: true,
-    },
-    {
-      id: '3',
-      text: 'He\'s very friendly and loves to play fetch.',
-      time: '2:33 PM',
-      isFromMe: false,
-    },
-    {
-      id: '4',
-      text: 'I need someone from 2 PM to 4 PM on Saturday.',
-      time: '2:35 PM',
-      isFromMe: false,
-    },
-    {
-      id: '5',
-      text: 'Perfect! I\'m available at that time. What\'s your address?',
-      time: '2:36 PM',
-      isFromMe: true,
-    },
-  ]);
   const [newMessage, setNewMessage] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    // New users start with no chat messages
+  ]);
 
   const handleBack = () => {
     if (selectedChat) {
@@ -174,20 +112,20 @@ const PetSitterMessagesScreen = () => {
   };
 
   const handleSendSupportMessage = async () => {
-    if (newMessage.trim() && supportTicketId) {
+    if (supportMessage.trim() && supportTicketId) {
       try {
         // In a real implementation, this would send the message via API
-        // await supportService.sendMessage(supportTicketId, newMessage);
+        // await supportService.sendMessage(supportTicketId, supportMessage);
         
         // For now, add the message locally
         const message: SupportMessage = {
           id: Date.now().toString(),
-          text: newMessage,
+          text: supportMessage,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isFromAdmin: false,
         };
         setSupportMessages(prev => [...prev, message]);
-        setNewMessage('');
+        setSupportMessage('');
         
         // Simulate admin response after 2 seconds
         setTimeout(() => {
@@ -370,20 +308,20 @@ const PetSitterMessagesScreen = () => {
         <View style={styles.messageInput}>
           <TextInput
             style={styles.input}
-            value={newMessage}
-            onChangeText={setNewMessage}
+            value={supportMessage}
+            onChangeText={setSupportMessage}
             placeholder="Type your message to support..."
             multiline
           />
           <TouchableOpacity 
-            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
+            style={[styles.sendButton, !supportMessage.trim() && styles.sendButtonDisabled]} 
             onPress={handleSendSupportMessage}
-            disabled={!newMessage.trim()}
+            disabled={!supportMessage.trim()}
           >
             <Ionicons 
               name="send" 
               size={20} 
-              color={newMessage.trim() ? '#fff' : '#ccc'} 
+              color={supportMessage.trim() ? '#fff' : '#ccc'} 
             />
           </TouchableOpacity>
         </View>
@@ -588,6 +526,12 @@ const styles = StyleSheet.create({
   },
   chatMessages: {
     flex: 1,
+    padding: 15,
+  },
+  chatContainer: {
+    flex: 1,
+  },
+  chatContent: {
     padding: 15,
   },
   chatMessage: {

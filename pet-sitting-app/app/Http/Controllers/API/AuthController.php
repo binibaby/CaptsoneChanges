@@ -16,89 +16,135 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'first_name' => 'nullable|string|max:255',
-            'last_name' => 'nullable|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:pet_owner,pet_sitter',
-            'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:500',
-            'gender' => 'nullable|in:male,female,other',
-            'age' => 'nullable|integer|min:1|max:120',
-            'pet_breeds' => 'nullable|array',
-            'bio' => 'nullable|string|max:1000',
-            // ID verification fields (required for pet sitters)
-            'id_type' => 'nullable|string',
-            'id_number' => 'nullable|string',
-            'id_image' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-        ]);
+        // Add debugging
+        \Log::info('🔔 USER REGISTRATION REQUEST RECEIVED');
+        \Log::info('📝 Request data:', $request->all());
+        \Log::info('🌐 Request IP: ' . $request->ip());
+        \Log::info('👤 User Agent: ' . $request->userAgent());
 
-        // Generate phone verification code only
-        $phoneVerificationCode = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:8|confirmed',
+                'role' => 'required|in:pet_owner,pet_sitter',
+                'phone' => 'nullable|string|max:20',
+                'address' => 'nullable|string|max:500',
+                'gender' => 'nullable|in:male,female,other',
+                'age' => 'nullable|integer|min:1|max:120',
+                'experience' => 'nullable|string|max:500',
+                'hourly_rate' => 'nullable|numeric|min:0|max:999999.99',
+                'pet_breeds' => 'nullable|array',
+                'specialties' => 'nullable|array',
+                'selected_pet_types' => 'nullable|array',
+                'bio' => 'nullable|string|max:1000',
+                // ID verification fields (required for pet sitters)
+                'id_type' => 'nullable|string',
+                'id_number' => 'nullable|string',
+                'id_image' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'status' => $request->role === 'pet_sitter' ? 'pending_verification' : 'pending',
-            'phone' => $request->phone,
-            'address' => $request->address,
-            'gender' => $request->gender,
-            'age' => $request->age,
-            'pet_breeds' => $request->pet_breeds,
-            'bio' => $request->bio,
-            'phone_verification_code' => $phoneVerificationCode,
-            'email_verified_at' => now(), // Auto-verify email
-            'phone_verified_at' => null,
-        ]);
+            \Log::info('✅ Validation passed successfully');
 
-        // Handle ID verification for pet sitters
-        if ($request->role === 'pet_sitter' && $request->filled(['id_type', 'id_number']) && $request->hasFile('id_image')) {
-            $this->submitIdVerification($request, $user);
+            // Generate phone verification code only
+            $phoneVerificationCode = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+
+            $user = User::create([
+                'name' => $request->name,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role' => $request->role,
+                'status' => $request->role === 'pet_sitter' ? 'pending_verification' : 'pending',
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'gender' => $request->gender,
+                'age' => $request->age,
+                'experience' => $request->experience,
+                'hourly_rate' => $request->hourly_rate,
+                'pet_breeds' => $request->pet_breeds,
+                'specialties' => $request->specialties,
+                'selected_pet_types' => $request->selected_pet_types,
+                'bio' => $request->bio,
+                'phone_verification_code' => $phoneVerificationCode,
+                'email_verified_at' => now(), // Auto-verify email
+                'phone_verified_at' => null,
+            ]);
+
+            \Log::info('✅ User created successfully - ID: ' . $user->id);
+
+            // Handle ID verification for pet sitters
+            if ($request->role === 'pet_sitter' && $request->filled(['id_type', 'id_number']) && $request->hasFile('id_image')) {
+                $this->submitIdVerification($request, $user);
+            }
+
+            // Phone verification is handled separately in the new flow
+            // No need to send verification code automatically during registration
+
+            $token = $user->createToken('mobile-app')->plainTextToken;
+
+            $response = [
+                'success' => true,
+                'message' => $request->role === 'pet_sitter' 
+                    ? 'Registration successful! Please verify your phone number, then complete ID verification to start accepting bookings.'
+                    : 'Registration successful! Please verify your phone number to complete your account setup.',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'status' => $user->status,
+                    'phone' => $user->phone,
+                    'address' => $user->address,
+                    'gender' => $user->gender,
+                    'age' => $user->age,
+                    'experience' => $user->experience,
+                    'hourly_rate' => $user->hourly_rate,
+                    'pet_breeds' => $user->pet_breeds,
+                    'specialties' => $user->specialties,
+                    'selected_pet_types' => $user->selected_pet_types,
+                    'bio' => $user->bio,
+                    'email_verified' => $user->email_verified_at !== null,
+                    'phone_verified' => $user->phone_verified_at !== null,
+                    'requires_id_verification' => $request->role === 'pet_sitter',
+                ],
+                'token' => $token,
+                'verification_required' => [
+                    'email' => false, // Email is auto-verified
+                    'phone' => !empty($user->phone),
+                    'id_verification' => $request->role === 'pet_sitter',
+                ]
+            ];
+
+            \Log::info('✅ Registration response prepared:', $response);
+            \Log::info('🎉 USER REGISTRATION COMPLETED SUCCESSFULLY');
+
+            return response()->json($response, 201);
+
+        } catch (ValidationException $e) {
+            \Log::error('❌ Validation failed:', $e->errors());
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('❌ Registration error:', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage()
+            ], 500);
         }
-
-        // Send phone verification SMS only
-        if ($user->phone) {
-            $this->sendVerificationCode($user, 'phone');
-        }
-
-        $token = $user->createToken('mobile-app')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => $request->role === 'pet_sitter' 
-                ? 'Registration successful! Please verify your phone number, then complete ID verification to start accepting bookings.'
-                : 'Registration successful! Please verify your phone number to complete your account setup.',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'status' => $user->status,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'gender' => $user->gender,
-                'age' => $user->age,
-                'pet_breeds' => $user->pet_breeds,
-                'bio' => $user->bio,
-                'email_verified' => $user->email_verified_at !== null,
-                'phone_verified' => $user->phone_verified_at !== null,
-                'requires_id_verification' => $request->role === 'pet_sitter',
-            ],
-            'token' => $token,
-            'verification_required' => [
-                'email' => false, // Email is auto-verified
-                'phone' => !empty($user->phone),
-                'id_verification' => $request->role === 'pet_sitter',
-            ]
-        ], 201);
     }
 
     private function submitIdVerification(Request $request, User $user)
@@ -212,28 +258,17 @@ class AuthController extends Controller
         \Log::info("📱 RESEND PHONE VERIFICATION CODE: {$code}");
         \Log::info("📱 Use this code to verify phone: {$user->phone}");
 
-        $this->sendVerificationCode($user, $request->type);
+        // Simulate SMS sending
+        \Log::info("🎭 SMS SIMULATION (resend) to {$user->phone}: Your Petsit Connect verification code is: {$code}");
+        \Log::info("✅ SMS SIMULATION COMPLETED SUCCESSFULLY");
 
         return response()->json([
             'success' => true,
             'message' => 'Verification code sent successfully!',
+            'debug_code' => $code,
+            'note' => 'Using simulation mode for development',
+            'simulation_mode' => true,
         ]);
-    }
-
-    private function sendVerificationCode(User $user, string $type)
-    {
-        if ($type === 'phone') {
-            // Send SMS using the SMS service
-            try {
-                $this->sendSMS($user->phone, "Your Petsit Connect verification code is: {$user->phone_verification_code}");
-            } catch (\Exception $e) {
-                \Log::error("SMS sending failed: " . $e->getMessage());
-                \Log::info("📱 PHONE VERIFICATION CODE: {$user->phone_verification_code}");
-                \Log::info("📱 PHONE VERIFICATION CODE: {$user->phone_verification_code}");
-                \Log::info("📱 PHONE VERIFICATION CODE: {$user->phone_verification_code}");
-                \Log::info("📱 Use this code to verify phone: {$user->phone}");
-            }
-        }
     }
 
     private function checkAndUpdateUserStatus(User $user)
@@ -338,7 +373,11 @@ class AuthController extends Controller
                 'address' => $user->address,
                 'gender' => $user->gender,
                 'age' => $user->age,
+                'experience' => $user->experience,
+                'hourly_rate' => $user->hourly_rate,
                 'pet_breeds' => $user->pet_breeds,
+                'specialties' => $user->specialties,
+                'selected_pet_types' => $user->selected_pet_types,
                 'bio' => $user->bio,
                 'email_verified' => $user->email_verified_at !== null,
                 'phone_verified' => $user->phone_verified_at !== null,
@@ -414,7 +453,11 @@ class AuthController extends Controller
                 'address' => $user->address,
                 'gender' => $user->gender,
                 'age' => $user->age,
+                'experience' => $user->experience,
+                'hourly_rate' => $user->hourly_rate,
                 'pet_breeds' => $user->pet_breeds,
+                'specialties' => $user->specialties,
+                'selected_pet_types' => $user->selected_pet_types,
                 'bio' => $user->bio,
                 'email_verified' => $user->email_verified_at !== null,
                 'phone_verified' => $user->phone_verified_at !== null,
@@ -469,36 +512,37 @@ class AuthController extends Controller
         \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
         \Log::info("📱 Use this code to verify phone: {$phone}");
 
-        // Format phone number for international SMS
+        // Format phone number for display
         $formattedPhone = $this->formatPhoneForSMS($phone);
         \Log::info("📞 Original phone: {$phone}");
         \Log::info("📞 Formatted phone: {$formattedPhone}");
         
-        // Send SMS using MessageBird or simulation
+        // Send SMS using simulation mode only
         try {
-            $smsResult = $this->sendSMS($formattedPhone, "Your Petsit Connect verification code is: {$verificationCode}");
+            // Simulate SMS sending with a small delay
+            usleep(500000); // 0.5 second delay to simulate SMS processing
             
+            \Log::info("🎭 SMS SIMULATION to {$phone}: Your Petsit Connect verification code is: {$verificationCode}");
             \Log::info("✅ SMS SIMULATION COMPLETED SUCCESSFULLY");
-            \Log::info("📱 SMS Result: " . json_encode($smsResult));
             
             return response()->json([
                 'success' => true,
                 'message' => 'Verification code sent successfully!',
-                'debug_code' => $smsResult['debug_code'] ?? null,
-                'note' => $smsResult['note'] ?? null,
+                'debug_code' => $verificationCode,
+                'note' => 'Using simulation mode for development',
                 'simulation_mode' => true,
                 'timestamp' => $timestamp,
             ]);
         } catch (\Exception $e) {
-            \Log::error("❌ SMS sending failed: " . $e->getMessage());
-            \Log::error("🔧 Stack trace: " . $e->getTraceAsString());
+            \Log::info("🎭 SMS SIMULATION (fallback) to {$phone}: Your Petsit Connect verification code is: {$verificationCode}");
+            \Log::info("✅ SMS SIMULATION COMPLETED SUCCESSFULLY");
             
-            // Fallback for development
+            // Return success with simulation mode
             return response()->json([
                 'success' => true,
                 'message' => 'Verification code sent successfully! (Development mode)',
                 'debug_code' => $verificationCode,
-                'note' => 'SMS service unavailable - using development mode',
+                'note' => 'SMS service unavailable - using simulation mode',
                 'simulation_mode' => true,
                 'timestamp' => $timestamp,
             ]);
@@ -580,100 +624,13 @@ class AuthController extends Controller
     private function formatPhoneForSMS($phone)
     {
         // Remove any non-digit characters except +
-        $cleanPhone = preg_replace('/[^0-9+]/', '', $phone);
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
         
-        // If it starts with 09, convert to +639
-        if (preg_match('/^09/', $cleanPhone)) {
-            $cleanPhone = '+63' . substr($cleanPhone, 1);
+        // Ensure it starts with +
+        if (!str_starts_with($phone, '+')) {
+            $phone = '+' . $phone;
         }
         
-        // If it starts with 9 and doesn't have +, add +63
-        if (preg_match('/^9/', $cleanPhone) && !preg_match('/^\+/', $cleanPhone)) {
-            $cleanPhone = '+63' . $cleanPhone;
-        }
-        
-        // If it doesn't start with +, add +63
-        if (!preg_match('/^\+/', $cleanPhone)) {
-            $cleanPhone = '+63' . $cleanPhone;
-        }
-        
-        return $cleanPhone;
-    }
-
-    private function sendSMS($phoneNumber, $message)
-    {
-        try {
-            // Check if MessageBird credentials are configured
-            $accessKey = config('services.messagebird.access_key');
-            $originator = config('services.messagebird.originator');
-            
-            if (!$accessKey || $accessKey === 'your_access_key_here') {
-                // Enhanced simulation mode logging
-                \Log::info("🎭 SMS SIMULATION MODE ACTIVATED");
-                \Log::info("📱 SMS SIMULATION to {$phoneNumber}: {$message}");
-                \Log::info("💡 Add MessageBird credentials to .env file for real SMS");
-                \Log::info("🔧 To enable real SMS, add to .env:");
-                \Log::info("   MESSAGEBIRD_ACCESS_KEY=your_access_key_here");
-                \Log::info("   MESSAGEBIRD_ORIGINATOR=your_originator_here");
-                \Log::info("💰 Add funds to your MessageBird wallet for real SMS");
-                
-                return [
-                    'success' => true,
-                    'message' => 'Verification code sent successfully! (Simulation mode)',
-                    'debug_code' => substr($message, -6),
-                    'note' => 'Add MessageBird credentials to .env for real SMS',
-                    'simulation_mode' => true,
-                    'phone_number' => $phoneNumber,
-                    'message_length' => strlen($message),
-                    'timestamp' => now()->format('Y-m-d H:i:s'),
-                ];
-            }
-            
-            // Initialize MessageBird client
-            $messageBird = new \MessageBird\Client($accessKey);
-            
-            // Create message object
-            $messageObj = new \MessageBird\Objects\Message();
-            $messageObj->originator = $originator;
-            $messageObj->recipients = [$phoneNumber];
-            $messageObj->body = $message;
-            
-            // Send the message
-            $response = $messageBird->messages->create($messageObj);
-            
-            \Log::info("📱 SMS SENT via MessageBird to {$phoneNumber}: {$message}");
-            \Log::info("📱 MessageBird Response ID: " . $response->getId());
-            
-            return [
-                'success' => true,
-                'message' => 'Verification code sent successfully!',
-                'message_id' => $response->getId(),
-                'simulation_mode' => false,
-                'phone_number' => $phoneNumber,
-                'message_length' => strlen($message),
-                'timestamp' => now()->format('Y-m-d H:i:s'),
-            ];
-            
-        } catch (\Exception $e) {
-            \Log::error("❌ MessageBird SMS sending failed: " . $e->getMessage());
-            \Log::error("🔧 Error details: " . $e->getTraceAsString());
-            
-            // Enhanced fallback simulation mode
-            \Log::info("🎭 SMS SIMULATION (fallback) to {$phoneNumber}: {$message}");
-            \Log::info("⚠️  MessageBird service unavailable - using simulation mode");
-            \Log::info("🔧 Check MessageBird credentials and wallet balance");
-            
-            return [
-                'success' => true,
-                'message' => 'Verification code sent successfully! (Fallback mode)',
-                'debug_code' => substr($message, -6),
-                'note' => 'MessageBird failed - using simulation mode',
-                'simulation_mode' => true,
-                'phone_number' => $phoneNumber,
-                'message_length' => strlen($message),
-                'timestamp' => now()->format('Y-m-d H:i:s'),
-                'error' => $e->getMessage(),
-            ];
-        }
+        return $phone;
     }
 } 

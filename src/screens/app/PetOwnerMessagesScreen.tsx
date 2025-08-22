@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     FlatList,
     Image,
@@ -40,46 +40,7 @@ interface SupportMessage {
 const PetOwnerMessagesScreen = () => {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      senderName: 'Sarah Johnson',
-      lastMessage: 'Hi John! I\'d be happy to help with Max. What time do you need me?',
-      time: '2 min ago',
-      unreadCount: 1,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: true,
-      petName: 'Max',
-    },
-    {
-      id: '2',
-      senderName: 'Emma Wilson',
-      lastMessage: 'Luna is a bit shy at first but warms up quickly. She loves to be brushed.',
-      time: '15 min ago',
-      unreadCount: 0,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: false,
-      petName: 'Luna',
-    },
-    {
-      id: '3',
-      senderName: 'Mike Chen',
-      lastMessage: 'Thanks for booking with me! I\'ll take great care of Max.',
-      time: '1 hour ago',
-      unreadCount: 0,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: true,
-      petName: 'Max',
-    },
-    {
-      id: '4',
-      senderName: 'Lisa Park',
-      lastMessage: 'I\'m available this weekend if you need someone for Luna.',
-      time: '2 hours ago',
-      unreadCount: 2,
-      avatar: require('../../assets/images/default-avatar.png'),
-      isOnline: false,
-      petName: 'Luna',
-    },
+    // New users start with no messages
   ]);
 
   const [selectedChat, setSelectedChat] = useState<Message | null>(null);
@@ -87,36 +48,7 @@ const PetOwnerMessagesScreen = () => {
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
   const [supportTicketId, setSupportTicketId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      text: 'Hi John! I\'d be happy to help with Max. What time do you need me?',
-      time: '2:30 PM',
-      isFromMe: false,
-    },
-    {
-      id: '2',
-      text: 'Hi Sarah! I need someone from 2 PM to 4 PM on Saturday.',
-      time: '2:32 PM',
-      isFromMe: true,
-    },
-    {
-      id: '3',
-      text: 'Perfect! I\'m available at that time. What\'s your address?',
-      time: '2:33 PM',
-      isFromMe: false,
-    },
-    {
-      id: '4',
-      text: '123 Main St, San Francisco. Max is very friendly and loves to play fetch.',
-      time: '2:35 PM',
-      isFromMe: true,
-    },
-    {
-      id: '5',
-      text: 'Great! I\'ll see you and Max on Saturday at 2 PM.',
-      time: '2:36 PM',
-      isFromMe: false,
-    },
+    // New users start with no chat messages
   ]);
   const [newMessage, setNewMessage] = useState('');
 

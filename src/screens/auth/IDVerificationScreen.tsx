@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import verificationService from '../../services/verificationService';
 
 const IDVerificationScreen = () => {
@@ -69,18 +70,37 @@ const IDVerificationScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Back Button */}
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Ionicons name="arrow-back" size={24} color="#333" />
+      </TouchableOpacity>
+
       <Text style={styles.title}>ID Verification</Text>
       <Text style={styles.subtitle}>Upload a clear photo of your government-issued ID</Text>
+      
       {idImage ? (
         <Image source={{ uri: idImage }} style={styles.idImage} />
       ) : (
-        <TouchableOpacity style={styles.uploadButton} onPress={pickIdImage}>
-          <Text style={styles.uploadButtonText}>Take ID Photo</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.selfieButton} onPress={pickIdImage}>
+            <Text style={styles.selfieButtonText}>📷 Take ID Photo</Text>
+          </TouchableOpacity>
+        </View>
       )}
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Submit</Text>}
-      </TouchableOpacity>
+      
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={[styles.continueButton, loading && styles.disabledButton]} 
+          onPress={handleSubmit} 
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.continueButtonText}>Submit Verification</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -92,6 +112,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     backgroundColor: '#fff',
+    paddingHorizontal: 20,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    padding: 8,
   },
   title: {
     fontSize: 24,
@@ -112,28 +140,56 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ccc',
   },
-  uploadButton: {
+  buttonContainer: {
+    width: '75%',
+    marginBottom: 30,
+    alignSelf: 'center',
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  selfieButton: {
     backgroundColor: '#F59E0B',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    marginBottom: 24,
+    paddingVertical: 18,
+    borderRadius: 15,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E67E22',
   },
-  uploadButtonText: {
+  selfieButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 18,
+    fontWeight: 'bold',
   },
-  button: {
-    backgroundColor: '#10B981',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
+  continueButton: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 18,
+    borderRadius: 15,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E67E22',
   },
-  buttonText: {
+  continueButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  disabledButton: {
+    backgroundColor: '#FFD7A0',
+    shadowOpacity: 0.1,
+    borderColor: '#FFE4B3',
+    opacity: 0.7,
   },
 });
 

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     FlatList,
     Image,
@@ -41,74 +41,7 @@ const MomentsScreen = () => {
       // For now, simulate fetching moments
       await new Promise(resolve => setTimeout(resolve, 1000));
       setMoments([
-        {
-          id: '1',
-          user: {
-            name: 'Sarah Johnson',
-            image: require('../../assets/images/default-avatar.png'),
-          },
-          pet: {
-            name: 'Max',
-            type: 'Golden Retriever',
-          },
-          image: require('../../assets/images/dog.png'),
-          caption: 'Max had the best time at the park today! 🐕❤️',
-          likes: 24,
-          comments: 5,
-          timeAgo: '2 hours ago',
-          isLiked: false,
-        },
-        {
-          id: '2',
-          user: {
-            name: 'Mike Chen',
-            image: require('../../assets/images/default-avatar.png'),
-          },
-          pet: {
-            name: 'Luna',
-            type: 'Persian Cat',
-          },
-          image: require('../../assets/images/cat.png'),
-          caption: 'Luna found the perfect spot for her afternoon nap 😴',
-          likes: 18,
-          comments: 3,
-          timeAgo: '4 hours ago',
-          isLiked: true,
-        },
-        {
-          id: '3',
-          user: {
-            name: 'Emily Davis',
-            image: require('../../assets/images/default-avatar.png'),
-          },
-          pet: {
-            name: 'Buddy',
-            type: 'Labrador',
-          },
-          image: require('../../assets/images/dog.png'),
-          caption: 'Training session success! Buddy learned a new trick today 🎾',
-          likes: 31,
-          comments: 8,
-          timeAgo: '6 hours ago',
-          isLiked: false,
-        },
-        {
-          id: '4',
-          user: {
-            name: 'Alex Wilson',
-            image: require('../../assets/images/default-avatar.png'),
-          },
-          pet: {
-            name: 'Whiskers',
-            type: 'Siamese Cat',
-          },
-          image: require('../../assets/images/cat.png'),
-          caption: 'Whiskers exploring the new cat tree 🐱',
-          likes: 15,
-          comments: 2,
-          timeAgo: '1 day ago',
-          isLiked: false,
-        },
+        // New users start with no moments
       ]);
     } catch (err) {
       setError('Failed to fetch moments');

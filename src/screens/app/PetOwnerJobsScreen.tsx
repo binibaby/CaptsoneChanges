@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     Image,
     SafeAreaView,
@@ -29,58 +29,7 @@ const PetOwnerJobsScreen = () => {
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState<'upcoming' | 'past'>('upcoming');
   const [jobs, setJobs] = useState<Job[]>([
-    {
-      id: '1',
-      petSitterName: 'Sarah Johnson',
-      petName: 'Max',
-      date: 'Dec 16, 2024',
-      time: '2:00 PM - 4:00 PM',
-      duration: '2 hours',
-      rate: '$50',
-      status: 'confirmed',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/dog.png'),
-      location: 'San Francisco, CA',
-    },
-    {
-      id: '2',
-      petSitterName: 'Emma Wilson',
-      petName: 'Luna',
-      date: 'Dec 17, 2024',
-      time: '9:00 AM - 5:00 PM',
-      duration: '8 hours',
-      rate: '$200',
-      status: 'pending',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/cat.png'),
-      location: 'San Francisco, CA',
-    },
-    {
-      id: '3',
-      petSitterName: 'Mike Chen',
-      petName: 'Max',
-      date: 'Dec 15, 2024',
-      time: '1:00 PM - 3:00 PM',
-      duration: '2 hours',
-      rate: '$50',
-      status: 'completed',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/dog.png'),
-      location: 'San Francisco, CA',
-    },
-    {
-      id: '4',
-      petSitterName: 'Lisa Park',
-      petName: 'Luna',
-      date: 'Dec 14, 2024',
-      time: '10:00 AM - 12:00 PM',
-      duration: '2 hours',
-      rate: '$40',
-      status: 'completed',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/cat.png'),
-      location: 'San Francisco, CA',
-    },
+    // New users start with no jobs
   ]);
 
   const handleBack = () => {

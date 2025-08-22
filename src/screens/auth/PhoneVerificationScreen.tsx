@@ -43,6 +43,8 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
   const [verificationCode, setVerificationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const sendVerificationCode = async () => {
     if (!phoneNumber) {
@@ -51,15 +53,50 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     }
 
     setIsLoading(true);
+    let timeoutId: NodeJS.Timeout | null = null;
+    let controller: AbortController | null = null;
+    
     try {
       console.log('LOG PhoneVerificationScreen - Sending code to:', phoneNumber);
       
       const apiUrl = getApiUrl('/api/send-verification-code');
       console.log('Using API URL:', apiUrl);
+      console.log('Network check - testing connection...');
       
-      // Add timeout to the fetch request
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      // Test network connectivity first
+      const isNetworkConnected = await checkNetworkStatus();
+      console.log('Network status check result:', isNetworkConnected);
+      
+      if (!isNetworkConnected) {
+        throw new Error('No internet connection detected');
+      }
+      
+      // Test server connectivity
+      console.log('Testing server connectivity...');
+      try {
+        const pingResponse = await fetch(apiUrl.replace('/api/send-verification-code', '/'), {
+          method: 'HEAD',
+          mode: 'cors',
+          signal: AbortSignal.timeout(15000) // Increased timeout
+        });
+        console.log('Server ping successful:', pingResponse.status);
+      } catch (pingError) {
+        console.log('Server ping failed:', pingError);
+        // Don't fail completely on ping - let the actual API call determine success
+        console.log('Continuing with API call despite ping failure...');
+      }
+      
+      // Create AbortController and set a longer timeout (30 seconds)
+      controller = new AbortController();
+      timeoutId = setTimeout(() => {
+        if (controller) {
+          console.log('Request timeout - aborting after 30 seconds');
+          controller.abort();
+        }
+      }, 30000); // Increased to 30 seconds
+      
+      console.log('Making fetch request to:', apiUrl);
+      console.log('Request payload:', { phone: phoneNumber });
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -72,7 +109,11 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
         }),
       });
       
-      clearTimeout(timeoutId);
+      // Clear timeout if request completes successfully
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
 
       console.log('API Response Status:', response.status);
       console.log('API Response Headers:', response.headers);
@@ -106,27 +147,33 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
         console.error('API Error Response:', data);
         Alert.alert('Error', data.message || 'Failed to send verification code');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending verification code:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        type: error.constructor.name
-      });
-      
       let errorMessage = 'Network error occurred. Please check your connection.';
       
       if (error.name === 'AbortError') {
-        errorMessage = 'Request timed out. Please try again.';
-      } else if (error.message.includes('Network request failed')) {
-        errorMessage = 'Unable to connect to server. Please check your internet connection.';
-      } else if (error.message.includes('JSON')) {
+        errorMessage = 'Request timed out. Please check your internet connection and try again.';
+      } else if (error.message?.includes('Network request failed')) {
+        errorMessage = 'Unable to connect to server. Please check:\n\n1. Your internet connection\n2. Server is running on 192.168.100.164:8000\n3. Both devices are on same network';
+      } else if (error.message?.includes('JSON')) {
         errorMessage = 'Invalid response from server. Please try again.';
+      } else if (error.message?.includes('fetch')) {
+        errorMessage = 'Connection failed. Please check your network and try again.';
+      } else if (error.message?.includes('No internet connection')) {
+        errorMessage = 'No internet connection detected. Please check your network settings.';
+      } else if (error.message?.includes('Cannot reach server')) {
+        errorMessage = error.message;
       }
       
       Alert.alert('Error', errorMessage);
+      setLastError(errorMessage);
+      setRetryCount(prev => prev + 1);
     } finally {
+      // Clean up timeout and controller
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      controller = null;
       setIsLoading(false);
     }
   };
@@ -138,21 +185,41 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     }
 
     setIsLoading(true);
+    let timeoutId: NodeJS.Timeout | null = null;
+    let controller: AbortController | null = null;
+    
     try {
       console.log('LOG PhoneVerificationScreen - Verifying code:', verificationCode);
       
-      console.log('Using API URL:', getApiUrl('/api/verify-phone-code'));
+      const apiUrl = getApiUrl('/api/verify-phone-code');
+      console.log('Using API URL:', apiUrl);
       
-      const response = await fetch(getApiUrl('/api/verify-phone-code'), {
+      // Create AbortController and set timeout (30 seconds)
+      controller = new AbortController();
+      timeoutId = setTimeout(() => {
+        if (controller) {
+          console.log('Verify request timeout - aborting after 30 seconds');
+          controller.abort();
+        }
+      }, 30000);
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: getAuthHeaders(),
         mode: 'cors',
         credentials: 'omit',
+        signal: controller.signal,
         body: JSON.stringify({
           phone: phoneNumber,
           code: verificationCode,
         }),
       });
+
+      // Clear timeout if request completes successfully
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
 
       console.log('Verify API Response Status:', response.status);
       const data = await response.json();
@@ -177,11 +244,74 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       } else {
         Alert.alert('Error', data.message || 'Invalid verification code');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error verifying code:', error);
-      Alert.alert('Error', 'Network error. Please check your connection.');
+      
+      let errorMessage = 'Network error occurred. Please check your connection.';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. Please check your internet connection and try again.';
+      } else if (error.message?.includes('Network request failed')) {
+        errorMessage = 'Unable to connect to server. Please check your internet connection.';
+      } else if (error.message?.includes('JSON')) {
+        errorMessage = 'Invalid response from server. Please try again.';
+      } else if (error.message?.includes('fetch')) {
+        errorMessage = 'Connection failed. Please check your network and try again.';
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
+      // Clean up timeout and controller
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      controller = null;
       setIsLoading(false);
+    }
+  };
+
+  const retryRequest = () => {
+    if (retryCount >= 3) {
+      Alert.alert(
+        'Too Many Retries', 
+        'You have exceeded the maximum retry attempts. Please check your internet connection and try again later.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setRetryCount(0);
+              setLastError(null);
+            }
+          }
+        ]
+      );
+      return;
+    }
+    
+    setRetryCount(prev => prev + 1);
+    setLastError(null);
+    sendVerificationCode();
+  };
+
+  const checkNetworkStatus = async () => {
+    // Simple network check - in a production app, you might want to
+    // use a library like 'react-native-network-info' or implement
+    // a ping to your server to check connectivity
+    try {
+      console.log('Testing network connectivity...');
+      
+      // Try to make a simple request to check connectivity
+      const response = await fetch('https://www.google.com', { 
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: AbortSignal.timeout(10000) // Increased to 10 second timeout
+      });
+      console.log('Network check successful - internet connection available');
+      return true;
+    } catch (error) {
+      console.log('Network check failed:', error);
+      // Don't fail completely on network check - let the actual API call determine connectivity
+      return true; // Assume network is available and let the API call fail if needed
     }
   };
 
@@ -206,21 +336,61 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
               value={phoneNumber}
               onChangeText={setPhoneNumber}
               placeholder="Enter your phone number"
+              placeholderTextColor="#999"
               keyboardType="phone-pad"
               editable={!codeSent}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              textContentType="none"
             />
           </View>
 
           {!codeSent ? (
-            <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={sendVerificationCode}
-              disabled={isLoading}
-            >
-              <Text style={styles.buttonText}>
-                {isLoading ? 'Sending...' : 'Send Verification Code'}
-              </Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={sendVerificationCode}
+                disabled={isLoading}
+              >
+                <Text style={styles.buttonText}>
+                  {isLoading ? 'Sending...' : 'Send Verification Code'}
+                </Text>
+                {isLoading && (
+                  <View style={styles.loadingIndicator}>
+                    <Text style={styles.loadingText}>Please wait...</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              
+              {lastError && retryCount > 0 && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>
+                    {lastError}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={retryRequest}
+                    disabled={isLoading}
+                  >
+                    <Text style={styles.retryButtonText}>
+                      Retry ({retryCount}/3)
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <View style={styles.tipsContainer}>
+                    <Text style={styles.tipsTitle}>💡 Troubleshooting Tips:</Text>
+                    <Text style={styles.tipsText}>• Check your internet connection</Text>
+                    <Text style={styles.tipsText}>• Ensure the phone number is correct</Text>
+                    <Text style={styles.tipsText}>• Try switching between WiFi and mobile data</Text>
+                    <Text style={styles.tipsText}>• Wait a few minutes before retrying</Text>
+                    <Text style={styles.tipsText}>• Verify server is running on 192.168.100.164:8000</Text>
+                    <Text style={styles.tipsText}>• Ensure both devices are on same network</Text>
+                    <Text style={styles.tipsText}>• Note: Using simulation mode for development</Text>
+                  </View>
+                </View>
+              )}
+            </>
           ) : (
             <>
               <View style={styles.inputContainer}>
@@ -230,8 +400,16 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
                   value={verificationCode}
                   onChangeText={setVerificationCode}
                   placeholder="Enter 6-digit code"
-                  keyboardType="number-pad"
+                  placeholderTextColor="#999"
+                  keyboardType="numeric"
                   maxLength={6}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  textContentType="none"
+                  secureTextEntry={false}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
                 />
               </View>
 
@@ -329,6 +507,66 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 14,
     fontWeight: '500',
+  },
+  errorContainer: {
+    backgroundColor: '#fdd',
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#c00',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tipsContainer: {
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  tipsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#555',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    textAlign: 'left',
+  },
+  loadingIndicator: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#555',
+  },
+  tipsText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    textAlign: 'left',
   },
 });
 

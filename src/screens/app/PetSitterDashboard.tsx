@@ -13,24 +13,15 @@ import {
 
 const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
 
-const upcomingJobs = [
-  {
-    id: '1',
-    petName: 'Mochi',
-    ownerName: 'Emma Wilson',
-    date: 'Dec 15, 2024',
-    time: '2:00 PM - 6:00 PM',
-    status: 'Confirmed',
-    petImage: require('../../assets/images/mochi.png'),
-    earnings: '$45',
-  },
+const upcomingBookings: any[] = [
+  // New users start with no bookings
 ];
 
 const earningsData = {
-  thisWeek: '$320',
-  thisMonth: '$1,240',
-  totalEarnings: '$3,850',
-  completedJobs: 28,
+  thisWeek: '$0', // New users start with $0 earnings
+  thisMonth: '$0', // New users start with $0 earnings
+  totalEarnings: '$0', // New users start with $0 total earnings
+  completedJobs: 0, // New users start with 0 completed jobs
 };
 
 const quickActions: { title: string; icon: any; color: string; route: string }[] = [
@@ -121,7 +112,7 @@ const PetSitterDashboard = () => {
             <View style={styles.statsIcon}>
               <Ionicons name="calendar" size={24} color="#fff" />
             </View>
-            <Text style={styles.statsValueWhite}>{upcomingJobs.length}</Text>
+            <Text style={styles.statsValueWhite}>{upcomingBookings.length}</Text>
             <Text style={styles.statsLabelWhite}>Upcoming Jobs</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
           </View>
@@ -169,7 +160,7 @@ const PetSitterDashboard = () => {
           </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
-          {upcomingJobs.map((job, idx) => (
+          {upcomingBookings.map((job, idx) => (
             <View key={job.id} style={[styles.upcomingJobCard, { backgroundColor: upcomingJobColors[idx % upcomingJobColors.length] }]}>
               <Image source={job.petImage} style={styles.jobPetImage} />
               <Text style={styles.jobPetName}>{job.petName}</Text>

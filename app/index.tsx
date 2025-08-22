@@ -1,9 +1,38 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../src/contexts/AuthContext';
 
 export default function App() {
+  const [isContextReady, setIsContextReady] = useState(false);
+  const router = useRouter();
+
+  // Wait for component to mount and context to be ready
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsContextReady(true);
+    }, 200); // Increased delay to ensure context is ready
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!isContextReady) {
+    return (
+      <View style={styles.container}>
+        <Image
+          source={require('../src/assets/images/logo.png')}
+          style={styles.logo}
+        />
+        <Text style={styles.title}>Petsit Connect</Text>
+        <Text style={styles.subtitle}>Connecting pets with loving care</Text>
+        <ActivityIndicator size="large" color="#FFFFFF" style={styles.spinner} />
+      </View>
+    );
+  }
+
+  return <AppContent />;
+}
+
+function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     Alert,
     Image,
@@ -30,62 +30,7 @@ interface Request {
 const PetSitterRequestsScreen = () => {
   const router = useRouter();
   const [requests, setRequests] = useState<Request[]>([
-    {
-      id: '1',
-      petOwnerName: 'John Davis',
-      petName: 'Max',
-      petBreed: 'Golden Retriever',
-      date: 'Dec 16, 2024',
-      time: '2:00 PM - 4:00 PM',
-      duration: '2 hours',
-      rate: '$50',
-      status: 'pending',
-      message: 'Hi Sarah! I need someone to watch Max while I\'m at work. He\'s very friendly and loves to play fetch.',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/dog.png'),
-    },
-    {
-      id: '2',
-      petOwnerName: 'Emma Wilson',
-      petName: 'Luna',
-      petBreed: 'Siamese Cat',
-      date: 'Dec 17, 2024',
-      time: '9:00 AM - 5:00 PM',
-      duration: '8 hours',
-      rate: '$200',
-      status: 'accepted',
-      message: 'Luna is a bit shy at first but warms up quickly. She loves to be brushed and will follow you around.',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/cat.png'),
-    },
-    {
-      id: '3',
-      petOwnerName: 'Mike Chen',
-      petName: 'Buddy',
-      petBreed: 'Labrador Retriever',
-      date: 'Dec 18, 2024',
-      time: '1:00 PM - 3:00 PM',
-      duration: '2 hours',
-      rate: '$50',
-      status: 'declined',
-      message: 'Buddy is very energetic and needs lots of exercise. He\'s great with other dogs.',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/dog.png'),
-    },
-    {
-      id: '4',
-      petOwnerName: 'Sarah Johnson',
-      petName: 'Mochi',
-      petBreed: 'Abyssinian',
-      date: 'Dec 15, 2024',
-      time: '10:00 AM - 12:00 PM',
-      duration: '2 hours',
-      rate: '$40',
-      status: 'completed',
-      message: 'Mochi is very playful and loves climbing. She\'s very independent.',
-      avatar: require('../../assets/images/default-avatar.png'),
-      petImage: require('../../assets/images/cat.png'),
-    },
+    // New users start with no requests
   ]);
 
   const handleBack = () => {

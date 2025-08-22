@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     FlatList,
     Image,
@@ -25,62 +25,7 @@ interface Notification {
 const PetOwnerNotificationsScreen = () => {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'booking',
-      title: 'Booking Confirmed',
-      message: 'Sarah J. has confirmed your booking for Max on Saturday',
-      time: '5 minutes ago',
-      isRead: false,
-      avatar: require('../../assets/images/default-avatar.png'),
-      action: 'View Booking'
-    },
-    {
-      id: '2',
-      type: 'message',
-      title: 'New Message',
-      message: 'Sarah J. sent you a message about Max\'s care instructions',
-      time: '15 minutes ago',
-      isRead: false,
-      avatar: require('../../assets/images/default-avatar.png'),
-      action: 'Reply'
-    },
-    {
-      id: '3',
-      type: 'reminder',
-      title: 'Upcoming Booking',
-      message: 'Reminder: You have a booking with Sarah J. tomorrow at 2:00 PM',
-      time: '1 hour ago',
-      isRead: true,
-      action: 'View Details'
-    },
-    {
-      id: '4',
-      type: 'system',
-      title: 'Payment Processed',
-      message: 'Your payment of $50.00 has been processed successfully',
-      time: '2 hours ago',
-      isRead: true,
-      action: 'View Receipt'
-    },
-    {
-      id: '5',
-      type: 'booking',
-      title: 'Booking Request Sent',
-      message: 'Your booking request has been sent to 3 pet sitters',
-      time: '3 hours ago',
-      isRead: true,
-      action: 'View Requests'
-    },
-    {
-      id: '6',
-      type: 'system',
-      title: 'Welcome to Petsit Connect!',
-      message: 'Thank you for joining our community. Find reliable pet sitters near you.',
-      time: '1 day ago',
-      isRead: true,
-      action: 'Get Started'
-    }
+    // New users start with no notifications
   ]);
 
   const handleBack = () => {

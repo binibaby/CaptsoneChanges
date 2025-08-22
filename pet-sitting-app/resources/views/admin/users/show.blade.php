@@ -74,9 +74,27 @@
                             <dd class="text-sm text-gray-900">{{ $user->address ?: 'Not provided' }}</dd>
                         </div>
                         <div>
+                            <dt class="text-sm font-medium text-gray-500">Experience</dt>
+                            <dd class="text-sm text-gray-900">{{ $user->experience ?: 'Not specified' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Hourly Rate</dt>
+                            <dd class="text-sm text-gray-900">{{ $user->hourly_rate ? '$' . $user->hourly_rate . '/hr' : 'Not specified' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Specialties</dt>
+                            <dd class="text-sm text-gray-900">
+                                @if($user->specialties && is_array($user->specialties) && count($user->specialties) > 0)
+                                    {{ implode(', ', $user->specialties) }}
+                                @else
+                                    Not specified
+                                @endif
+                            </dd>
+                        </div>
+                        <div>
                             <dt class="text-sm font-medium text-gray-500">Pet Breeds</dt>
                             <dd class="text-sm text-gray-900">
-                                @if($user->pet_breeds && is_array($user->pet_breeds))
+                                @if($user->pet_breeds && is_array($user->pet_breeds) && count($user->pet_breeds) > 0)
                                     {{ implode(', ', $user->pet_breeds) }}
                                 @else
                                     Not specified
@@ -84,7 +102,7 @@
                             </dd>
                         </div>
                         <div>
-                            <dt class="text-sm font-medium text-gray-500">Bio</dt>
+                            <dt class="text-sm font-medium text-gray-500">About Me</dt>
                             <dd class="text-sm text-gray-900">{{ $user->bio ?: 'No bio provided' }}</dd>
                         </div>
                     </dl>
@@ -226,6 +244,60 @@
                     @endif
                 </div>
             </div>
+            
+            <!-- Verification Notes Section -->
+            @if($stats['verification_status'])
+            <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Verification Notes</h4>
+                @if($stats['verification_status']->status === 'skipped')
+                    <div class="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+                        <strong>⚠️ ID Verification Skipped:</strong> User chose to skip ID verification during registration. 
+                        They can complete this later through their profile.
+                    </div>
+                @endif
+                
+                @if($stats['verification_status']->notes)
+                    <div class="text-sm text-gray-700 mt-2">
+                        <strong>Notes:</strong> {{ $stats['verification_status']->notes }}
+                    </div>
+                @endif
+                
+                @if($stats['verification_status']->extracted_data)
+                    @php
+                        $extractedData = json_decode($stats['verification_status']->extracted_data, true);
+                    @endphp
+                    @if(isset($extractedData['skip_reason']))
+                        <div class="text-sm text-gray-700 mt-2">
+                            <strong>Skip Reason:</strong> {{ $extractedData['skip_reason'] }}
+                        </div>
+                    @endif
+                    @if(isset($extractedData['can_complete_later']))
+                        <div class="text-sm text-gray-700 mt-2">
+                            <strong>Can Complete Later:</strong> {{ $extractedData['can_complete_later'] ? 'Yes' : 'No' }}
+                        </div>
+                    @endif
+                @endif
+            </div>
+            @endif
+            
+            <!-- Phone Verification Status -->
+            <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 class="text-sm font-medium text-blue-700 mb-2">Phone Verification</h4>
+                @if($user->phone_verified_at)
+                    <div class="text-sm text-green-700">
+                        <strong>✅ Phone Verified:</strong> {{ $user->phone_verified_at->format('M d, Y H:i') }}
+                    </div>
+                @elseif($user->phone)
+                    <div class="text-sm text-amber-700">
+                        <strong>📱 Phone Number:</strong> {{ $user->phone }} (Not verified)
+                        <br><em class="text-xs">Note: Using simulation mode for development</em>
+                    </div>
+                @else
+                    <div class="text-sm text-gray-700">
+                        <strong>📱 Phone:</strong> Not provided
+                    </div>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -255,6 +327,85 @@
                 <button onclick="deleteUser({{ $user->id }})" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Delete User
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Information Section (Admin Only) -->
+    <div class="bg-white shadow rounded-lg mt-6">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900">Security Information</h2>
+        </div>
+        <div class="px-6 py-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Account Security</h3>
+                    <dl class="space-y-3">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Password Hash</dt>
+                            <dd class="text-sm text-gray-900 font-mono break-all">
+                                {{ $user->password ? substr($user->password, 0, 50) . '...' : 'No password set' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Email Verified</dt>
+                            <dd class="text-sm text-gray-900">
+                                @if($user->email_verified_at)
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                        ✅ {{ $user->email_verified_at->format('M d, Y H:i') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                        ❌ Not Verified
+                                    </span>
+                                @endif
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Account Created</dt>
+                            <dd class="text-sm text-gray-900">{{ $user->created_at->format('M d, Y H:i') }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+                            <dd class="text-sm text-gray-900">{{ $user->updated_at->format('M d, Y H:i') }}</dd>
+                        </div>
+                    </dl>
+                </div>
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Location & Activity</h3>
+                    <dl class="space-y-3">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Country/Region</dt>
+                            <dd class="text-sm text-gray-900">
+                                @if($user->address)
+                                    @php
+                                        $addressParts = explode(',', $user->address);
+                                        $country = end($addressParts);
+                                    @endphp
+                                    {{ trim($country) ?: 'Not specified' }}
+                                @else
+                                    Not specified
+                                @endif
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Last Active</dt>
+                            <dd class="text-sm text-gray-900">
+                                @if($user->last_active_at)
+                                    {{ $user->last_active_at->format('M d, Y H:i') }}
+                                @else
+                                    Never
+                                @endif
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Remember Token</dt>
+                            <dd class="text-sm text-gray-900 font-mono break-all">
+                                {{ $user->remember_token ? substr($user->remember_token, 0, 30) . '...' : 'None' }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
             </div>
         </div>
     </div>

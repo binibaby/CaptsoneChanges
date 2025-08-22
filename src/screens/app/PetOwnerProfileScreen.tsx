@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -11,23 +11,39 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PetOwnerProfileScreen = () => {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
-    name: 'John Davis',
-    email: 'john.davis@email.com',
-    phone: '+1 (555) 987-6543',
-    address: '123 Main St, San Francisco, CA 94102',
-    bio: 'Pet lover and proud owner of Max, a friendly Golden Retriever. Looking for reliable pet sitters in the area.',
-    pets: [
-      { name: 'Max', type: 'Dog', breed: 'Golden Retriever', age: '3 years' },
-      { name: 'Luna', type: 'Cat', breed: 'Siamese', age: '2 years' }
-    ],
-    emergencyContact: 'Sarah Davis',
-    emergencyPhone: '+1 (555) 123-4567',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    bio: '',
+    pets: [] as any[],
+    emergencyContact: '',
+    emergencyPhone: '',
   });
+
+  // Update profile data when user changes
+  useEffect(() => {
+    if (user) {
+      console.log('PetOwnerProfileScreen: Loading user data from auth context:', user);
+      setProfile({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        bio: user.aboutMe || '',
+        pets: [], // New users start with no pets
+        emergencyContact: '', // New users start with no emergency contact
+        emergencyPhone: '',
+      });
+    }
+  }, [user]);
 
   const [selectedPet, setSelectedPet] = useState<null | typeof profile.pets[0]>(null);
   const [modalVisible, setModalVisible] = useState(false);

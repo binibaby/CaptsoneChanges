@@ -1,11 +1,10 @@
 import React from 'react';
 import {
     Image,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 interface WelcomeScreenProps {
@@ -14,7 +13,7 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) => {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.content}>
         <Image
           source={require('../../assets/images/logo.png')}
@@ -31,7 +30,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) => {
           <Text style={styles.getStartedButtonText}>Get Started</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -40,24 +39,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     alignItems: 'center',
-    paddingTop: 50,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   content: {
     flex: 1,
-    width: '85%',
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
     width: 80,
     height: 80,
-    marginBottom: 20,
+    marginBottom: 30,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#333',
   },
   subtitle: {
@@ -65,19 +65,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 40,
     color: '#666',
+    lineHeight: 24,
   },
   buttonContainer: {
-    width: '75%',
-    marginBottom: 30,
+    width: '100%',
+    marginBottom: 40,
   },
   getStartedButton: {
     backgroundColor: '#F59E0B',
-    paddingVertical: 15,
-    borderRadius: 10000,
+    paddingVertical: 18,
+    borderRadius: 25,
     alignItems: 'center',
     width: '100%',
-    
-    
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   getStartedButtonText: {
     color: '#fff',

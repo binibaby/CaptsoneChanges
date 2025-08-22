@@ -77,16 +77,10 @@ const HomeScreen = () => {
         {/* Upcoming Bookings */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-          <View style={styles.bookingCard}>
-            <Image source={require('../../assets/images/default-avatar.png')} style={styles.bookingAvatar} />
-            <View style={styles.bookingInfo}>
-              <Text style={styles.bookingName}>Sarah Johnson</Text>
-              <Text style={styles.bookingDetails}>Saturday, 2:00 PM - 4:00 PM</Text>
-              <Text style={styles.bookingPet}>Caring for: Max (Golden Retriever)</Text>
-            </View>
-            <View style={styles.bookingStatus}>
-              <Text style={styles.statusText}>Confirmed</Text>
-            </View>
+          {/* Show message for new users with no bookings */}
+          <View style={styles.noBookingsMessage}>
+            <Text style={styles.noBookingsText}>No upcoming bookings</Text>
+            <Text style={styles.noBookingsSubtext}>Your bookings will appear here</Text>
           </View>
         </View>
       </View>
@@ -252,6 +246,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  noBookingsMessage: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noBookingsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 5,
+  },
+  noBookingsSubtext: {
+    fontSize: 14,
+    color: '#999',
   },
 });
 

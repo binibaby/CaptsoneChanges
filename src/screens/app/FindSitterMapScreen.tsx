@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Image,
     Platform,
@@ -11,7 +12,6 @@ import {
     View
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
-import * as Location from 'expo-location';
 
 // Web-only version - no react-native-maps imports
 const FindSitterMapScreen = () => {
@@ -198,42 +198,7 @@ const FindSitterMapScreen = () => {
 };
 
 const PET_SITTERS = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    latlng: { latitude: 37.78825, longitude: -122.4324 },
-    avatar: require('../../assets/images/default-avatar.png'),
-    rate: 25,
-    badges: [
-      { icon: 'checkmark-circle', color: '#4CAF50', label: 'Verified' },
-      { icon: 'star', color: '#FFD700', label: '4.9' },
-    ],
-    distance: '0.5 miles',
-  },
-  {
-    id: '2',
-    name: 'Mike Chen',
-    latlng: { latitude: 37.78925, longitude: -122.4344 },
-    avatar: require('../../assets/images/default-avatar.png'),
-    rate: 30,
-    badges: [
-      { icon: 'paw', color: '#FF9800', label: 'Dog Expert' },
-      { icon: 'star', color: '#FFD700', label: '4.7' },
-    ],
-    distance: '1.2 miles',
-  },
-  {
-    id: '3',
-    name: 'Emma Davis',
-    latlng: { latitude: 37.78725, longitude: -122.4314 },
-    avatar: require('../../assets/images/default-avatar.png'),
-    rate: 28,
-    badges: [
-      { icon: 'checkmark-circle', color: '#4CAF50', label: 'Verified' },
-      { icon: 'star', color: '#FFD700', label: '5.0' },
-    ],
-    distance: '0.8 miles',
-  },
+  // New users start with no pet sitters in the area
 ];
 
 const styles = StyleSheet.create({

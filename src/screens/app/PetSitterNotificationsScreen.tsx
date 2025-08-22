@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     FlatList,
     Image,
@@ -25,64 +25,7 @@ interface Notification {
 const PetSitterNotificationsScreen = () => {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'booking',
-      title: 'New Booking Request',
-      message: 'John D. wants to book you for Max (Golden Retriever) on Saturday',
-      time: '2 minutes ago',
-      isRead: false,
-      avatar: require('../../assets/images/default-avatar.png'),
-      action: 'View Request'
-    },
-    {
-      id: '2',
-      type: 'message',
-      title: 'New Message',
-      message: 'Sarah J. sent you a message about her cat Luna',
-      time: '15 minutes ago',
-      isRead: false,
-      avatar: require('../../assets/images/default-avatar.png'),
-      action: 'Reply'
-    },
-    {
-      id: '3',
-      type: 'review',
-      title: 'New Review',
-      message: 'You received a 5-star review from Mike C.',
-      time: '1 hour ago',
-      isRead: true,
-      avatar: require('../../assets/images/default-avatar.png'),
-      action: 'View Review'
-    },
-    {
-      id: '4',
-      type: 'system',
-      title: 'Profile Verification',
-      message: 'Your profile has been verified successfully!',
-      time: '2 hours ago',
-      isRead: true,
-      action: 'View Profile'
-    },
-    {
-      id: '5',
-      type: 'booking',
-      title: 'Booking Confirmed',
-      message: 'Your booking with Emma D. for Saturday has been confirmed',
-      time: '3 hours ago',
-      isRead: true,
-      avatar: require('../../assets/images/default-avatar.png'),
-      action: 'View Details'
-    },
-    {
-      id: '6',
-      type: 'system',
-      title: 'Payment Received',
-      message: 'You received $50.00 for your recent booking',
-      time: '1 day ago',
-      isRead: true,
-      action: 'View Payment'
-    }
+    // New users start with no notifications
   ]);
 
   const handleBack = () => {

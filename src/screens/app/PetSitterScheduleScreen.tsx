@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     SafeAreaView,
     ScrollView,
@@ -27,54 +27,7 @@ const PetSitterScheduleScreen = () => {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState('Dec 16');
   const [schedule, setSchedule] = useState<ScheduleItem[]>([
-    {
-      id: '1',
-      petOwnerName: 'John Davis',
-      petName: 'Max',
-      petBreed: 'Golden Retriever',
-      date: 'Dec 16',
-      time: '2:00 PM - 4:00 PM',
-      duration: '2 hours',
-      status: 'upcoming',
-      location: 'San Francisco, CA',
-      rate: '$50',
-    },
-    {
-      id: '2',
-      petOwnerName: 'Emma Wilson',
-      petName: 'Luna',
-      petBreed: 'Siamese Cat',
-      date: 'Dec 17',
-      time: '9:00 AM - 5:00 PM',
-      duration: '8 hours',
-      status: 'upcoming',
-      location: 'San Francisco, CA',
-      rate: '$200',
-    },
-    {
-      id: '3',
-      petOwnerName: 'Sarah Johnson',
-      petName: 'Mochi',
-      petBreed: 'Abyssinian',
-      date: 'Dec 15',
-      time: '10:00 AM - 12:00 PM',
-      duration: '2 hours',
-      status: 'completed',
-      location: 'San Francisco, CA',
-      rate: '$40',
-    },
-    {
-      id: '4',
-      petOwnerName: 'Mike Chen',
-      petName: 'Buddy',
-      petBreed: 'Labrador Retriever',
-      date: 'Dec 18',
-      time: '1:00 PM - 3:00 PM',
-      duration: '2 hours',
-      status: 'upcoming',
-      location: 'San Francisco, CA',
-      rate: '$50',
-    },
+    // New users start with no schedule items
   ]);
 
   const dates = ['Dec 15', 'Dec 16', 'Dec 17', 'Dec 18', 'Dec 19', 'Dec 20', 'Dec 21'];

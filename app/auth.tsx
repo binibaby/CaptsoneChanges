@@ -1,5 +1,7 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Alert } from 'react-native';
+import { useAuth } from '../src/contexts/AuthContext';
 import BackIDScreen from '../src/screens/auth/BackIDScreen';
 import FrontIDScreen from '../src/screens/auth/FrontIDScreen';
 import LoginScreen from '../src/screens/auth/LoginScreen';
@@ -17,6 +19,7 @@ export default function Auth() {
   const [selectedUserRole, setSelectedUserRole] = useState<'Pet Owner' | 'Pet Sitter' | null>(null);
   const [signupData, setSignupData] = useState<any>({});
   const router = useRouter();
+  const { updateUserProfile, storeUserFromBackend } = useAuth();
 
   const goToRoleSelection = () => setAuthStep('role-selection');
   const goToLogin = (role?: 'Pet Owner' | 'Pet Sitter') => {
@@ -71,7 +74,74 @@ export default function Auth() {
     setSignupData({ ...signupData, userRole: role });
   };
 
-  const onAuthSuccess = (user: any) => {
+  const onAuthSuccess = async (user: any) => {
+    try {
+      // If the user object is already complete from backend, just update the profile
+      if (user.id && user.email && user.id !== Date.now().toString()) {
+        console.log('User data already saved to backend, updating profile');
+        await updateUserProfile(user);
+      } else {
+        console.log('Saving user data to backend in onAuthSuccess');
+        // Save the user data to the backend
+        const response = await fetch('http://192.168.100.164:8000/api/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: `${user.firstName} ${user.lastName}`,
+            first_name: user.firstName,
+            last_name: user.lastName,
+            email: user.email,
+            password: user.password,
+            role: user.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
+            phone: user.phone,
+            address: user.address,
+            gender: user.gender,
+            age: user.age,
+            pet_breeds: user.selectedBreeds || [],
+            bio: user.aboutMe || '',
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('User data saved to backend successfully in onAuthSuccess:', result);
+          
+          // Create a complete user object from backend response
+          const completeUser = {
+            id: result.user.id,
+            email: result.user.email,
+            name: result.user.name,
+            firstName: result.user.first_name,
+            lastName: result.user.last_name,
+            userRole: result.user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter',
+            role: result.user.role,
+            phone: result.user.phone,
+            age: result.user.age,
+            gender: result.user.gender,
+            address: result.user.address,
+            experience: user.experience || '',
+            hourlyRate: user.hourlyRate || '',
+            aboutMe: result.user.bio || '',
+            specialties: user.specialties || [],
+            email_verified: result.user.email_verified,
+            phone_verified: result.user.phone_verified,
+            selectedPetTypes: user.selectedPetTypes,
+            selectedBreeds: result.user.pet_breeds,
+            profileImage: undefined,
+          };
+          
+          await storeUserFromBackend(result.user);
+        } else {
+          console.error('Failed to save user data to backend in onAuthSuccess:', result);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+    }
+
     if (user.userRole === 'Pet Owner') {
       router.replace('/pet-owner-dashboard');
     } else {
@@ -80,13 +150,107 @@ export default function Auth() {
   };
 
   // Modified completion handler for pet sitters
-  const onPetSitterComplete = (userData: any) => {
-    // After breed selection, go to phone verification for pet sitters
-    if (signupData.userRole === 'Pet Sitter') {
-      setSignupData({ ...signupData, userData });
-      setAuthStep('phone-verification');
-    } else {
-      onAuthSuccess(userData);
+  const onPetSitterComplete = async (userData: any) => {
+    try {
+      console.log('Saving complete user data to backend:', userData);
+      
+      // Save the complete user data to the backend
+      const response = await fetch('http://192.168.100.164:8000/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${userData.firstName} ${userData.lastName}`,
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          email: userData.email,
+          password: userData.password,
+          password_confirmation: userData.password, // Add password confirmation
+          role: userData.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
+          phone: userData.phone || '',
+          address: userData.address || '',
+          gender: userData.gender || '',
+          age: userData.age || null,
+          experience: userData.experience || '',
+          hourly_rate: userData.hourlyRate || null,
+          pet_breeds: userData.selectedBreeds || [],
+          specialties: userData.specialties || [],
+          selected_pet_types: userData.selectedPetTypes || [],
+          bio: userData.aboutMe || '',
+        }),
+      });
+
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Backend response error:', response.status, errorText);
+        throw new Error(`Backend error: ${response.status} - ${errorText}`);
+      }
+
+      // Try to parse JSON response
+      let result;
+      try {
+        const responseText = await response.text();
+        console.log('Raw backend response:', responseText);
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        throw new Error('Invalid response from backend - not valid JSON');
+      }
+      
+      if (result.success) {
+        console.log('User data saved to backend successfully:', result);
+        
+        // Create a complete user object for the auth context
+        const completeUser = {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+          firstName: result.user.first_name,
+          lastName: result.user.last_name,
+          userRole: result.user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter',
+          role: result.user.role,
+          phone: result.user.phone,
+          age: result.user.age,
+          gender: result.user.gender,
+          address: result.user.address,
+          experience: userData.experience || '',
+          hourlyRate: userData.hourlyRate || '',
+          aboutMe: result.user.bio || '',
+          specialties: userData.specialties || [],
+          email_verified: result.user.email_verified,
+          phone_verified: result.user.phone_verified,
+          selectedPetTypes: userData.selectedPetTypes,
+          selectedBreeds: result.user.pet_breeds,
+          profileImage: undefined,
+        };
+
+        // Store the complete user data in the auth context
+        await storeUserFromBackend(result.user);
+
+        // After breed selection, go to phone verification for pet sitters
+        if (signupData.userRole === 'Pet Sitter') {
+          setSignupData({ ...signupData, userData: completeUser });
+          setAuthStep('phone-verification');
+        } else {
+          onAuthSuccess(completeUser);
+        }
+      } else {
+        console.error('Failed to save user data to backend:', result);
+        throw new Error(result.message || 'Failed to save user data');
+      }
+    } catch (error) {
+      console.error('Error saving user data to backend:', error);
+      Alert.alert('Error', `Failed to save user data: ${error.message}`);
+      // Continue with the flow even if backend save fails
+      if (signupData.userRole === 'Pet Sitter') {
+        setSignupData({ ...signupData, userData });
+        setAuthStep('phone-verification');
+      } else {
+        onAuthSuccess(userData);
+      }
     }
   };
 
