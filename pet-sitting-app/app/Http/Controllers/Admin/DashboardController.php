@@ -28,6 +28,14 @@ class DashboardController extends Controller
         return view('admin.dashboard', compact('stats', 'recentActivities', 'chartsData'));
     }
 
+    public function reportsIndex()
+    {
+        // Get dashboard statistics for reports overview
+        $stats = $this->getDashboardStats();
+        
+        return view('admin.reports.index', compact('stats'));
+    }
+
     private function getDashboardStats()
     {
         $now = Carbon::now();

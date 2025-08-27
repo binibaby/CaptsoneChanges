@@ -134,6 +134,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // Reports
     Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [DashboardController::class, 'reportsIndex'])->name('index');
+        
         Route::get('/users', function () {
             return view('admin.reports.users');
         })->name('users');
