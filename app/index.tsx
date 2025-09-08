@@ -33,22 +33,35 @@ export default function App() {
 }
 
 function AppContent() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isLoading, user, isAuthenticated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading) {
-      if (!isAuthenticated) {
-        router.replace('/onboarding');
-      } else {
-        if (user?.userRole === 'Pet Owner') {
-          router.replace('/pet-owner-dashboard');
+      try {
+        if (isAuthenticated && user) {
+          // User is logged in, navigate to appropriate dashboard
+          console.log('User is authenticated, navigating to dashboard. Role:', user.role);
+          if (user.role === 'pet_owner') {
+            router.replace('/pet-owner-dashboard');
+          } else if (user.role === 'pet_sitter') {
+            router.replace('/pet-sitter-dashboard');
+          } else {
+            console.log('Unknown user role, redirecting to onboarding');
+            router.replace('/onboarding');
+          }
         } else {
-          router.replace('/pet-sitter-dashboard');
+          // User is not logged in, go to onboarding
+          console.log('User not authenticated, redirecting to onboarding');
+          router.replace('/onboarding');
         }
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback to onboarding on error
+        router.replace('/onboarding');
       }
     }
-  }, [isAuthenticated, isLoading, user, router]);
+  }, [isLoading, isAuthenticated, user, router]);
 
   if (isLoading) {
     return (
@@ -67,7 +80,7 @@ function AppContent() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <ActivityIndicator size="large" color="#007AFF" />
-      <Text style={{ marginTop: 16 }}>Loading...</Text>
+      <Text style={{ marginTop: 16 }}>Redirecting to onboarding...</Text>
     </View>
   );
 }

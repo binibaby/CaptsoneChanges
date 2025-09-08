@@ -74,7 +74,7 @@ const PaymentScreen: React.FC = () => {
 
     try {
       const token = await getAuthToken(); // Get from AsyncStorage or context
-      const apiUrl = 'http://192.168.100.145:8000/api';
+      const apiUrl = 'http://172.20.10.2:8000/api';
 
       let endpoint = '';
       let body: any = {

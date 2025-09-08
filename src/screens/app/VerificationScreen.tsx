@@ -246,7 +246,7 @@ const VerificationScreen = () => {
   const resendCode = async (type: 'email' | 'phone') => {
     try {
       // Call the resend verification code API
-      const response = await fetch('http://192.168.100.145:8000/api/resend-verification-code', {
+      const response = await fetch('http://172.20.10.2:8000/api/resend-verification-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

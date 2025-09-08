@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import verificationService from '../../services/verificationService';
 
 const IDVerificationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { firstName, lastName, age, phone } = route.params;
+  const { firstName, lastName, age, phone } = (route.params as any) || {};
   const [idImage, setIdImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,10 +49,6 @@ const IDVerificationScreen = () => {
       const result = await verificationService.submitVerification({
         document_type: 'ph_national_id', // or let user select
         document_image: idImage,
-        first_name: firstName,
-        last_name: lastName,
-        age,
-        phone,
       });
       if (result.success) {
         Alert.alert('Success', 'ID verified! You can now enter the app.', [

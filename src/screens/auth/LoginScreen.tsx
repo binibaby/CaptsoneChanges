@@ -1,14 +1,16 @@
-import { AntDesign, Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
     Platform,
     SafeAreaView,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
+    TouchableWithoutFeedback,
     View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,9 +25,32 @@ interface LoginScreenProps {
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, onBack, selectedUserRole }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const { login } = useAuth();
+  
+  // Refs for TextInput focus management
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+
+  // Keyboard event listeners using React Native's built-in Keyboard
+  useEffect(() => {
+    const { Keyboard } = require('react-native');
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      console.log('🎹 Keyboard did show!');
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      console.log('🎹 Keyboard did hide!');
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -49,13 +74,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        {onBack && (
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-        )}
-        <View style={styles.content}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+          )}
+          <View style={styles.content}>
           <Text style={styles.title}>Welcome Back! 👋</Text>
           <Text style={styles.subtitle}>
             {selectedUserRole 
@@ -65,21 +96,74 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
           </Text>
 
           <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <TouchableWithoutFeedback onPress={() => emailInputRef.current?.focus()}>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  ref={emailInputRef}
+                  style={[styles.input, emailFocused && styles.inputFocused]}
+                  placeholder="Enter your email"
+                  placeholderTextColor="#999"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                  onFocus={() => {
+                    console.log('Email input focused');
+                    setEmailFocused(true);
+                  }}
+                  onBlur={() => {
+                    console.log('Email input blurred');
+                    setEmailFocused(false);
+                  }}
+                  editable={true}
+                  selectTextOnFocus={true}
+                  clearButtonMode="while-editing"
+                  textContentType="emailAddress"
+                />
+              </View>
+            </TouchableWithoutFeedback>
+            <TouchableWithoutFeedback onPress={() => passwordInputRef.current?.focus()}>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  ref={passwordInputRef}
+                  style={[styles.input, styles.passwordInput, passwordFocused && styles.inputFocused]}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  onFocus={() => {
+                    console.log('Password input focused');
+                    setPasswordFocused(true);
+                  }}
+                  onBlur={() => {
+                    console.log('Password input blurred');
+                    setPasswordFocused(false);
+                  }}
+                  editable={true}
+                  selectTextOnFocus={true}
+                  textContentType="password"
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
 
           <View style={styles.optionsContainer}>
@@ -106,17 +190,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.orText}>or</Text>
-
-          <TouchableOpacity style={[styles.socialButton, styles.googleButton]}>
-            <AntDesign name="google" size={20} color="#4A4A4A" />
-            <Text style={styles.socialButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.socialButton, styles.appleButton]}>
-            <AntDesign name="apple1" size={20} color="#4A4A4A" />
-            <Text style={styles.socialButtonText}>Continue with Apple</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.signUpTextContainer}
             onPress={onRegister}
@@ -126,7 +199,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
               <Text style={styles.signUpLink}>Create Account</Text>
             </Text>
           </TouchableOpacity>
-        </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -139,6 +213,9 @@ const styles = StyleSheet.create({
   },
   keyboardAvoidingView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   backButton: {
     position: 'absolute',
@@ -170,12 +247,36 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 20,
   },
+  inputWrapper: {
+    width: '100%',
+  },
   input: {
     backgroundColor: '#f5f5f5',
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    minHeight: 50,
+  },
+  inputFocused: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#fff',
+  },
+  passwordContainer: {
+    position: 'relative',
+    marginBottom: 10,
+  },
+  passwordInput: {
+    paddingRight: 50,
+    marginBottom: 0,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+    padding: 5,
   },
   optionsContainer: {
     flexDirection: 'row',
@@ -213,33 +314,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-  },
-  orText: {
-    color: '#666',
-    marginBottom: 20,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    width: '100%',
-  },
-  googleButton: {
-    backgroundColor: '#FFFFFF',
-  },
-  appleButton: {
-    backgroundColor: '#FFFFFF',
-  },
-  socialButtonText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: '#4A4A4A',
-    fontWeight: '500',
   },
   signUpTextContainer: {
     marginTop: 20,

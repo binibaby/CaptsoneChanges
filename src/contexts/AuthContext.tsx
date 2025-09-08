@@ -1,6 +1,7 @@
+import * as Location from 'expo-location';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
 import authService, { User } from '../services/authService';
+import locationService, { LocationConfig } from '../services/locationService';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +20,12 @@ interface AuthContextType {
   storeUserFromBackend: (backendUser: any) => Promise<void>;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
+  // Location tracking properties
+  currentLocation: Location.LocationObject | null;
+  userAddress: string | null;
+  isLocationTracking: boolean;
+  startLocationTracking: (radius?: number) => Promise<void>;
+  stopLocationTracking: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,32 +47,34 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Location tracking state
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+  const [isLocationTracking, setIsLocationTracking] = useState(false);
 
   useEffect(() => {
-    checkAuthState();
-    
-    // Listen for app state changes (refresh, background/foreground)
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        // App has come to foreground (including on refresh)
-        console.log('App became active - checking if we should clear data');
-        if (__DEV__ && !user) {
-          // Only clear data if no user is logged in (fresh start)
-          console.log('Development mode: No user logged in, clearing data for fresh start');
-          authService.clearAllData().then(() => {
-            setUser(null);
-            console.log('All data cleared successfully for fresh start');
-          });
+    // Check if user is already logged in on app start
+    const checkExistingAuth = async () => {
+      try {
+        console.log('App started - checking existing authentication');
+        const existingUser = await authService.getCurrentUser();
+        if (existingUser) {
+          console.log('Found existing user:', existingUser.email);
+          setUser(existingUser);
+        } else {
+          console.log('No existing user found');
+          setUser(null);
         }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking existing auth:', error);
+        setUser(null);
+        setIsLoading(false);
       }
     };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
     
-    return () => {
-      subscription?.remove();
-    };
-  }, [user]);
+    checkExistingAuth();
+  }, []);
 
   const checkAuthState = async () => {
     try {
@@ -81,10 +90,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           role: currentUser.userRole
         });
         setUser(currentUser);
-      } else if (__DEV__) {
-        // Only clear data if no user exists and we're in development mode
-        console.log('Development mode: No existing user, clearing data for fresh start');
-        await authService.clearAllData();
+      } else {
+        console.log('No existing user found, starting fresh');
         setUser(null);
       }
     } catch (error) {
@@ -100,6 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const user = await authService.login(email, password);
       setUser(user);
+      return user; // Return the user object
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -120,6 +128,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const user = await authService.register(userData);
       setUser(user);
+      return user; // Return the user object
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -130,11 +139,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateUserProfile = async (profileData: Partial<User>) => {
     try {
+      console.log('AuthContext: updateUserProfile called with:', profileData);
+      console.log('AuthContext: Current user state:', user);
+      
+      // Validate profileData before processing
+      if (!profileData) {
+        console.error('AuthContext: profileData is null or undefined');
+        throw new Error('Profile data is required');
+      }
+      
       await authService.updateUserProfile(profileData);
       // Update the local user state with the new profile data
       if (user) {
         const updatedUser = { ...user, ...profileData };
         setUser(updatedUser);
+        console.log('AuthContext: User state updated successfully');
+      } else {
+        console.warn('AuthContext: No current user to update');
       }
     } catch (error) {
       console.error('Error updating user profile:', error);
@@ -178,6 +199,94 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Location tracking functions
+  const startLocationTracking = React.useCallback(async (radius: number = 1000) => {
+    if (!user) {
+      console.log('Cannot start location tracking: no user logged in');
+      return;
+    }
+
+    try {
+      console.log('Starting location tracking for user:', user.email);
+      
+      const config: LocationConfig = {
+        radius,
+        updateInterval: 30000, // 30 seconds
+        onLocationUpdate: async (location) => {
+          setCurrentLocation(location);
+          console.log('Location updated:', {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            accuracy: location.coords.accuracy,
+            timestamp: new Date(location.timestamp).toLocaleString()
+          });
+
+          // Get address from coordinates
+          try {
+            const address = await locationService.getAddressFromCoordinates(
+              location.coords.latitude,
+              location.coords.longitude
+            );
+            setUserAddress(address);
+            console.log('User address:', address);
+          } catch (error) {
+            console.error('Failed to get address:', error);
+          }
+        },
+        onRadiusEnter: (location) => {
+          console.log('User entered radius:', radius, 'meters');
+        },
+        onRadiusExit: (location) => {
+          console.log('User exited radius:', radius, 'meters');
+        },
+        onError: (error) => {
+          console.error('Location tracking error:', error);
+          setIsLocationTracking(false);
+        }
+      };
+
+      await locationService.startLocationTracking(config);
+      setIsLocationTracking(true);
+      
+      console.log('Location tracking started successfully for user:', user.email);
+    } catch (error) {
+      console.error('Failed to start location tracking:', error);
+      setIsLocationTracking(false);
+    }
+  }, [user]);
+
+  const stopLocationTracking = React.useCallback(() => {
+    try {
+      locationService.stopLocationTracking();
+      setIsLocationTracking(false);
+      setCurrentLocation(null);
+      setUserAddress(null);
+      console.log('Location tracking stopped');
+    } catch (error) {
+      console.error('Error stopping location tracking:', error);
+    }
+  }, []);
+
+  // Start location tracking when user logs in (disabled to prevent crashes)
+  useEffect(() => {
+    if (user && !isLocationTracking) {
+      console.log('User logged in, location tracking available but not auto-started');
+      // startLocationTracking(1000); // Disabled to prevent crashes
+    } else if (!user && isLocationTracking) {
+      console.log('User logged out, stopping location tracking...');
+      stopLocationTracking();
+    }
+  }, [user, isLocationTracking, startLocationTracking, stopLocationTracking]);
+
+  // Cleanup location tracking on unmount
+  useEffect(() => {
+    return () => {
+      if (isLocationTracking) {
+        stopLocationTracking();
+      }
+    };
+  }, [isLocationTracking, stopLocationTracking]);
+
   const value = {
     user,
     isLoading,
@@ -188,6 +297,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     storeUserFromBackend,
     refresh,
     logout,
+    // Location tracking values
+    currentLocation,
+    userAddress,
+    isLocationTracking,
+    startLocationTracking,
+    stopLocationTracking,
   };
 
   return (

@@ -16,3 +16,111 @@ sh: vite: command not found
 > vite
 
 sh: vite: command not found
+==== Wed Aug 27 14:33:10 PST 2025 - Starting Vite (Web) ====
+
+> dev
+> vite
+
+sh: vite: command not found
+==== Wed Aug 27 14:36:20 PST 2025 - Starting Vite (Web) ====
+
+> dev
+> vite
+
+
+  VITE v6.3.5  ready in 5594 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+  LARAVEL v12.21.0  plugin v2.0.1
+
+  ➜  APP_URL: http://localhost
+==== Wed Aug 27 14:38:53 PST 2025 - Starting Vite (Web) ====
+
+> dev
+> vite
+
+
+  VITE v6.3.5  ready in 792 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+  LARAVEL v12.21.0  plugin v2.0.1
+
+  ➜  APP_URL: http://localhost
+2:46:12 PM [vite] full reload resources/views/profile/partials/update-profile-information-form.blade.php
+2:46:14 PM [vite] full reload resources/views/profile/partials/update-profile-information-form.blade.php
+2:46:14 PM [vite] full reload resources/views/profile/partials/update-profile-information-form.blade.php
+2:46:44 PM [vite] full reload resources/views/profile/partials/update-profile-information-form.blade.php
+2:46:46 PM [vite] full reload resources/views/profile/partials/update-profile-information-form.blade.php
+2:47:01 PM [vite] full reload resources/views/profile/partials/update-profile-information-form.blade.php
+2:47:02 PM [vite] full reload resources/views/profile/partials/update-profile-information-form.blade.php
+4:07:36 PM [vite] full reload resources/views/admin/layouts/app.blade.php
+4:07:36 PM [vite] (client) page reload resources/views/admin/layouts/app.blade.php
+4:08:33 PM [vite] full reload resources/views/admin/dashboard.blade.php
+4:08:33 PM [vite] (client) page reload resources/views/admin/dashboard.blade.php
+4:09:10 PM [vite] full reload resources/views/admin/login.blade.php
+4:09:10 PM [vite] (client) page reload resources/views/admin/login.blade.php
+4:09:26 PM [vite] full reload resources/views/admin/login.blade.php
+4:09:26 PM [vite] (client) page reload resources/views/admin/login.blade.php
+4:09:40 PM [vite] (client) page reload storage/framework/views/2dc902834d3d2cb5d4692cba71b74614.php
+4:09:40 PM [vite] (client) page reload storage/framework/views/a11b2411c5d340172b489608938af145.php
+4:10:25 PM [vite] full reload routes/admin.php
+4:10:28 PM [vite] full reload routes/admin.php
+4:11:42 PM [vite] full reload resources/views/admin/reports/index.blade.php
+4:11:42 PM [vite] full reload resources/views/admin/reports/index.blade.php
+4:11:44 PM [vite] full reload resources/views/admin/reports/index.blade.php
+4:11:48 PM [vite] full reload resources/views/admin/reports/index.blade.php
+4:11:48 PM [vite] full reload resources/views/admin/reports/index.blade.php
+4:12:01 PM [vite] full reload routes/admin.php
+4:12:05 PM [vite] full reload routes/admin.php
+4:16:11 PM [vite] full reload resources/views/admin/reports/index.blade.php
+4:16:11 PM [vite] (client) page reload resources/views/admin/reports/index.blade.php
+4:21:37 PM [vite] full reload resources/views/admin/layouts/app.blade.php
+4:21:37 PM [vite] (client) page reload resources/views/admin/layouts/app.blade.php
+4:23:35 PM [vite] full reload resources/views/admin/dashboard.blade.php
+4:23:35 PM [vite] (client) page reload resources/views/admin/dashboard.blade.php
+4:23:44 PM [vite] (client) page reload storage/framework/views/2dc902834d3d2cb5d4692cba71b74614.php
+4:23:44 PM [vite] (client) page reload storage/framework/views/a11b2411c5d340172b489608938af145.php
+4:25:42 PM [vite] full reload resources/views/admin/dashboard.blade.php
+4:25:42 PM [vite] (client) page reload resources/views/admin/dashboard.blade.php
+4:25:46 PM [vite] full reload resources/views/admin/dashboard.blade.php
+4:25:46 PM [vite] (client) page reload resources/views/admin/dashboard.blade.php
+4:25:48 PM [vite] (client) page reload storage/framework/views/2dc902834d3d2cb5d4692cba71b74614.php
+4:26:57 PM [vite] full reload resources/views/admin/dashboard.blade.php
+4:26:57 PM [vite] (client) page reload resources/views/admin/dashboard.blade.php
+4:27:09 PM [vite] full reload resources/views/admin/dashboard.blade.php
+4:27:09 PM [vite] (client) page reload resources/views/admin/dashboard.blade.php
+4:27:46 PM [vite] (client) page reload storage/framework/views/2dc902834d3d2cb5d4692cba71b74614.php
+9:22:00 AM [vite] full reload resources/views/admin/dashboard.blade.php
+9:22:00 AM [vite] (client) page reload resources/views/admin/dashboard.blade.php
+==== Thu Aug 28 09:27:41 PST 2025 - Starting Vite (Web) ====
+
+> dev
+> vite
+
+
+  VITE v6.3.5  ready in 1128 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+  LARAVEL v12.21.0  plugin v2.0.1
+
+  ➜  APP_URL: http://localhost
+==== Thu Aug 28 09:37:32 PST 2025 - Starting Vite (Web) ====
+
+> dev
+> vite
+
+
+  VITE v6.3.5  ready in 1576 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+  LARAVEL v12.21.0  plugin v2.0.1
+
+  ➜  APP_URL: http://localhost

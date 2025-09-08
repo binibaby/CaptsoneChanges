@@ -2,13 +2,13 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { getApiUrl, getAuthHeaders } from '../../constants/config';
 
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   cameraButton: {
     backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginBottom: 30,
   },
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   skipButton: {
     backgroundColor: '#F59E0B',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginBottom: 20,
   },
@@ -392,31 +392,34 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 20,
   },
   backButton: {
-    flex: 1,
     backgroundColor: '#f0f0f0',
-    padding: 15,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     alignItems: 'center',
     marginRight: 10,
+    minWidth: 60,
   },
   backButtonText: {
     color: '#333',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   submitButton: {
     flex: 1,
     backgroundColor: '#10B981',
-    padding: 15,
-    borderRadius: 8,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 25,
     alignItems: 'center',
     marginLeft: 10,
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

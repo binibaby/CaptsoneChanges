@@ -7,11 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "capstoneapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We use your location to show nearby pet sitters on the map."
+        "NSLocationWhenInUseUsageDescription": "We use your location to show nearby pet sitters on the map and provide real-time location-based services.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location to provide real-time pet sitting services, notify you when you're near available sitters, and track your location for service delivery.",
+        "UIBackgroundModes": ["location", "background-processing"]
       }
     },
     "android": {
@@ -20,7 +22,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION"]
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +38,16 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "We use your location to provide real-time pet sitting services, notify you when you're near available sitters, and track your location for service delivery.",
+          "locationAlwaysPermission": "We use your location to provide real-time pet sitting services, notify you when you're near available sitters, and track your location for service delivery.",
+          "locationWhenInUsePermission": "We use your location to show nearby pet sitters on the map and provide real-time location-based services.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],

@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  FlatList,
-  Image,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Image,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import BadgeDisplay from '../../components/BadgeDisplay';
 
@@ -61,9 +61,12 @@ const JobsScreen = () => {
               )}
             </View>
             <Text style={styles.postedTime}>{item.postedTime}</Text>
-            {item.badges && item.badges.length > 0 && (
-              <BadgeDisplay badges={item.badges} size="small" maxDisplay={2} />
-            )}
+            <BadgeDisplay 
+              badges={item.badges} 
+              size="small" 
+              maxDisplay={2} 
+              isPetSitter={true} // Always show verification status for pet sitters
+            />
           </View>
         </View>
         <View style={styles.rateContainer}>

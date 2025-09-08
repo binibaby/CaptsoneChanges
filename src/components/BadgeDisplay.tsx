@@ -11,11 +11,27 @@ interface Badge {
 }
 
 interface BadgeDisplayProps {
-  badges: Badge[];
+  badges?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    color: string;
+    earned_at: string;
+  }>;
   showDescription?: boolean;
+  size?: 'small' | 'medium' | 'large';
+  maxDisplay?: number;
+  isPetSitter?: boolean; // Add this prop to identify pet sitters
 }
 
-const BadgeDisplay: React.FC<BadgeDisplayProps> = ({ badges, showDescription = false }) => {
+const BadgeDisplay: React.FC<BadgeDisplayProps> = ({ 
+  badges, 
+  showDescription = false, 
+  size = 'medium', 
+  maxDisplay, 
+  isPetSitter = false 
+}) => {
   const getIcon = (iconName: string) => {
     const iconMap: { [key: string]: string } = {
       'shield-checkmark': '🛡️',
@@ -32,6 +48,7 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({ badges, showDescription = f
       'globe': '🌍',
       'star': '⭐',
       'cpu': '🤖',
+      'alert-circle': '⚠️', // Add alert icon for not verified status
     };
     return iconMap[iconName] || '🏆';
   };
@@ -42,6 +59,29 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({ badges, showDescription = f
     borderWidth: 1,
   });
 
+  // If no badges and this is a pet sitter, show "Not Verified Yet" badge
+  if ((!badges || badges.length === 0) && isPetSitter) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verification Status</Text>
+        <View style={styles.badgesContainer}>
+          <View style={[styles.badge, getBadgeStyle('#FF9800')]}>
+            <Text style={styles.badgeIcon}>⚠️</Text>
+            <View style={styles.badgeContent}>
+              <Text style={[styles.badgeName, { color: '#FF9800' }]}>
+                Not Verified Yet
+              </Text>
+              <Text style={styles.badgeDescription}>
+                Complete ID verification to earn verification badges
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // If no badges and not a pet sitter, return null
   if (!badges || badges.length === 0) {
     return null;
   }

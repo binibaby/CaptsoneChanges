@@ -127,6 +127,20 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'verification' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/verification.log'),
+            'level' => 'info',
+            'replace_placeholders' => true,
+        ],
+
+        'phone_codes' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/phone-codes.log'),
+            'level' => 'info',
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

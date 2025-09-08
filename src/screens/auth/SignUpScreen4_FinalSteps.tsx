@@ -36,6 +36,10 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('other');
   const [address, setAddress] = useState('');
+  const [experience, setExperience] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [newSpecialty, setNewSpecialty] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong'>('weak');
   const [showPassword, setShowPassword] = useState(true);
@@ -73,7 +77,7 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   };
 
   const isFormValid = () => {
-    return firstName.trim() && 
+    const baseValidation = firstName.trim() && 
            lastName.trim() && 
            email.trim() && 
            password.trim() && 
@@ -83,6 +87,13 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
            address.trim() &&
            password === confirmPassword &&
            password.length >= 8;
+    
+    // For pet sitters, also require experience
+    if (userRole === 'Pet Sitter') {
+      return baseValidation && experience.trim();
+    }
+    
+    return baseValidation;
   };
 
   const handleComplete = async () => {
@@ -130,6 +141,9 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
         userRole,
         selectedPetTypes,
         selectedBreeds,
+        experience: userRole === 'Pet Sitter' ? experience : '',
+        hourlyRate: userRole === 'Pet Sitter' ? hourlyRate : '',
+        specialties: userRole === 'Pet Sitter' ? specialties : [],
         isVerified: false,
         verificationPending: userRole === 'Pet Sitter',
         createdAt: new Date().toISOString(),
@@ -273,6 +287,83 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
                 numberOfLines={3}
               />
             </View>
+
+            {/* Pet Sitter Specific Fields */}
+            {userRole === 'Pet Sitter' && (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Hourly Rate (₱)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your hourly rate (e.g., 250)"
+                    placeholderTextColor="#999"
+                    value={hourlyRate}
+                    onChangeText={setHourlyRate}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Experience (Years) *</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="How many years of pet sitting experience do you have? (e.g., 3 years, 1.5 years, 6 months)"
+                    placeholderTextColor="#999"
+                    value={experience}
+                    onChangeText={setExperience}
+                    multiline
+                    numberOfLines={3}
+                  />
+                  {userRole === 'Pet Sitter' && experience.length === 0 && (
+                    <Text style={styles.errorText}>Experience is required for pet sitters</Text>
+                  )}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Specialties</Text>
+                  <View style={styles.specialtiesContainer}>
+                    {specialties.map((specialty, index) => (
+                      <View key={index} style={styles.specialtyTag}>
+                        <Text style={styles.specialtyText}>{specialty}</Text>
+                        <TouchableOpacity
+                          style={styles.removeSpecialtyButton}
+                          onPress={() => setSpecialties(specialties.filter((_, i) => i !== index))}
+                        >
+                          <Ionicons name="close" size={16} color="#666" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.addSpecialtyContainer}>
+                    <TextInput
+                      style={styles.specialtyInput}
+                      placeholder="Add a specialty (e.g., Dog training, Cat care, Overnight sitting)"
+                      placeholderTextColor="#999"
+                      value={newSpecialty}
+                      onChangeText={setNewSpecialty}
+                      onSubmitEditing={() => {
+                        if (newSpecialty.trim()) {
+                          setSpecialties([...specialties, newSpecialty.trim()]);
+                          setNewSpecialty('');
+                        }
+                      }}
+                    />
+                    <TouchableOpacity
+                      style={[styles.addSpecialtyButton, !newSpecialty.trim() && styles.disabledAddButton]}
+                      onPress={() => {
+                        if (newSpecialty.trim()) {
+                          setSpecialties([...specialties, newSpecialty.trim()]);
+                          setNewSpecialty('');
+                        }
+                      }}
+                      disabled={!newSpecialty.trim()}
+                    >
+                      <Ionicons name="add" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
 
           <View style={styles.formGroup}>
@@ -706,6 +797,71 @@ const styles = StyleSheet.create({
   requirementMet: {
     color: '#4CAF50',
     fontWeight: '600',
+  },
+  specialtiesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 10,
+  },
+  specialtyTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0E0E0',
+    borderRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#C0C0C0',
+  },
+  specialtyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginRight: 8,
+  },
+  removeSpecialtyButton: {
+    padding: 4,
+  },
+  addSpecialtyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingHorizontal: 10,
+  },
+  specialtyInput: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    backgroundColor: '#F8F9FA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    minHeight: 56,
+    color: '#333',
+  },
+  addSpecialtyButton: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 15,
+    marginLeft: 10,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  disabledAddButton: {
+    backgroundColor: '#E0E0E0',
+    opacity: 0.7,
   },
 });
 

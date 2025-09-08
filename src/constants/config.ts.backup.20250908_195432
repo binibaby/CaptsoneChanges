@@ -31,8 +31,8 @@ export const NETWORK_FALLBACK = {
     '10.0.0.100',       // Corporate networks
   ],
   
-  // Connection test timeout (reduced for faster detection)
-  CONNECTION_TIMEOUT: 1000,
+  // Connection test timeout
+  CONNECTION_TIMEOUT: 3000,
   
   // Retry attempts
   MAX_RETRIES: 3,

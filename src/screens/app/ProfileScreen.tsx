@@ -3,16 +3,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  Image,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -32,7 +31,7 @@ const ProfileScreen = () => {
   
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [newSpecialty, setNewSpecialty] = useState('');
   const [profileData, setProfileData] = useState<{
     firstName: string;
     lastName: string;
@@ -77,12 +76,14 @@ const ProfileScreen = () => {
     console.log('ProfileScreen: useEffect triggered with user:', user);
     if (user) {
       console.log('Profile screen: Loading user data from auth context:', user);
-      console.log('Profile screen: User name parts:', user.name ? user.name.split(' ') : []);
       
-      // Split the user name into first and last name
-      const nameParts = user.name ? user.name.split(' ') : [];
+      // Safely extract name parts with proper fallbacks
+      const userName = user.name || '';
+      const nameParts = userName ? userName.split(' ') : [];
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
+      
+      console.log('Profile screen: User name parts:', { userName, nameParts, firstName, lastName });
       
       const newProfileData = {
         firstName,
@@ -204,19 +205,37 @@ const ProfileScreen = () => {
 
   const handleSaveProfile = async () => {
     try {
-      // Save the profile data to the auth context
-      await updateUserProfile({
-        firstName: profileData.firstName,
-        lastName: profileData.lastName,
+      // Validate profileData exists and has required fields
+      if (!profileData) {
+        console.error('ProfileScreen: profileData is null or undefined');
+        Alert.alert('Error', 'Profile data is missing. Please try again.');
+        return;
+      }
+
+      // Ensure firstName and lastName have fallback values
+      const firstName = profileData.firstName || '';
+      const lastName = profileData.lastName || '';
+      
+      console.log('ProfileScreen: Saving profile with data:', {
+        firstName,
+        lastName,
         email: profileData.email,
         phone: profileData.phone,
+      });
+
+      // Save the profile data to the auth context
+      await updateUserProfile({
+        firstName,
+        lastName,
+        email: profileData.email || '',
+        phone: profileData.phone || '',
         age: profileData.age ? parseInt(profileData.age) : undefined,
-        gender: profileData.gender,
-        address: profileData.address,
-        experience: profileData.experience,
-        hourlyRate: profileData.hourlyRate,
-        aboutMe: profileData.aboutMe,
-        specialties: profileData.specialties,
+        gender: profileData.gender || '',
+        address: profileData.address || '',
+        experience: profileData.experience || '',
+        hourlyRate: profileData.hourlyRate || '',
+        aboutMe: profileData.aboutMe || '',
+        specialties: profileData.specialties || [],
       });
       
       setIsEditing(false);
@@ -227,23 +246,12 @@ const ProfileScreen = () => {
     }
   };
 
-  const handleVerifyID = (idType: string) => {
-    setShowVerifyModal(false);
-    Alert.alert('ID Verification', `Redirecting to verify your ${idType}...`);
-    // Here you would navigate to ID verification screen
-  };
-
   const menuItems = [
     {
       icon: 'person-outline',
       title: 'Edit Profile',
       onPress: () => setIsEditing(true),
     },
-    ...(user?.userRole === 'Pet Sitter' ? [{
-      icon: 'shield-checkmark-outline',
-      title: 'Verification & Badges',
-      onPress: () => console.log('Navigate to verification'),
-    }] : []),
     {
       icon: 'settings-outline',
       title: 'Settings',
@@ -299,17 +307,11 @@ const ProfileScreen = () => {
           </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>
-              {profileData.firstName && profileData.lastName 
-                ? `${profileData.firstName} ${profileData.lastName}` 
+              {(profileData.firstName || profileData.lastName)
+                ? `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim()
                 : 'Enter Your Name'
               }
             </Text>
-            {user?.userRole === 'Pet Sitter' && (
-              <View style={styles.verificationBadge}>
-                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={styles.verificationText}>Gov ID</Text>
-              </View>
-            )}
             {profileData.address ? (
               <View style={styles.locationContainer}>
                 <Ionicons name="location" size={16} color="#FF6B6B" />
@@ -337,16 +339,6 @@ const ProfileScreen = () => {
             <Text style={styles.debugText}>Debug: Profile Data - Pet Breeds: {profileData.petBreeds.length > 0 ? profileData.petBreeds.join(', ') : 'None'}</Text>
           </View>
         )}
-
-        {/* Verify ID Button */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={styles.verifyButton} 
-            onPress={() => setShowVerifyModal(true)}
-          >
-            <Text style={styles.verifyButtonText}>Verify Your ID</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Professional Metrics Section */}
         <View style={styles.statsSection}>
@@ -401,7 +393,7 @@ const ProfileScreen = () => {
             <Text style={styles.inputLabel}>Full Name</Text>
             <TextInput
               style={[styles.input, !isEditing && styles.disabledInput]}
-              value={`${profileData.firstName} ${profileData.lastName}`}
+              value={`${profileData.firstName || ''} ${profileData.lastName || ''}`.trim()}
               onChangeText={(text) => {
                 const names = text.split(' ');
                 setProfileData({
@@ -453,13 +445,13 @@ const ProfileScreen = () => {
           {user?.userRole === 'Pet Sitter' && (
             <>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Experience</Text>
+                <Text style={styles.inputLabel}>Experience (Years)</Text>
                 <TextInput
                   style={[styles.input, !isEditing && styles.disabledInput]}
                   value={profileData.experience}
                   onChangeText={(text) => setProfileData({...profileData, experience: text})}
                   editable={isEditing}
-                  placeholder="e.g., 3 years"
+                  placeholder="e.g., 3 years, 1.5 years, 6 months"
                 />
               </View>
 
@@ -491,16 +483,72 @@ const ProfileScreen = () => {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Specialties</Text>
-                {profileData.specialties.length > 0 ? (
-                  <View style={styles.specialtiesContainer}>
-                    {profileData.specialties.map((specialty, index) => (
-                      <View key={index} style={styles.specialtyTag}>
-                        <Text style={styles.specialtyText}>{specialty}</Text>
-                      </View>
-                    ))}
-                  </View>
+                {isEditing ? (
+                  <>
+                    <View style={styles.specialtiesContainer}>
+                      {profileData.specialties.map((specialty, index) => (
+                        <View key={index} style={styles.specialtyTag}>
+                          <Text style={styles.specialtyText}>{specialty}</Text>
+                          <TouchableOpacity
+                            style={styles.removeSpecialtyButton}
+                            onPress={() => setProfileData({
+                              ...profileData, 
+                              specialties: profileData.specialties.filter((_, i) => i !== index)
+                            })}
+                          >
+                            <Ionicons name="close" size={16} color="#666" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.addSpecialtyContainer}>
+                      <TextInput
+                        style={styles.specialtyInput}
+                        placeholder="Add a specialty (e.g., Dog training, Cat care)"
+                        placeholderTextColor="#999"
+                        value={newSpecialty}
+                        onChangeText={setNewSpecialty}
+                        onSubmitEditing={() => {
+                          if (newSpecialty.trim()) {
+                            setProfileData({
+                              ...profileData, 
+                              specialties: [...profileData.specialties, newSpecialty.trim()]
+                            });
+                            setNewSpecialty('');
+                          }
+                        }}
+                      />
+                      <TouchableOpacity
+                        style={[styles.addSpecialtyButton, !newSpecialty.trim() && styles.disabledAddButton]}
+                        onPress={() => {
+                          if (newSpecialty.trim()) {
+                            setProfileData({
+                              ...profileData, 
+                              specialties: [...profileData.specialties, newSpecialty.trim()]
+                            });
+                            setNewSpecialty('');
+                          }
+                        }}
+                        disabled={!newSpecialty.trim()}
+                      >
+                        <Ionicons name="add" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  </>
                 ) : (
-                  <Text style={styles.emptyText}>No specialties added yet</Text>
+                  <>
+                    {profileData.specialties.length > 0 ? (
+                      <View style={styles.specialtiesContainer}>
+                        {profileData.specialties.map((specialty, index) => (
+                          <View key={index} style={styles.specialtyTag}>
+                            <Text style={styles.specialtyText}>{specialty}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.emptyText}>No specialties added yet</Text>
+                    )}
+                  </>
                 )}
               </View>
             </>
@@ -570,37 +618,6 @@ const ProfileScreen = () => {
           <Text style={styles.versionText}>Petsit Connect v1.0.0</Text>
         </View>
       </ScrollView>
-
-      {/* Verify ID Modal */}
-      <Modal
-        visible={showVerifyModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowVerifyModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Primary ID Type</Text>
-              <TouchableOpacity onPress={() => setShowVerifyModal(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalScroll}>
-              {primaryIDs.map((idType, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.idTypeItem}
-                  onPress={() => handleVerifyID(idType)}
-                >
-                  <Text style={styles.idTypeText}>{idType}</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#ccc" />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -669,17 +686,6 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 5,
   },
-  verificationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  verificationText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginLeft: 5,
-  },
   reviewsText: {
     fontSize: 12,
     color: '#666',
@@ -700,25 +706,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 20,
     paddingHorizontal: 20,
-  },
-  verifyButton: {
-    backgroundColor: '#F59E0B',
-    paddingVertical: 18,
-    borderRadius: 15,
-    alignItems: 'center',
-    width: '100%',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: '#E67E22',
-  },
-  verifyButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   editProfileButton: {
     backgroundColor: '#F59E0B',
@@ -813,11 +800,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   specialtyText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  removeSpecialtyButton: {
+    padding: 5,
+  },
+  addSpecialtyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    marginTop: 10,
+  },
+  specialtyInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#333',
+  },
+  addSpecialtyButton: {
+    padding: 10,
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+  },
+  disabledAddButton: {
+    backgroundColor: '#ccc',
   },
   emptyText: {
     fontSize: 14,
@@ -889,46 +904,6 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: '#999',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalScroll: {
-    padding: 20,
-  },
-  idTypeItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  idTypeText: {
-    fontSize: 16,
-    color: '#333',
   },
   debugInfo: {
     backgroundColor: '#f0f0f0',

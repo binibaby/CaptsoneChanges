@@ -24,9 +24,9 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
   const route = useRoute();
   
   // Get data from either props or route params
-  const userData = propUserData || route.params?.userData;
-  const phoneVerified = propPhoneVerified ?? route.params?.phoneVerified;
-  const frontImage = propFrontImage || route.params?.frontImage;
+  const userData = propUserData || (route.params as any)?.userData;
+  const phoneVerified = propPhoneVerified ?? (route.params as any)?.phoneVerified ?? false;
+  const frontImage = propFrontImage || (route.params as any)?.frontImage;
   
   console.log('BackIDScreen - propUserData:', propUserData);
   console.log('BackIDScreen - propPhoneVerified:', propPhoneVerified);
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   cameraButton: {
     backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginBottom: 30,
   },
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   skipButton: {
     backgroundColor: '#F59E0B',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginBottom: 20,
   },
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f0f0f0',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,  
     alignItems: 'center',
     marginRight: 10,
   },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#10B981',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginLeft: 10,
   },

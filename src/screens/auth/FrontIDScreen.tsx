@@ -2,13 +2,13 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { getApiUrl, getAuthHeaders } from '../../constants/config';
 
@@ -23,8 +23,8 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
   const route = useRoute();
   
   // Get data from either props or route params
-  const userData = propUserData || route.params?.userData;
-  const phoneVerified = propPhoneVerified ?? route.params?.phoneVerified;
+  const userData = propUserData || (route.params as any)?.userData;
+  const phoneVerified = propPhoneVerified ?? (route.params as any)?.phoneVerified ?? false;
   
   console.log('FrontIDScreen - propUserData:', propUserData);
   console.log('FrontIDScreen - propPhoneVerified:', propPhoneVerified);
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   cameraButton: {
     backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginBottom: 30,
   },
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   skipButton: {
     backgroundColor: '#F59E0B',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginBottom: 20,
   },
@@ -295,8 +295,8 @@ const styles = StyleSheet.create({
   backButton: {
     flex: 1,
     backgroundColor: '#f0f0f0',
-    padding: 15,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 100,
     alignItems: 'center',
     marginRight: 10,
   },
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#10B981',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 100,
     alignItems: 'center',
     marginLeft: 10,
   },

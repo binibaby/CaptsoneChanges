@@ -76,41 +76,33 @@ export default function Auth() {
 
   const onAuthSuccess = async (user: any) => {
     try {
-      console.log('onAuthSuccess called with user:', user);
-      
-      // Validate user object
-      if (!user) {
-        console.error('onAuthSuccess: user is null or undefined');
-        throw new Error('User data is missing');
-      }
-      
       // If the user object is already complete from backend, just update the profile
       if (user && user.id && user.email && user.id !== Date.now().toString()) {
         console.log('User data already saved to backend, updating profile');
         console.log('User object being passed to updateUserProfile:', user);
         
-        // Map backend user object to frontend user structure
+        // Ensure the user object has the correct structure for updateUserProfile
         const userForUpdate = {
           id: user.id,
           email: user.email,
           name: user.name,
-          firstName: user.first_name || '',  // Backend uses first_name
-          lastName: user.last_name || '',    // Backend uses last_name
-          userRole: (user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter') as 'Pet Owner' | 'Pet Sitter',
+          firstName: user.firstName || user.first_name || '',
+          lastName: user.lastName || user.last_name || '',
+          userRole: user.userRole,
           role: user.role,
           phone: user.phone || '',
           age: user.age,
           gender: user.gender || '',
           address: user.address || '',
           experience: user.experience || '',
-          hourlyRate: user.hourly_rate || '',  // Backend uses hourly_rate
-          aboutMe: user.bio || '',             // Backend uses bio
+          hourlyRate: user.hourlyRate || '',
+          aboutMe: user.aboutMe || '',
           specialties: user.specialties || [],
           email_verified: user.email_verified || false,
           phone_verified: user.phone_verified || false,
-          selectedPetTypes: user.selected_pet_types || [],
-          selectedBreeds: user.pet_breeds || [],  // Backend uses pet_breeds
-          profileImage: user.profile_image || undefined,
+          selectedPetTypes: user.selectedPetTypes || [],
+          selectedBreeds: user.selectedBreeds || [],
+          profileImage: user.profileImage || undefined,
         };
         
         console.log('User object structured for updateUserProfile:', userForUpdate);
@@ -124,9 +116,9 @@ export default function Auth() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-            first_name: user.firstName || '',
-            last_name: user.lastName || '',
+            name: `${user.firstName} ${user.lastName}`,
+            first_name: user.firstName,
+            last_name: user.lastName,
             email: user.email,
             password: user.password,
             role: user.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
@@ -149,23 +141,23 @@ export default function Auth() {
             id: result.user.id,
             email: result.user.email,
             name: result.user.name,
-            firstName: result.user.first_name || '',
-            lastName: result.user.last_name || '',
+            firstName: result.user.first_name,
+            lastName: result.user.last_name,
             userRole: result.user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter',
             role: result.user.role,
-            phone: result.user.phone || '',
+            phone: result.user.phone,
             age: result.user.age,
-            gender: result.user.gender || '',
-            address: result.user.address || '',
-            experience: result.user.experience || '',
-            hourlyRate: result.user.hourly_rate || '',
+            gender: result.user.gender,
+            address: result.user.address,
+            experience: user.experience || '',
+            hourlyRate: user.hourlyRate || '',
             aboutMe: result.user.bio || '',
-            specialties: result.user.specialties || [],
-            email_verified: result.user.email_verified || false,
-            phone_verified: result.user.phone_verified || false,
-            selectedPetTypes: result.user.selected_pet_types || [],
-            selectedBreeds: result.user.pet_breeds || [],
-            profileImage: result.user.profile_image || undefined,
+            specialties: user.specialties || [],
+            email_verified: result.user.email_verified,
+            phone_verified: result.user.phone_verified,
+            selectedPetTypes: user.selectedPetTypes,
+            selectedBreeds: result.user.pet_breeds,
+            profileImage: undefined,
           };
           
           await storeUserFromBackend(result.user);
@@ -177,23 +169,10 @@ export default function Auth() {
       console.error('Error updating user profile:', error);
     }
 
-    // Navigate based on user role
-    try {
-      const userRole = user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter';
-      console.log('Navigating user to dashboard. Role:', userRole);
-      
-      if (user.role === 'pet_owner') {
-        router.replace('/pet-owner-dashboard');
-      } else if (user.role === 'pet_sitter') {
-        router.replace('/pet-sitter-dashboard');
-      } else {
-        console.log('Unknown user role, redirecting to onboarding');
-        router.replace('/onboarding');
-      }
-    } catch (error) {
-      console.error('Navigation error in onAuthSuccess:', error);
-      // Fallback to onboarding on error
-      router.replace('/onboarding');
+    if (user.userRole === 'Pet Owner') {
+      router.replace('/pet-owner-dashboard');
+    } else {
+      router.replace('/pet-sitter-dashboard');
     }
   };
 
@@ -210,9 +189,9 @@ export default function Auth() {
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-          first_name: userData.firstName || '',
-          last_name: userData.lastName || '',
+          name: `${userData.firstName} ${userData.lastName}`,
+          first_name: userData.firstName,
+          last_name: userData.lastName,
           email: userData.email,
           password: userData.password,
           password_confirmation: userData.password, // Add password confirmation
@@ -291,7 +270,7 @@ export default function Auth() {
       }
     } catch (error) {
       console.error('Error saving user data to backend:', error);
-      Alert.alert('Error', `Failed to save user data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      Alert.alert('Error', `Failed to save user data: ${error.message}`);
       // Continue with the flow even if backend save fails
       if (signupData.userRole === 'Pet Sitter') {
         setSignupData({ ...signupData, userData });

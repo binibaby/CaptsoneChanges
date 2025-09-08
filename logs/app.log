@@ -86,3 +86,85 @@ Error: Premature close
     at onclose (node:internal/streams/end-of-stream:159:30)
     at processTicksAndRejections (node:internal/process/task_queues:77:11)
 Web Bundling failed 74646ms node_modules/expo-router/entry.js (1251 modules)
+==== Wed Aug 27 14:33:10 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  expo@53.0.20 - expected version: 53.0.22
+  expo-router@5.1.4 - expected version: ~5.1.5
+  expo-system-ui@5.0.10 - expected version: ~5.0.11
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+==== Wed Aug 27 14:36:20 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  expo@53.0.20 - expected version: 53.0.22
+  expo-router@5.1.4 - expected version: ~5.1.5
+  expo-system-ui@5.0.10 - expected version: ~5.0.11
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+==== Wed Aug 27 14:38:53 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+==== Thu Aug 28 09:27:40 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+iOS node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (21/72)
+iOS node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (109/302)
+iOS node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (193/391)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓░░░░░░░░░░ 38.2% (283/458)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓░░░░░░░░░░ 41.8% (382/592)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 52.2% (534/759)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 66.1% (667/822)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 70.3% (717/864)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 72.0% (796/946)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 77.2% ( 910/1036)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80.2% (1054/1203)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 87.2% (1213/1324)
+iOS node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 90.9% (1474/1546)
+iOS node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 47127ms node_modules/expo-router/entry.js (1586 modules)
+iOS Bundled 1422ms node_modules/expo-router/entry.js (1 module)
+ WARN  [Layout children]: No route named "admin" exists in nested children: ["auth", "e-wallet", "find-sitter-map", "index", "my-pets", "onboarding", "pet-owner-dashboard", "pet-owner-jobs", "pet-owner-messages", "pet-owner-notifications", "pet-owner-profile", "pet-sitter-availability", "pet-sitter-dashboard", "pet-sitter-messages", "pet-sitter-notifications", "pet-sitter-profile", "pet-sitter-requests", "pet-sitter-schedule", "_sitemap", "+not-found"]
+ LOG  getCurrentUser: No cached user, checking AsyncStorage
+ LOG  getCurrentUser: Found user data in AsyncStorage: {"id":5,"email":"bar@gmail.com","name":"Jasmine Paneda","firstName":"Jasmine","lastName":"Paneda","userRole":"Pet Sitter","role":"pet_sitter","phone":"0932523523","age":22,"gender":"female","address":"La Union","experience":"2","hourlyRate":"23","aboutMe":"","specialties":["Cat Taker"],"email_verified":true,"phone_verified":false,"selectedPetTypes":["dogs"],"selectedBreeds":["yorkshire","dachshund"]}
+ LOG  getCurrentUser: Parsed user data: {"aboutMe": "", "address": "La Union", "age": 22, "email": "bar@gmail.com", "email_verified": true, "experience": "2", "firstName": "Jasmine", "gender": "female", "hourlyRate": "23", "id": 5, "lastName": "Paneda", "name": "Jasmine Paneda", "phone": "0932523523", "phone_verified": false, "role": "pet_sitter", "selectedBreeds": ["yorkshire", "dachshund"], "selectedPetTypes": ["dogs"], "specialties": ["Cat Taker"], "userRole": "Pet Sitter"}
+ LOG  Found existing user: bar@gmail.com
+ LOG  User details: {"email": "bar@gmail.com", "id": 5, "name": "Jasmine Paneda", "role": "Pet Sitter"}
+ LOG  getCurrentUser: Returning cached user: bar@gmail.com
+ LOG  Found existing user: bar@gmail.com
+ LOG  User details: {"email": "bar@gmail.com", "id": 5, "name": "Jasmine Paneda", "role": "Pet Sitter"}
+ LOG  PetSitterProfileScreen: Loading user data from auth context: {"aboutMe": "", "address": "La Union", "age": 22, "email": "bar@gmail.com", "email_verified": true, "experience": "2", "firstName": "Jasmine", "gender": "female", "hourlyRate": "23", "id": 5, "lastName": "Paneda", "name": "Jasmine Paneda", "phone": "0932523523", "phone_verified": false, "role": "pet_sitter", "selectedBreeds": ["yorkshire", "dachshund"], "selectedPetTypes": ["dogs"], "specialties": ["Cat Taker"], "userRole": "Pet Sitter"}
+==== Thu Aug 28 09:37:32 PST 2025 - Starting Expo (App) ====
+
+> capstoneapp@1.0.0 start
+> expo start
+
+Starting project at /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.

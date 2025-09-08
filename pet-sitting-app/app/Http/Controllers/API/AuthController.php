@@ -257,6 +257,14 @@ class AuthController extends Controller
         \Log::info("📱 RESEND PHONE VERIFICATION CODE: {$code}");
         \Log::info("📱 RESEND PHONE VERIFICATION CODE: {$code}");
         \Log::info("📱 Use this code to verify phone: {$user->phone}");
+        
+        // Log to dedicated verification codes file
+        $timestamp = now()->format('Y-m-d H:i:s');
+        \Log::channel('verification')->info("🔢 RESEND VERIFICATION CODE FOR {$user->phone}: {$code}");
+        \Log::channel('verification')->info("⏰ Generated at: {$timestamp}");
+        \Log::channel('verification')->info("📱 Phone: {$user->phone}");
+        \Log::channel('verification')->info("🔄 Type: Resend Code");
+        \Log::channel('verification')->info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         // Simulate SMS sending
         \Log::info("🎭 SMS SIMULATION (resend) to {$user->phone}: Your Petsit Connect verification code is: {$code}");
@@ -511,6 +519,14 @@ class AuthController extends Controller
         \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
         \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
         \Log::info("📱 Use this code to verify phone: {$phone}");
+        
+        // Log to dedicated verification codes file
+        \Log::channel('verification')->info("🔢 VERIFICATION CODE FOR {$phone}: {$verificationCode}");
+        \Log::channel('verification')->info("⏰ Generated at: {$timestamp}");
+        \Log::channel('verification')->info("📱 Phone: {$phone}");
+        \Log::channel('verification')->info("🔑 Cache Key: {$cacheKey}");
+        \Log::channel('verification')->info("⏳ Expires in: 10 minutes");
+        \Log::channel('verification')->info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         // Format phone number for display
         $formattedPhone = $this->formatPhoneForSMS($phone);

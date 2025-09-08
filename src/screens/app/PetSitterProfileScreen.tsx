@@ -3,17 +3,17 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -36,11 +36,14 @@ const PetSitterProfileScreen = () => {
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
   const [selectedIDType, setSelectedIDType] = useState('');
   const [idImage, setIdImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [verifiedIDs, setVerifiedIDs] = useState([
-    { type: 'gov', label: 'Gov ID', icon: 'checkmark-circle', color: '#4CAF50', verified: true },
-    { type: 'driver', label: "Driver's License", icon: 'car', color: '#2196F3', verified: false },
-    { type: 'student', label: 'Student ID', icon: 'school', color: '#9C27B0', verified: false },
-    { type: 'passport', label: 'Passport', icon: 'airplane', color: '#FF9800', verified: false },
+    { type: 'umid', label: 'UMID (Unified Multi-Purpose ID)', icon: 'card', color: '#4CAF50', verified: false },
+    { type: 'sss', label: 'SSS ID', icon: 'card', color: '#2196F3', verified: false },
+    { type: 'gsis', label: 'GSIS ID', icon: 'card', color: '#9C27B0', verified: false },
+    { type: 'philhealth', label: 'PhilHealth ID', icon: 'medical', color: '#00BCD4', verified: false },
+    { type: 'passport', label: 'Philippine Passport', icon: 'airplane', color: '#FF9800', verified: false },
+    { type: 'driver', label: "Driver's License (LTO)", icon: 'car', color: '#795548', verified: false },
   ]);
 
   // Update profile data when user changes
@@ -101,6 +104,26 @@ const PetSitterProfileScreen = () => {
     setIdImage(null);
   };
 
+  const pickProfileImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        allowsMultipleSelection: false,
+        selectionLimit: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Image picker error:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
   const pickImage = async () => {
     // Request camera permissions first
     const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
@@ -159,7 +182,15 @@ const PetSitterProfileScreen = () => {
       <ScrollView style={styles.content}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <Image source={require('../../assets/images/default-avatar.png')} style={styles.profileImage} />
+          <TouchableOpacity onPress={pickProfileImage} style={styles.profileImageContainer}>
+            <Image 
+              source={profileImage ? { uri: profileImage } : require('../../assets/images/default-avatar.png')} 
+              style={styles.profileImage} 
+            />
+            <View style={styles.imageEditOverlay}>
+              <Ionicons name="camera" size={16} color="#fff" />
+            </View>
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile.name}</Text>
             {/* Badge Row */}
@@ -170,6 +201,15 @@ const PetSitterProfileScreen = () => {
                   <Text style={{ color: id.color, fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>{id.label}</Text>
                 </View>
               ))}
+              {/* Show "Not Verified Yet" when no IDs are verified */}
+              {verifiedIDs.filter((id) => id.verified).length === 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF3E0', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, marginTop: 4, marginBottom: 4 }}>
+                  <View style={{ backgroundColor: '#FF9800', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                    <Ionicons name="alert-circle" size={16} color="#fff" />
+                  </View>
+                  <Text style={{ color: '#FF9800', fontWeight: 'bold', fontSize: 14 }}>Not Verified Yet</Text>
+                </View>
+              )}
             </View>
             <View style={styles.ratingContainer}>
               <Text style={styles.reviewsText}>({profile.reviews} reviews)</Text>
@@ -179,8 +219,16 @@ const PetSitterProfileScreen = () => {
         </View>
 
         {/* Verify Your ID Button */}
-        <TouchableOpacity style={{ marginTop: 8, alignSelf: 'flex-start', backgroundColor: '#F59E0B', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 }} onPress={openVerifyModal}>
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Verify Your ID</Text>
+        <TouchableOpacity 
+          style={styles.verifyButton} 
+          onPress={openVerifyModal}
+          activeOpacity={0.8}
+        >
+          <View style={styles.verifyButtonContent}>
+            <Ionicons name="shield-checkmark" size={16} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={styles.verifyButtonText}>Verify Your ID</Text>
+            <Ionicons name="chevron-forward" size={14} color="#fff" style={{ marginLeft: 6 }} />
+          </View>
         </TouchableOpacity>
 
         {/* Stats */}
@@ -273,6 +321,21 @@ const PetSitterProfileScreen = () => {
               keyboardType="numeric"
             />
           </View>
+
+        </View>
+
+        {/* Experience Section */}
+        <View style={[styles.section, { marginBottom: 30, paddingBottom: 25 }]}>
+          <Text style={styles.sectionTitle}>Experience</Text>
+          <TextInput
+            style={[styles.bioInput, !isEditing && styles.disabledInput]}
+            value={profile.experience}
+            onChangeText={(text) => setProfile({...profile, experience: text})}
+            editable={isEditing}
+            placeholder="Tell us about your pet sitting experience..."
+            multiline
+            numberOfLines={4}
+          />
         </View>
 
         {/* Bio */}
@@ -326,29 +389,29 @@ const PetSitterProfileScreen = () => {
 
       {/* Modal for ID Verification */}
       <Modal visible={verifyModalVisible} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '85%' }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Verify Your ID</Text>
-            <Text style={{ marginBottom: 8 }}>Select ID Type:</Text>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, width: '90%', maxWidth: 400 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 24, marginBottom: 20, textAlign: 'center' }}>Verify Your ID</Text>
+            <Text style={{ marginBottom: 16, fontSize: 16, color: '#666' }}>Select ID Type:</Text>
             {verifiedIDs.map((id) => (
-              <TouchableOpacity key={id.type} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }} onPress={() => setSelectedIDType(id.type)}>
-                <Ionicons name={id.icon as any} size={18} color={id.color} />
-                <Text style={{ marginLeft: 8, color: id.color, fontWeight: 'bold', fontSize: 15 }}>{id.label}</Text>
-                {selectedIDType === id.type && <Ionicons name="checkmark" size={18} color="#4CAF50" style={{ marginLeft: 8 }} />}
+              <TouchableOpacity key={id.type} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingVertical: 8 }} onPress={() => setSelectedIDType(id.type)}>
+                <Ionicons name={id.icon as any} size={24} color={id.color} />
+                <Text style={{ marginLeft: 12, color: id.color, fontWeight: 'bold', fontSize: 18 }}>{id.label}</Text>
+                {selectedIDType === id.type && <Ionicons name="checkmark" size={24} color="#4CAF50" style={{ marginLeft: 12 }} />}
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={{ marginTop: 12, backgroundColor: '#F59E0B', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, alignSelf: 'flex-start' }} onPress={pickImage}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>{idImage ? 'Capture Again' : 'Open Camera to Capture'}</Text>
+            <TouchableOpacity style={{ marginTop: 20, backgroundColor: '#F59E0B', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, alignSelf: 'center' }} onPress={pickImage}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{idImage ? 'Capture Again' : 'Open Camera to Capture'}</Text>
             </TouchableOpacity>
             {idImage && (
-              <Image source={{ uri: idImage }} style={{ width: 120, height: 80, borderRadius: 8, marginTop: 10, alignSelf: 'center' }} />
+              <Image source={{ uri: idImage }} style={{ width: 160, height: 120, borderRadius: 12, marginTop: 16, alignSelf: 'center' }} />
             )}
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 }}>
-              <TouchableOpacity onPress={closeVerifyModal} style={{ marginRight: 16 }}>
-                <Text style={{ color: '#888', fontWeight: 'bold', fontSize: 15 }}>Cancel</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, gap: 16 }}>
+              <TouchableOpacity onPress={closeVerifyModal} style={{ flex: 1, backgroundColor: '#E0E0E0', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}>
+                <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16 }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={submitVerification} disabled={!selectedIDType || !idImage} style={{ backgroundColor: (!selectedIDType || !idImage) ? '#F0F0F0' : '#4CAF50', borderRadius: 8, paddingHorizontal: 18, paddingVertical: 8 }}>
-                <Text style={{ color: (!selectedIDType || !idImage) ? '#aaa' : '#fff', fontWeight: 'bold', fontSize: 15 }}>Submit</Text>
+              <TouchableOpacity onPress={submitVerification} disabled={!selectedIDType || !idImage} style={{ flex: 1, backgroundColor: (!selectedIDType || !idImage) ? '#F0F0F0' : '#4CAF50', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}>
+                <Text style={{ color: (!selectedIDType || !idImage) ? '#aaa' : '#fff', fontWeight: 'bold', fontSize: 16 }}>Submit</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -499,7 +562,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   inputGroup: {
-    marginBottom: 15,
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 14,
@@ -560,6 +623,46 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     marginLeft: 15,
+  },
+  verifyButton: {
+    marginTop: 12,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  verifyButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  profileImageContainer: {
+    position: 'relative',
+  },
+  imageEditOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
 });
 

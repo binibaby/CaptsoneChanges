@@ -58,3 +58,165 @@
 📞 Phone: +639123456789
 ⏰ Time: Thu Aug 14 09:11:39 PST 2025
 
+==== Wed Aug 27 14:33:10 PST 2025 - Starting Phone Code Monitor ====
+📱 PHONE VERIFICATION CODE MONITOR
+===================================
+🔍 Monitoring verification codes in real-time...
+💡 This will show all SMS codes, verification requests, and phone-related logs
+
+🔍 Starting real-time phone verification monitoring...
+📊 Watching logs for: verification codes, SMS, OTP, phone numbers
+
+📋 Monitoring Laravel logs...
+📋 Monitoring verification audit logs...
+📋 Monitoring general application logs...
+
+🎯 Phone verification codes will appear here in real-time!
+💡 Keep this terminal open to see all verification activities
+🛑 Press Ctrl+C to stop monitoring
+
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Received 🔑 CODE: 🔐 234719 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: ⏰ Timestamp: 🔐 2025 🔐-08-22 10:04:27  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🌐 Request IP: 192.168.100.159  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 👤 User Agent: Expo/🔐 101772 🔐1 CFNetwork/🔐 3826 🔐.600.41 Darwin/24.6.0  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Cache key used: 📞 PHONE_🔄 VERIFICATION_🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Stored 🔑 CODE found: 🔐 234719 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🔍 Code comparison: Expected='🔐 234719 🔐' vs Received='🔐 234719 🔐'  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: ✅ VERIFY SMS - Code verified successfully for 📞 PHONE: 🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🧹 Cache cleared for key: 📞 PHONE_🔄 VERIFICATION_🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🎉 PHONE VERIFICATION COMPLETED SUCCESSFULLY  
+==== Wed Aug 27 14:36:20 PST 2025 - Starting Phone Code Monitor ====
+📱 PHONE VERIFICATION CODE MONITOR
+===================================
+🔍 Monitoring verification codes in real-time...
+💡 This will show all SMS codes, verification requests, and phone-related logs
+
+🔍 Starting real-time phone verification monitoring...
+📊 Watching logs for: verification codes, SMS, OTP, phone numbers
+
+📋 Monitoring Laravel logs...
+📋 Monitoring verification audit logs...
+📋 Monitoring general application logs...
+
+🎯 Phone verification codes will appear here in real-time!
+💡 Keep this terminal open to see all verification activities
+🛑 Press Ctrl+C to stop monitoring
+
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Received 🔑 CODE: 🔐 234719 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: ⏰ Timestamp: 🔐 2025 🔐-08-22 10:04:27  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🌐 Request IP: 192.168.100.159  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 👤 User Agent: Expo/🔐 101772 🔐1 CFNetwork/🔐 3826 🔐.600.41 Darwin/24.6.0  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Cache key used: 📞 PHONE_🔄 VERIFICATION_🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Stored 🔑 CODE found: 🔐 234719 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🔍 Code comparison: Expected='🔐 234719 🔐' vs Received='🔐 234719 🔐'  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: ✅ VERIFY SMS - Code verified successfully for 📞 PHONE: 🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🧹 Cache cleared for key: 📞 PHONE_🔄 VERIFICATION_🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🎉 PHONE VERIFICATION COMPLETED SUCCESSFULLY  
+==== Wed Aug 27 14:38:53 PST 2025 - Starting Phone Code Monitor ====
+📱 PHONE VERIFICATION CODE MONITOR
+===================================
+🔍 Monitoring verification codes in real-time...
+💡 This will show all SMS codes, verification requests, and phone-related logs
+
+🔍 Starting real-time phone verification monitoring...
+📊 Watching logs for: verification codes, SMS, OTP, phone numbers
+
+📋 Monitoring Laravel logs...
+📋 Monitoring verification audit logs...
+📋 Monitoring general application logs...
+
+🎯 Phone verification codes will appear here in real-time!
+💡 Keep this terminal open to see all verification activities
+🛑 Press Ctrl+C to stop monitoring
+
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Received 🔑 CODE: 🔐 234719 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: ⏰ Timestamp: 🔐 2025 🔐-08-22 10:04:27  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🌐 Request IP: 192.168.100.159  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 👤 User Agent: Expo/🔐 101772 🔐1 CFNetwork/🔐 3826 🔐.600.41 Darwin/24.6.0  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Cache key used: 📞 PHONE_🔄 VERIFICATION_🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 📱 VERIFY SMS - Stored 🔑 CODE found: 🔐 234719 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🔍 Code comparison: Expected='🔐 234719 🔐' vs Received='🔐 234719 🔐'  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: ✅ VERIFY SMS - Code verified successfully for 📞 PHONE: 🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🧹 Cache cleared for key: 📞 PHONE_🔄 VERIFICATION_🔐 096362 🔐🔐 83365 🔐  
+[🔐 2025 🔐-08-22 10:04:27] local.INFO: 🎉 PHONE VERIFICATION COMPLETED SUCCESSFULLY  
+==== Thu Aug 28 09:27:41 PST 2025 - Starting Phone Code Monitor ====
+📱 PHONE VERIFICATION CODE MONITOR
+===================================
+🔍 Monitoring verification codes in real-time...
+💡 This will show all SMS codes, verification requests, and phone-related logs
+
+🔍 Starting real-time phone verification monitoring...
+📊 Watching logs for: verification codes, SMS, OTP, phone numbers
+
+📋 Monitoring Laravel logs...
+📋 Monitoring verification audit logs...
+📋 Monitoring general application logs...
+#61 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():183}:184}(Object(Illuminate\\Http\\Request))
+#62 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(208): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#63 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(126): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():183}:184}(Object(Illuminate\\Http\\Request))
+#64 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#65 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#66 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(🔐 1219 🔐): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#67 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/public/index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#68 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('/Users/jassy/De...')
+#69 {main}
+"} 
+
+🎯 Phone verification codes will appear here in real-time!
+💡 Keep this terminal open to see all verification activities
+🛑 Press Ctrl+C to stop monitoring
+
+==== 2025-08-28 09:31:23 - ENHANCED PHONE LOGGING STARTED ====
+🔍 Monitoring all verification activities...
+
+==== 2025-08-28 01:32:09 - TEST VERIFICATION CODE ====
+🔐 VERIFICATION CODE: 123456
+📞 Phone: +1234567890
+⏰ Time: 2025-08-28 01:32:09
+📝 Details: Test verification code for logging system
+
+==== Thu Aug 28 09:37:32 PST 2025 - Starting Phone Code Monitor ====
+==== 2025-08-28 09:37:46 - ENHANCED PHONE LOGGING STARTED ====
+🔍 Monitoring all verification activities...
+
+📱 PHONE VERIFICATION CODE MONITOR
+===================================
+🔍 Monitoring verification codes in real-time...
+💡 This will show all SMS codes, verification requests, and phone-related logs
+
+🔍 Starting real-time phone verification monitoring...
+📊 Watching logs for: verification codes, SMS, OTP, phone numbers
+
+📋 Monitoring Laravel logs...
+📋 Monitoring verification audit logs...
+📋 Monitoring general application logs...
+
+🎯 Phone verification codes will appear here in real-time!
+💡 Keep this terminal open to see all verification activities
+🛑 Press Ctrl+C to stop monitoring
+
+#61 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():183}:184}(Object(Illuminate\\Http\\Request))
+#62 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(208): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#63 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(126): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():183}:184}(Object(Illuminate\\Http\\Request))
+#64 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#65 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#66 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(🔐 1219 🔐): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#67 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/public/index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#68 /Users/jassy/Desktop/CAPSTONE APP /CapstoneApp/pet-sitting-app/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('/Users/jassy/De...')
+#69 {main}
+"} 
+[🔐 2025 🔐-08-28 01:32:09] local.INFO: 🧪 TEST - Verification 🔑 CODE 🔐 654321 🔐 sent to +🔐 987654 🔐🔐 3210 🔐
+==== 2025-08-28 09:44:09 - ENHANCED PHONE LOGGING STARTED ====
+🔍 Monitoring all verification activities...
+
+==== 2025-08-28 09:45:49 - ENHANCED PHONE LOGGING STARTED ====
+🔍 Monitoring all verification activities...
+
+[2025-08-28 01:32:09] local.INFO: 🧪 TEST - Verification code 654321 sent to +9876543210
+==== 2025-08-28 01:46:15 - TEST VERIFICATION CODE ====
+🔐 VERIFICATION CODE: 923792
+📞 Phone: +17617561570
+⏰ Time: 2025-08-28 01:46:15
+📝 Details: Test verification code for logging system
+
+[2025-08-28 01:46:15] local.INFO: 🔐 VERIFICATION CODE 923792 sent to +17617561570 via SMS

@@ -12,11 +12,13 @@ import {
     View
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Web-only version - no react-native-maps imports
 const FindSitterMapScreen = () => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const router = useRouter();
+  const { currentLocation, userAddress, isLocationTracking, startLocationTracking } = useAuth();
 
   const handleBack = () => {
     router.back();
@@ -49,33 +51,59 @@ const FindSitterMapScreen = () => {
   const mapRef = useRef<MapView | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
+    // Start location tracking with 2km radius for this screen
+    startLocationTracking(2000);
+  }, []);
 
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (!isMounted) return;
-        const region: Region = {
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        };
-        setUserRegion(region);
-        // Smoothly move map when available
+  // Update user region when location changes
+  useEffect(() => {
+    if (currentLocation) {
+      const region: Region = {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+      setUserRegion(region);
+      
+      // Smoothly move map to user location
+      if (mapRef.current) {
         requestAnimationFrame(() => {
           mapRef.current?.animateToRegion(region, 600);
         });
-      } catch (_) {
-        // Ignore; map will use fallback region
       }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    }
+  }, [currentLocation]);
+
+  // Location status indicator
+  const renderLocationStatus = () => {
+    if (!isLocationTracking) {
+      return (
+        <View style={styles.locationStatus}>
+          <Ionicons name="location-outline" size={16} color="#FF6B6B" />
+          <Text style={styles.locationStatusText}>Location tracking inactive</Text>
+        </View>
+      );
+    }
+
+    if (!currentLocation) {
+      return (
+        <View style={styles.locationStatus}>
+          <Ionicons name="location-outline" size={16} color="#FFA500" />
+          <Text style={styles.locationStatusText}>Getting your location...</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.locationStatus}>
+        <Ionicons name="location" size={16} color="#4CAF50" />
+        <Text style={styles.locationStatusText}>
+          {userAddress || 'Location detected'}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -89,6 +117,9 @@ const FindSitterMapScreen = () => {
           <Ionicons name="filter" size={24} color="#333" />
         </TouchableOpacity>
       </View>
+
+      {/* Location Status Indicator */}
+      {renderLocationStatus()}
 
       {/* Map View */}
       <View style={styles.mapContainer}>
@@ -335,6 +366,26 @@ const styles = StyleSheet.create({
   rateUnit: {
     fontSize: 14,
     color: '#666',
+  },
+  locationStatus: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 10,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  locationStatusText: {
+    marginLeft: 5,
+    fontSize: 14,
+    color: '#333',
   },
 });
 
