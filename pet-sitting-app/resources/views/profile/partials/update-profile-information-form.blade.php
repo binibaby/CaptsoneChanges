@@ -49,7 +49,7 @@
 
         @if($user->role === 'pet_sitter')
             <div>
-                <x-input-label for="experience" :value="__('Experience')" />
+                <x-input-label for="experience" :value="__('Years of Experience')" />
                 <textarea id="experience" name="experience" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm" rows="3" placeholder="Tell us about your pet sitting experience...">{{ old('experience', $user->experience) }}</textarea>
                 <x-input-error class="mt-2" :messages="$errors->get('experience')" />
             </div>

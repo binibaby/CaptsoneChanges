@@ -49,32 +49,44 @@ export class NetworkService {
   public async detectWorkingIP(): Promise<string> {
     console.log('🔍 Detecting working IP address...');
 
-    // Fast path: Try only the first primary IP (current WiFi) with quick timeout
-    const primaryIP = NETWORK_FALLBACK.PRIMARY_IPS[0];
-    console.log(`🌐 Testing primary IP: ${primaryIP}`);
+    // Fast path: Try mobile data IP first (current network)
+    const mobileIP = '172.20.10.2';
+    console.log(`🌐 Testing mobile data IP: ${mobileIP}`);
     
-    const isWorking = await this.testIPConnection(primaryIP);
+    const isMobileWorking = await this.testIPConnection(mobileIP);
+    if (isMobileWorking) {
+      this.currentBaseUrl = `http://${mobileIP}:8000`;
+      this.isConnected = true;
+      console.log(`✅ Connected to mobile data: ${this.currentBaseUrl}`);
+      return this.currentBaseUrl;
+    }
+
+    // Try localhost for development
+    const localhostIP = 'localhost';
+    console.log(`🌐 Testing localhost: ${localhostIP}`);
+    
+    const isWorking = await this.testIPConnection(localhostIP);
     if (isWorking) {
-      this.currentBaseUrl = `http://${primaryIP}:8000`;
+      this.currentBaseUrl = `http://${localhostIP}:8000`;
       this.isConnected = true;
       console.log(`✅ Connected to: ${this.currentBaseUrl}`);
       return this.currentBaseUrl;
     }
 
-    // If primary fails, try mobile data IP quickly
-    const mobileIP = NETWORK_FALLBACK.PRIMARY_IPS[1];
-    if (mobileIP) {
-      console.log(`🌐 Testing mobile IP: ${mobileIP}`);
-      const isMobileWorking = await this.testIPConnection(mobileIP);
-      if (isMobileWorking) {
-        this.currentBaseUrl = `http://${mobileIP}:8000`;
-        this.isConnected = true;
-        console.log(`✅ Connected to mobile: ${this.currentBaseUrl}`);
-        return this.currentBaseUrl;
-      }
+    // Try the configured network IP
+    const networkIP = '192.168.100.179';
+    console.log(`🌐 Testing network IP: ${networkIP}`);
+    
+    const isNetworkWorking = await this.testIPConnection(networkIP);
+    if (isNetworkWorking) {
+      this.currentBaseUrl = `http://${networkIP}:8000`;
+      this.isConnected = true;
+      console.log(`✅ Connected to network: ${this.currentBaseUrl}`);
+      return this.currentBaseUrl;
     }
 
     // If both fail, use the primary IP as default (don't test all fallbacks)
+    const primaryIP = NETWORK_FALLBACK.PRIMARY_IPS[0];
     this.currentBaseUrl = `http://${primaryIP}:8000`;
     this.isConnected = false;
     console.log(`⚠️ Using default IP: ${this.currentBaseUrl}`);

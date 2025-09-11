@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 // @ts-ignore
 import FindIcon from '../../assets/icons/find.png';
@@ -17,9 +16,9 @@ const upcomingBookings = [
 ];
 
 const ownerStats = {
-  totalSpent: '$0', // New users start with $0 spent
+  totalSpent: '₱0', // New users start with ₱0 spent
   activeBookings: 0, // New users start with 0 active bookings
-  thisWeek: '$0', // New users start with $0 spent this week
+  thisWeek: '₱0', // New users start with ₱0 spent this week
 };
 
 const quickActions = [

@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { makeApiCall } from './networkService';
 
 export interface User {
   id: string;
@@ -22,6 +21,7 @@ export interface User {
   selectedPetTypes?: ('dogs' | 'cats')[];
   selectedBreeds?: string[];
   profileImage?: string;
+  token?: string;
 }
 
 export interface AuthState {
@@ -49,8 +49,8 @@ class AuthService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      // Use direct IP for faster login (bypass network service)
-      const response = await fetch('http://192.168.100.175:8000/api/login', {
+      // Use mobile data IP for mobile device access
+      const response = await fetch('http://172.20.10.2:8000/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,6 +115,7 @@ class AuthService {
           selectedPetTypes: result.user.selected_pet_types || [],
           selectedBreeds: result.user.pet_breeds || [],
           profileImage: result.user.profile_image || undefined,
+          token: result.token || undefined,
         };
 
         this.currentUser = user;
@@ -155,8 +156,8 @@ class AuthService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      // Use direct IP for faster registration (bypass network service)
-      const response = await fetch('http://192.168.100.175:8000/api/register', {
+      // Use mobile data IP for faster registration (bypass network service)
+      const response = await fetch('http://172.20.10.2:8000/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -225,6 +226,7 @@ class AuthService {
           selectedPetTypes: result.user.selected_pet_types || [],
           selectedBreeds: result.user.pet_breeds || [],
           profileImage: result.user.profile_image || undefined,
+          token: result.token || undefined,
         };
 
         this.currentUser = user;
@@ -251,36 +253,29 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
+    console.log('AuthService: Logging out user');
     this.currentUser = null;
-    await AsyncStorage.removeItem('user');
+    
+    try {
+      // Clear all user data to ensure complete logout
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('user_logged_out');
+      console.log('AuthService: All user data cleared');
+      
+      console.log('AuthService: User logged out successfully');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Continue with logout even if clearing data fails
+    }
   }
 
   async clearAllData(): Promise<void> {
     this.currentUser = null;
     try {
-      // Get all keys first to see what's actually stored
-      const allKeys = await AsyncStorage.getAllKeys();
-      console.log('Current AsyncStorage keys:', allKeys);
-      
-      // Clear all keys that might contain user data
-      const keysToRemove = allKeys.filter(key => 
-        key.includes('user') || 
-        key.includes('auth') || 
-        key.includes('profile') || 
-        key.includes('signup') ||
-        key.includes('preference')
-      );
-      
-      console.log('Keys to remove:', keysToRemove);
-      
-      for (const key of keysToRemove) {
-        try {
-          await AsyncStorage.removeItem(key);
-          console.log(`Removed key: ${key}`);
-        } catch (error) {
-          console.log(`Could not remove key ${key}:`, error);
-        }
-      }
+      // Clear all user data to ensure complete cleanup
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('user_logged_out');
+      console.log('clearAllData: All user data cleared');
       
       console.log('All user data cleared successfully');
     } catch (error) {
@@ -289,28 +284,43 @@ class AuthService {
     }
   }
 
+  // Method to clear current user from memory
+  clearCurrentUser(): void {
+    this.currentUser = null;
+    console.log('AuthService: Current user cleared from memory');
+  }
+
   async getCurrentUser(): Promise<User | null> {
+    // Check if we have a current user in memory (from current session)
     if (this.currentUser) {
-      console.log('getCurrentUser: Returning cached user:', this.currentUser.email);
+      console.log('getCurrentUser: Returning current session user:', this.currentUser.email);
       return this.currentUser;
     }
     
+    // Try to restore from storage
     try {
-      console.log('getCurrentUser: No cached user, checking AsyncStorage');
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        console.log('getCurrentUser: Found user data in AsyncStorage:', userData);
-        this.currentUser = JSON.parse(userData);
-        console.log('getCurrentUser: Parsed user data:', this.currentUser);
-        return this.currentUser;
-      } else {
-        console.log('getCurrentUser: No user data found in AsyncStorage');
+      const stored = await AsyncStorage.getItem('user');
+      if (stored) {
+        const user = JSON.parse(stored);
+        this.currentUser = user;
+        console.log('getCurrentUser: Restored user from storage:', user.email);
+        return user;
       }
     } catch (error) {
-      console.error('Error reading user from storage:', error);
+      console.error('Error restoring user from storage:', error);
     }
     
+    console.log('getCurrentUser: No user found');
     return null;
+  }
+
+  private async saveUserToStorage(user: User): Promise<void> {
+    try {
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      console.log('User saved to storage successfully');
+    } catch (error) {
+      console.error('Error saving user to storage:', error);
+    }
   }
 
   async updateUserProfile(profileData: Partial<User>): Promise<User> {
@@ -397,6 +407,9 @@ class AuthService {
   async storeUserFromBackend(backendUser: any): Promise<User> {
     console.log('Storing user data from backend:', backendUser);
     
+    // Clear logout flag when user logs in
+    await AsyncStorage.removeItem('user_logged_out');
+    
     // Check if backendUser exists and has required fields
     if (!backendUser || !backendUser.id) {
       console.error('Invalid backend user data received:', backendUser);
@@ -424,6 +437,7 @@ class AuthService {
       selectedPetTypes: backendUser.selected_pet_types || [],
       selectedBreeds: backendUser.pet_breeds || [],
       profileImage: backendUser.profile_image || undefined,
+      token: backendUser.token || undefined,
     };
 
     this.currentUser = user;

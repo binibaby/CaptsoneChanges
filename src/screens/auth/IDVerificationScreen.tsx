@@ -67,7 +67,13 @@ const IDVerificationScreen = () => {
   return (
     <View style={styles.container}>
       {/* Back Button */}
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <TouchableOpacity style={styles.backButton} onPress={() => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.navigate('onboarding' as never);
+        }
+      }}>
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
 

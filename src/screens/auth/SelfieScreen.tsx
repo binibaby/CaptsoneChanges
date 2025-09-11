@@ -2,15 +2,16 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { getApiUrl, getAuthHeaders } from '../../constants/config';
+import { getAuthHeaders } from '../../constants/config';
+import { makeApiCall } from '../../services/networkService';
 
 interface SelfieScreenProps {
   userData?: any;
@@ -132,7 +133,7 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
         has_selfie_image: !!selfieImageBase64,
       };
 
-      const response = await fetch(getApiUrl('/api/verification/submit-simple'), {
+      const response = await makeApiCall('/api/verification/submit-simple', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
@@ -171,7 +172,14 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
       }
     } catch (error) {
       console.error('Verification error:', error);
-      Alert.alert('Error', 'Failed to submit verification. Please try again.');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        userData: userData,
+        hasSelfieImage: !!selfieImage,
+        hasFrontImage: !!frontImage,
+        hasBackImage: !!backImage
+      });
+      Alert.alert('Error', `Failed to submit verification: ${error instanceof Error ? error.message : 'Network error'}. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -190,8 +198,8 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
           text: 'Skip for Now',
           onPress: async () => {
             try {
-              // Call the public skip verification API (no token required during onboarding)
-              const response = await fetch(getApiUrl('/api/verification/skip-public'), {
+              // Use network service for better connectivity
+              const response = await makeApiCall('/api/verification/skip-public', {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
@@ -231,7 +239,13 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
               }
             } catch (error) {
               console.error('Skip verification error:', error);
-              Alert.alert('Error', 'Failed to skip verification. Please try again.');
+              console.error('Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                userData: userData,
+                userId: (userData as any)?.user?.id || (userData as any)?.id,
+                phone: (userData as any)?.phone
+              });
+              Alert.alert('Error', `Failed to skip verification: ${error instanceof Error ? error.message : 'Network error'}. Please try again.`);
             }
           },
         },
@@ -245,7 +259,13 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
       console.log('Going back in auth flow');
       // This would need to be handled by the parent component
     } else {
-      navigation.goBack();
+      // Check if we can go back, otherwise navigate to a safe screen
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        // If no previous screen, navigate to onboarding
+        navigation.navigate('onboarding' as never);
+      }
     }
   };
 
@@ -301,7 +321,7 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
             {isSubmitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.submitButtonText}>Submit Verification</Text>
+              <Text style={styles.submitButtonText}>Submit</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -392,16 +412,15 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
   },
   backButton: {
+    flex: 1,
     backgroundColor: '#f0f0f0',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 100,  
     alignItems: 'center',
     marginRight: 10,
-    minWidth: 60,
   },
   backButtonText: {
     color: '#333',
@@ -411,9 +430,9 @@ const styles = StyleSheet.create({
   submitButton: {
     flex: 1,
     backgroundColor: '#10B981',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 100,
     alignItems: 'center',
     marginLeft: 10,
   },
@@ -421,6 +440,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

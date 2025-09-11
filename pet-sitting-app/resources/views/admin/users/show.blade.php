@@ -19,6 +19,31 @@
             <h2 class="text-xl font-semibold text-gray-900">Profile Information</h2>
         </div>
         <div class="px-6 py-4">
+            <!-- Profile Image -->
+            <div class="mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Profile Picture</h3>
+                <div class="flex items-center space-x-4">
+                    @if($user->profile_image)
+                        <img src="{{ $user->profile_image }}" alt="Profile Image" class="w-16 h-16 rounded-full object-cover border-2 border-gray-200">
+                    @else
+                        <div class="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                            <svg class="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                    @endif
+                    <div>
+                        <p class="text-sm text-gray-600">
+                            @if($user->profile_image)
+                                Profile image uploaded
+                            @else
+                                No profile image uploaded
+                            @endif
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>

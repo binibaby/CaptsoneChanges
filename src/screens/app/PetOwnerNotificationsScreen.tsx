@@ -1,39 +1,76 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
     FlatList,
     Image,
+    RefreshControl,
     SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
-
-interface Notification {
-  id: string;
-  type: 'booking' | 'message' | 'reminder' | 'system';
-  title: string;
-  message: string;
-  time: string;
-  isRead: boolean;
-  avatar?: any;
-  action?: string;
-}
+import { Notification, notificationService } from '../../services/notificationService';
 
 const PetOwnerNotificationsScreen = () => {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([
-    // New users start with no notifications
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    // Load notifications on mount
+    loadNotifications();
+
+    // Subscribe to notification updates
+    const unsubscribe = notificationService.subscribe((updatedNotifications) => {
+      console.log('🔄 Notification subscription update:', updatedNotifications.length);
+      setNotifications(updatedNotifications);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Reload notifications when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Screen focused, refreshing notifications...');
+      refreshNotifications();
+    }, [])
+  );
+
+  const refreshNotifications = async () => {
+    try {
+      console.log('🔄 Refreshing notifications from API...');
+      const refreshedNotifications = await notificationService.refreshNotifications();
+      setNotifications(refreshedNotifications);
+      console.log('📋 Refreshed notifications:', refreshedNotifications.length);
+    } catch (error) {
+      console.error('Error refreshing notifications:', error);
+      // Fallback to regular load
+      loadNotifications();
+    }
+  };
+
+  const loadNotifications = async () => {
+    console.log('🔔 Loading notifications in notification screen...');
+    const loadedNotifications = await notificationService.getNotifications();
+    console.log('📋 Loaded notifications:', loadedNotifications.length);
+    loadedNotifications.forEach(notification => {
+      console.log(`  - ${notification.type}: ${notification.title} (read: ${notification.isRead})`);
+    });
+    setNotifications(loadedNotifications);
+  };
 
   const handleBack = () => {
     router.back();
   };
 
-  const handleNotificationPress = (notification: Notification) => {
-    // Mark as read
+  const handleNotificationPress = async (notification: Notification) => {
+    // Mark as read first
+    await notificationService.markAsRead(notification.id);
+    
+    // Update local state immediately
     setNotifications(prev => 
       prev.map(n => 
         n.id === notification.id ? { ...n, isRead: true } : n
@@ -43,7 +80,15 @@ const PetOwnerNotificationsScreen = () => {
     // Handle different notification types
     switch (notification.type) {
       case 'booking':
-        router.push('/pet-owner-jobs');
+        // For pet owners, booking notifications are confirmations/cancellations
+        if (notification.action === 'Message') {
+          // Navigate to messages to chat with the sitter
+          router.push('/pet-owner-messages');
+        } else if (notification.data?.status === 'cancelled' && notification.action === 'Find New Sitter') {
+          router.push('/find-sitter-map');
+        } else {
+          router.push('/pet-owner-jobs');
+        }
         break;
       case 'message':
         router.push('/pet-owner-messages');
@@ -51,18 +96,34 @@ const PetOwnerNotificationsScreen = () => {
       case 'reminder':
         router.push('/pet-owner-jobs');
         break;
+      case 'review':
+        // Navigate to reviews section
+        console.log('Navigate to reviews');
+        break;
       case 'system':
         if (notification.action === 'Get Started') {
           router.push('/find-sitter-map');
+        } else if (notification.data?.type === 'payment_processed') {
+          router.push('/pet-owner-jobs');
         }
         break;
     }
   };
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
+    await notificationService.markAllAsRead();
+    
+    // Update local state immediately
     setNotifications(prev => 
       prev.map(n => ({ ...n, isRead: true }))
     );
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    console.log('🔄 Refreshing notifications from API...');
+    await loadNotifications();
+    setRefreshing(false);
   };
 
   const getNotificationIcon = (type: string) => {
@@ -73,6 +134,8 @@ const PetOwnerNotificationsScreen = () => {
         return <Ionicons name="mail" size={24} color="#3B82F6" />;
       case 'reminder':
         return <Ionicons name="alarm" size={24} color="#F59E0B" />;
+      case 'review':
+        return <Ionicons name="star" size={24} color="#FFD700" />;
       case 'system':
         return <Ionicons name="notifications" size={24} color="#9C27B0" />;
       default:
@@ -143,6 +206,14 @@ const PetOwnerNotificationsScreen = () => {
         keyExtractor={(item) => item.id}
         style={styles.notificationsList}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3B82F6']}
+            tintColor="#3B82F6"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="notifications-off" size={64} color="#ccc" />

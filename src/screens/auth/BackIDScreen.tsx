@@ -1,16 +1,17 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { getApiUrl, getAuthHeaders } from '../../constants/config';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { getAuthHeaders } from '../../constants/config';
+import { makeApiCall } from '../../services/networkService';
 
 interface BackIDScreenProps {
   userData?: any;
@@ -102,8 +103,8 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
           text: 'Skip for Now',
           onPress: async () => {
             try {
-              // Call the public skip verification API to avoid token requirement during onboarding
-              const response = await fetch(getApiUrl('/api/verification/skip-public'), {
+              // Use network service for better connectivity
+              const response = await makeApiCall('/api/verification/skip-public', {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
@@ -142,7 +143,13 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
               }
             } catch (error) {
               console.error('Skip verification error:', error);
-              Alert.alert('Error', 'Failed to skip verification. Please try again.');
+              console.error('Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                userData: userData,
+                userId: (userData as any)?.user?.id || (userData as any)?.id,
+                phone: (userData as any)?.phone
+              });
+              Alert.alert('Error', `Failed to skip verification: ${error instanceof Error ? error.message : 'Network error'}. Please try again.`);
             }
           },
         },
@@ -156,7 +163,13 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
       console.log('Going back in auth flow');
       // This would need to be handled by the parent component
     } else {
-      navigation.goBack();
+      // Check if we can go back, otherwise navigate to a safe screen
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        // If no previous screen, navigate to onboarding
+        navigation.navigate('onboarding' as never);
+      }
     }
   };
 

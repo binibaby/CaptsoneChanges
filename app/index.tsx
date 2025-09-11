@@ -39,29 +39,16 @@ function AppContent() {
   useEffect(() => {
     if (!isLoading) {
       try {
-        if (isAuthenticated && user) {
-          // User is logged in, navigate to appropriate dashboard
-          console.log('User is authenticated, navigating to dashboard. Role:', user.role);
-          if (user.role === 'pet_owner') {
-            router.replace('/pet-owner-dashboard');
-          } else if (user.role === 'pet_sitter') {
-            router.replace('/pet-sitter-dashboard');
-          } else {
-            console.log('Unknown user role, redirecting to onboarding');
-            router.replace('/onboarding');
-          }
-        } else {
-          // User is not logged in, go to onboarding
-          console.log('User not authenticated, redirecting to onboarding');
-          router.replace('/onboarding');
-        }
+        // Force fresh start - always go to onboarding
+        console.log('App started - FORCING FRESH START, redirecting to onboarding');
+        router.replace('/onboarding');
       } catch (error) {
         console.error('Navigation error:', error);
         // Fallback to onboarding on error
         router.replace('/onboarding');
       }
     }
-  }, [isLoading, isAuthenticated, user, router]);
+  }, [isLoading, router]);
 
   if (isLoading) {
     return (

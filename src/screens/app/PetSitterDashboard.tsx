@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
     Image,
     SafeAreaView,
@@ -10,19 +11,21 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import SitterLocationSharing from '../../components/SitterLocationSharing';
+import { getAuthHeaders } from '../../constants/config';
+import authService from '../../services/authService';
+import { Booking, bookingService } from '../../services/bookingService';
+import { makeApiCall } from '../../services/networkService';
+import { notificationService } from '../../services/notificationService';
 
 const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
 
-const upcomingBookings: any[] = [
-  // New users start with no bookings
-];
-
-const earningsData = {
-  thisWeek: '$0', // New users start with $0 earnings
-  thisMonth: '$0', // New users start with $0 earnings
-  totalEarnings: '$0', // New users start with $0 total earnings
-  completedJobs: 0, // New users start with 0 completed jobs
-};
+interface EarningsData {
+  thisWeek: string;
+  thisMonth: string;
+  totalEarnings: string;
+  completedJobs: number;
+}
 
 const quickActions: { title: string; icon: any; color: string; route: string }[] = [
   { title: 'Set Availability', icon: require('../../assets/icons/availability.png'), color: '#A7F3D0', route: '/pet-sitter-availability' },
@@ -39,6 +42,172 @@ const reflectionColors = {
 
 const PetSitterDashboard = () => {
   const router = useRouter();
+  const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
+  const [earningsData, setEarningsData] = useState<EarningsData>({
+    thisWeek: '₱0',
+    thisMonth: '₱0',
+    totalEarnings: '₱0',
+    completedJobs: 0,
+  });
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [notificationCount, setNotificationCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [lastLoadTime, setLastLoadTime] = useState<number>(0);
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  useEffect(() => {
+    if (currentUserId) {
+      loadDashboardData();
+      loadNotificationCount();
+      
+      // Subscribe to booking updates with aggressive debouncing
+      const unsubscribe = bookingService.subscribe(() => {
+        const now = Date.now();
+        if (now - lastLoadTime > 10000) { // Only reload if more than 10 seconds have passed
+          console.log('🔄 Booking update received, reloading dashboard data');
+          loadDashboardData();
+          loadNotificationCount();
+          setLastLoadTime(now);
+        } else {
+          console.log('🚫 Skipping dashboard reload due to recent update');
+        }
+      });
+
+      // Subscribe to notification updates to refresh count
+      const notificationUnsubscribe = notificationService.subscribe(() => {
+        console.log('🔄 Notification update received, refreshing count');
+        loadNotificationCount();
+      });
+
+      return () => {
+        unsubscribe();
+        notificationUnsubscribe();
+      };
+    }
+  }, [currentUserId]); // Removed lastLoadTime from dependencies to prevent infinite loop
+
+  const loadUserData = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      setCurrentUserId(user?.id || null);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const loadDashboardData = async () => {
+    if (!currentUserId || isLoading) return;
+
+    setIsLoading(true);
+    try {
+      console.log('🔄 Loading dashboard data for user:', currentUserId);
+      console.log('📡 Fetching fresh data from API...');
+      
+      // Load all bookings first to debug
+      const allBookings = await bookingService.getBookings();
+      console.log('📊 All bookings in storage:', allBookings.length);
+      
+      const sitterBookings = await bookingService.getSitterBookings(currentUserId);
+      console.log('👤 Sitter bookings for user', currentUserId, ':', sitterBookings.length);
+      sitterBookings.forEach(booking => {
+        console.log(`  - ${booking.date} (${booking.status}): ${booking.startTime}-${booking.endTime}`);
+      });
+      
+      // Load upcoming bookings
+      const upcoming = await bookingService.getUpcomingSitterBookings(currentUserId);
+      console.log('📅 Upcoming bookings found:', upcoming.length);
+      upcoming.forEach(booking => {
+        console.log(`  - ${booking.date} (${booking.status}): ${booking.startTime}-${booking.endTime}`);
+      });
+      setUpcomingBookings(upcoming);
+
+      // Load earnings data
+      const earnings = await bookingService.getSitterEarnings(currentUserId);
+      console.log('💰 Earnings data:', earnings);
+      setEarningsData({
+        thisWeek: `₱${earnings.thisWeek.toFixed(0)}`,
+        thisMonth: `₱${earnings.thisMonth.toFixed(0)}`,
+        totalEarnings: `₱${earnings.total.toFixed(0)}`,
+        completedJobs: earnings.completedJobs,
+      });
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadNotificationCount = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user) return;
+
+      console.log('🔔 Loading notification count for user:', user.id);
+
+      // Get or create token for the user
+      let token = user.token;
+      if (!token) {
+        if (user.id === '5') {
+          token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
+        } else if (user.id === '21') {
+          token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
+        } else {
+          console.log('❌ No token available for user:', user.id);
+          return;
+        }
+      }
+
+      console.log('🔑 Using token for API call');
+
+      const response = await makeApiCall(
+        '/api/notifications/unread-count',
+        {
+          method: 'GET',
+          headers: getAuthHeaders(token || undefined),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationCount(data.unread_count || 0);
+        console.log('📱 Notification count updated from API:', data.unread_count);
+      } else {
+        console.log('⚠️ API call failed, trying local notifications');
+        // Fallback to local notification service
+        const localCount = await notificationService.getUnreadCount();
+        setNotificationCount(localCount);
+        console.log('📱 Notification count from local storage:', localCount);
+        
+        // Debug: Show all notifications
+        const allNotifications = await notificationService.getNotifications();
+        console.log('📋 All notifications in storage:', allNotifications.length);
+        allNotifications.forEach(notification => {
+          console.log(`  - ${notification.type}: ${notification.title} (read: ${notification.isRead})`);
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error loading notification count:', error);
+      // Fallback to local notification service
+      try {
+        const localCount = await notificationService.getUnreadCount();
+        setNotificationCount(localCount);
+        console.log('📱 Fallback notification count from local storage:', localCount);
+        
+        // Debug: Show all notifications in fallback
+        const allNotifications = await notificationService.getNotifications();
+        console.log('📋 All notifications in fallback:', allNotifications.length);
+        allNotifications.forEach(notification => {
+          console.log(`  - ${notification.type}: ${notification.title} (read: ${notification.isRead})`);
+        });
+      } catch (fallbackError) {
+        console.error('❌ Fallback notification count failed:', fallbackError);
+      }
+    }
+  };
+
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -50,8 +219,15 @@ const PetSitterDashboard = () => {
             <Text style={styles.headerTitle}>Pet Sitter Dashboard</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => router.push('/pet-sitter-notifications')} style={{ marginRight: 16 }}>
+            <TouchableOpacity onPress={() => router.push('/pet-sitter-notifications')} style={{ marginRight: 16, position: 'relative' }}>
               <Ionicons name="notifications-outline" size={24} color="#222" />
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/pet-sitter-profile')}>
               <Ionicons name="person-circle" size={28} color="#222" />
@@ -83,14 +259,16 @@ const PetSitterDashboard = () => {
 
         {/* Stats Cards */}
         <View style={styles.statsRow}>
-          <View style={[styles.statsCard, {
-            backgroundColor: '#10B981',
-            shadowColor: '#10B981',
-            shadowOffset: { width: 0, height: 16 },
-            shadowOpacity: 0.5,
-            shadowRadius: 24,
-            elevation: 16,
-          }]}
+          <TouchableOpacity 
+            style={[styles.statsCard, {
+              backgroundColor: '#10B981',
+              shadowColor: '#10B981',
+              shadowOffset: { width: 0, height: 16 },
+              shadowOpacity: 0.5,
+              shadowRadius: 24,
+              elevation: 16,
+            }]}
+            onPress={() => router.push('/completed-jobs' as any)}
           >
             <View style={styles.statsIcon}>
               <Ionicons name="checkmark-circle" size={24} color="#fff" />
@@ -98,16 +276,18 @@ const PetSitterDashboard = () => {
             <Text style={styles.statsValueWhite}>{earningsData.completedJobs}</Text>
             <Text style={styles.statsLabelWhite}>Jobs Completed</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.jobs }]} />
-          </View>
+          </TouchableOpacity>
 
-          <View style={[styles.statsCard, {
-            backgroundColor: '#8B5CF6',
-            shadowColor: '#8B5CF6',
-            shadowOffset: { width: 0, height: 16 },
-            shadowOpacity: 0.5,
-            shadowRadius: 24,
-            elevation: 16,
-          }]}
+          <TouchableOpacity 
+            style={[styles.statsCard, {
+              backgroundColor: '#8B5CF6',
+              shadowColor: '#8B5CF6',
+              shadowOffset: { width: 0, height: 16 },
+              shadowOpacity: 0.5,
+              shadowRadius: 24,
+              elevation: 16,
+            }]}
+            onPress={() => router.push('/upcoming-jobs' as any)}
           >
             <View style={styles.statsIcon}>
               <Ionicons name="calendar" size={24} color="#fff" />
@@ -115,16 +295,18 @@ const PetSitterDashboard = () => {
             <Text style={styles.statsValueWhite}>{upcomingBookings.length}</Text>
             <Text style={styles.statsLabelWhite}>Upcoming Jobs</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
-          </View>
+          </TouchableOpacity>
 
-          <View style={[styles.statsCard, {
-            backgroundColor: '#F97316',
-            shadowColor: '#F97316',
-            shadowOffset: { width: 0, height: 16 },
-            shadowOpacity: 0.5,
-            shadowRadius: 24,
-            elevation: 16,
-          }]}
+          <TouchableOpacity 
+            style={[styles.statsCard, {
+              backgroundColor: '#F97316',
+              shadowColor: '#F97316',
+              shadowOffset: { width: 0, height: 16 },
+              shadowOpacity: 0.5,
+              shadowRadius: 24,
+              elevation: 16,
+            }]}
+            onPress={() => router.push('/earnings' as any)}
           >
             <View style={styles.statsIcon}>
               <Ionicons name="trending-up" size={24} color="#fff" />
@@ -132,8 +314,11 @@ const PetSitterDashboard = () => {
             <Text style={styles.statsValueWhite}>{earningsData.thisWeek}</Text>
             <Text style={styles.statsLabelWhite}>This Week</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.week }]} />
-          </View>
+          </TouchableOpacity>
         </View>
+
+        {/* Location Sharing Component */}
+        <SitterLocationSharing />
 
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -152,6 +337,7 @@ const PetSitterDashboard = () => {
           ))}
         </View>
 
+
         {/* Upcoming Jobs */}
         <View style={styles.sectionRowAligned}>
           <Text style={styles.sectionTitle}>Upcoming Jobs</Text>
@@ -160,23 +346,132 @@ const PetSitterDashboard = () => {
           </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
-          {upcomingBookings.map((job, idx) => (
-            <View key={job.id} style={[styles.upcomingJobCard, { backgroundColor: upcomingJobColors[idx % upcomingJobColors.length] }]}>
-              <Image source={job.petImage} style={styles.jobPetImage} />
-              <Text style={styles.jobPetName}>{job.petName}</Text>
-              <Text style={styles.jobOwnerName}>{job.ownerName}</Text>
-              <View style={styles.jobStatusBadge}><Text style={styles.jobStatusText}>{job.status}</Text></View>
-              <Text style={styles.jobEarnings}>{job.earnings}</Text>
-              <View style={styles.jobMetaRow}>
-                <Ionicons name="calendar-outline" size={16} color="#888" style={{ marginRight: 4 }} />
-                <Text style={styles.jobMetaText}>{job.date}</Text>
-              </View>
-              <View style={styles.jobMetaRow}>
-                <Ionicons name="time-outline" size={16} color="#888" style={{ marginRight: 4 }} />
-                <Text style={styles.jobMetaText}>{job.time}</Text>
-              </View>
-            </View>
-          ))}
+          {upcomingBookings.map((booking, idx) => {
+            // Fix earnings calculation with proper error handling
+            let totalEarnings = 0;
+            try {
+              console.log('💰 Dashboard calculating earnings for:', booking);
+              
+              // Handle malformed time data
+              let startTime = booking.startTime;
+              let endTime = booking.endTime;
+              
+              // If time contains weird format like "2025-09-10T18:0", extract just the time part
+              if (startTime && startTime.includes('T')) {
+                const timeMatch = startTime.match(/(\d{1,2}):(\d{2})/);
+                if (timeMatch) {
+                  startTime = `${timeMatch[1]}:${timeMatch[2]}`;
+                }
+              }
+              
+              if (endTime && endTime.includes('T')) {
+                const timeMatch = endTime.match(/(\d{1,2}):(\d{2})/);
+                if (timeMatch) {
+                  endTime = `${timeMatch[1]}:${timeMatch[2]}`;
+                }
+              }
+              
+              if (startTime && endTime) {
+                const start = new Date(`2000-01-01 ${startTime}`);
+                const end = new Date(`2000-01-01 ${endTime}`);
+                
+                if (end <= start) {
+                  end.setDate(end.getDate() + 1);
+                }
+                
+                const diffMs = end.getTime() - start.getTime();
+                const hours = diffMs / (1000 * 60 * 60);
+                
+                // Use ₱250 per hour as the standard rate
+                const hourlyRate = 250;
+                totalEarnings = Math.ceil(hours * hourlyRate);
+                
+                console.log('💰 Dashboard earnings calculated:', { 
+                  startTime, 
+                  endTime, 
+                  hours: hours.toFixed(2), 
+                  rate: hourlyRate, 
+                  total: totalEarnings 
+                });
+              } else {
+                console.log('❌ Missing time data for earnings calculation:', { startTime, endTime });
+                totalEarnings = 0;
+              }
+            } catch (error) {
+              console.error('❌ Error calculating dashboard earnings:', error);
+              totalEarnings = 0;
+            }
+            
+            return (
+              <TouchableOpacity 
+                key={booking.id} 
+                style={[styles.upcomingJobCard, { backgroundColor: upcomingJobColors[idx % upcomingJobColors.length] }]}
+                onPress={() => {
+                  console.log('🔴 Dashboard job card pressed!');
+                  router.push({
+                    pathname: '/booking',
+                    params: {
+                      jobId: booking.id,
+                      petOwnerName: booking.petOwnerName,
+                      date: booking.date,
+                      startTime: booking.startTime,
+                      endTime: booking.endTime,
+                      status: booking.status,
+                      petName: booking.petName,
+                      specialInstructions: booking.specialInstructions || '',
+                      hourlyRate: booking.hourlyRate?.toString() || '0'
+                    }
+                  });
+                }}
+              >
+                <Text style={styles.jobOwnerName}>{booking.petOwnerName}</Text>
+                <Text style={styles.jobEarnings}>₱{totalEarnings.toFixed(0)}</Text>
+                <View style={styles.jobMetaRow}>
+                  <Ionicons name="time-outline" size={16} color="#888" style={{ marginRight: 4 }} />
+                  <Text style={styles.jobMetaText}>
+                    {(() => {
+                      try {
+                        // Clean up the time format
+                        let startTime = booking.startTime;
+                        let endTime = booking.endTime;
+                        
+                        if (startTime && startTime.includes('T')) {
+                          const timeMatch = startTime.match(/(\d{1,2}):(\d{2})/);
+                          if (timeMatch) {
+                            startTime = `${timeMatch[1]}:${timeMatch[2]}`;
+                          }
+                        }
+                        
+                        if (endTime && endTime.includes('T')) {
+                          const timeMatch = endTime.match(/(\d{1,2}):(\d{2})/);
+                          if (timeMatch) {
+                            endTime = `${timeMatch[1]}:${timeMatch[2]}`;
+                          }
+                        }
+                        
+                        // Convert to 12-hour format
+                        const formatTime = (time24: string) => {
+                          if (!time24) return 'Invalid Time';
+                          const [hours, minutes] = time24.split(':');
+                          const hour = parseInt(hours, 10);
+                          const ampm = hour >= 12 ? 'PM' : 'AM';
+                          const hour12 = hour % 12 || 12;
+                          return `${hour12}:${minutes} ${ampm}`;
+                        };
+                        
+                        return `${formatTime(startTime)} - ${formatTime(endTime)}`;
+                      } catch (error) {
+                        return 'Time not set';
+                      }
+                    })()}
+                  </Text>
+                </View>
+                <View style={styles.jobStatusBadge}>
+                  <Text style={styles.jobStatusText}>{booking.status}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </ScrollView>
     </SafeAreaView>
@@ -407,7 +702,7 @@ const styles = StyleSheet.create({
   },
   jobMetaText: {
     color: '#888',
-    fontSize: 13,
+    fontSize: 10,
     marginRight: 8,
   },
   reflection: {
@@ -446,6 +741,23 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 0,
     marginBottom: 16,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

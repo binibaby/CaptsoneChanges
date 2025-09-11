@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -11,33 +11,57 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-
-interface Request {
-  id: string;
-  petOwnerName: string;
-  petName: string;
-  petBreed: string;
-  date: string;
-  time: string;
-  duration: string;
-  rate: string;
-  status: 'pending' | 'accepted' | 'declined' | 'completed';
-  message: string;
-  avatar: any;
-  petImage: any;
-}
+import { bookingService, Booking } from '../../services/bookingService';
+import { notificationService } from '../../services/notificationService';
+import authService from '../../services/authService';
 
 const PetSitterRequestsScreen = () => {
   const router = useRouter();
-  const [requests, setRequests] = useState<Request[]>([
-    // New users start with no requests
-  ]);
+  const [requests, setRequests] = useState<Booking[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  useEffect(() => {
+    if (currentUserId) {
+      loadRequests();
+      
+      // Subscribe to booking updates
+      const unsubscribe = bookingService.subscribe(() => {
+        loadRequests();
+      });
+
+      return unsubscribe;
+    }
+  }, [currentUserId]);
+
+  const loadUserData = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      setCurrentUserId(user?.id || null);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const loadRequests = async () => {
+    if (!currentUserId) return;
+
+    try {
+      const pendingRequests = await bookingService.getPendingSitterBookings(currentUserId);
+      setRequests(pendingRequests);
+    } catch (error) {
+      console.error('Error loading requests:', error);
+    }
+  };
 
   const handleBack = () => {
     router.back();
   };
 
-  const handleAcceptRequest = (requestId: string) => {
+  const handleAcceptRequest = async (requestId: string) => {
     Alert.alert(
       'Accept Request',
       'Are you sure you want to accept this booking request?',
@@ -45,20 +69,34 @@ const PetSitterRequestsScreen = () => {
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Accept', 
-          onPress: () => {
-            setRequests(prev => 
-              prev.map(req => 
-                req.id === requestId ? { ...req, status: 'accepted' } : req
-              )
-            );
-            Alert.alert('Success', 'Request accepted! The pet owner will be notified.');
+          onPress: async () => {
+            try {
+              const updatedBooking = await bookingService.updateBookingStatus(requestId, 'confirmed');
+              if (updatedBooking) {
+                // Create notification for pet owner
+                await notificationService.createBookingConfirmationNotification({
+                  sitterId: updatedBooking.sitterId,
+                  sitterName: updatedBooking.sitterName,
+                  petOwnerName: updatedBooking.petOwnerName,
+                  date: updatedBooking.date,
+                  startTime: updatedBooking.startTime,
+                  endTime: updatedBooking.endTime,
+                  status: 'confirmed',
+                });
+                
+                Alert.alert('Success', 'Request accepted! The pet owner will be notified.');
+              }
+            } catch (error) {
+              console.error('Error accepting request:', error);
+              Alert.alert('Error', 'Failed to accept request. Please try again.');
+            }
           }
         }
       ]
     );
   };
 
-  const handleDeclineRequest = (requestId: string) => {
+  const handleDeclineRequest = async (requestId: string) => {
     Alert.alert(
       'Decline Request',
       'Are you sure you want to decline this booking request?',
@@ -67,20 +105,34 @@ const PetSitterRequestsScreen = () => {
         { 
           text: 'Decline', 
           style: 'destructive',
-          onPress: () => {
-            setRequests(prev => 
-              prev.map(req => 
-                req.id === requestId ? { ...req, status: 'declined' } : req
-              )
-            );
-            Alert.alert('Request Declined', 'The pet owner has been notified.');
+          onPress: async () => {
+            try {
+              const updatedBooking = await bookingService.updateBookingStatus(requestId, 'cancelled');
+              if (updatedBooking) {
+                // Create notification for pet owner
+                await notificationService.createBookingConfirmationNotification({
+                  sitterId: updatedBooking.sitterId,
+                  sitterName: updatedBooking.sitterName,
+                  petOwnerName: updatedBooking.petOwnerName,
+                  date: updatedBooking.date,
+                  startTime: updatedBooking.startTime,
+                  endTime: updatedBooking.endTime,
+                  status: 'cancelled',
+                });
+                
+                Alert.alert('Request Declined', 'The pet owner has been notified.');
+              }
+            } catch (error) {
+              console.error('Error declining request:', error);
+              Alert.alert('Error', 'Failed to decline request. Please try again.');
+            }
           }
         }
       ]
     );
   };
 
-  const handleViewDetails = (request: Request) => {
+  const handleViewDetails = (request: Booking) => {
     // Navigate to request details or chat
     console.log('View details for request:', request.id);
   };
@@ -137,10 +189,13 @@ const PetSitterRequestsScreen = () => {
             {pendingRequests.map((request) => (
               <View key={request.id} style={styles.requestCard}>
                 <View style={styles.requestHeader}>
-                  <Image source={request.avatar} style={styles.ownerAvatar} />
+                  <Image 
+                    source={require('../../assets/images/default-avatar.png')} 
+                    style={styles.ownerAvatar} 
+                  />
                   <View style={styles.requestInfo}>
                     <Text style={styles.ownerName}>{request.petOwnerName}</Text>
-                    <Text style={styles.requestDate}>{request.date}</Text>
+                    <Text style={styles.requestDate}>{new Date(request.date).toLocaleDateString()}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: getStatusColor(request.status) }]}>
                     <Text style={styles.statusText}>{getStatusText(request.status)}</Text>
@@ -148,29 +203,32 @@ const PetSitterRequestsScreen = () => {
                 </View>
 
                 <View style={styles.petInfo}>
-                  <Image source={request.petImage} style={styles.petImage} />
+                  <Image 
+                    source={request.petImage ? { uri: request.petImage } : require('../../assets/images/default-avatar.png')} 
+                    style={styles.petImage} 
+                  />
                   <View style={styles.petDetails}>
-                    <Text style={styles.petName}>{request.petName}</Text>
-                    <Text style={styles.petBreed}>{request.petBreed}</Text>
+                    <Text style={styles.petName}>{request.petName || 'Pet'}</Text>
+                    <Text style={styles.petBreed}>Pet Care Request</Text>
                   </View>
                 </View>
 
                 <View style={styles.bookingDetails}>
                   <View style={styles.detailItem}>
                     <Ionicons name="time-outline" size={16} color="#666" />
-                    <Text style={styles.detailText}>{request.time}</Text>
+                    <Text style={styles.detailText}>{request.startTime} - {request.endTime}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <Ionicons name="calendar-outline" size={16} color="#666" />
-                    <Text style={styles.detailText}>{request.duration}</Text>
+                    <Text style={styles.detailText}>{new Date(request.date).toLocaleDateString()}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <Ionicons name="cash-outline" size={16} color="#666" />
-                    <Text style={styles.detailText}>{request.rate}</Text>
+                    <Text style={styles.detailText}>₱{request.hourlyRate}/hour</Text>
                   </View>
                 </View>
 
-                <Text style={styles.messageText}>{request.message}</Text>
+                <Text style={styles.messageText}>{request.specialInstructions || 'No special instructions provided.'}</Text>
 
                 <View style={styles.actionButtons}>
                   <TouchableOpacity 

@@ -203,9 +203,9 @@ const PetSitterScheduleScreen = () => {
             </View>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryNumber}>
-                ${schedule
+                ₱{schedule
                   .filter(item => item.status === 'completed')
-                  .reduce((total, item) => total + parseInt(item.rate.replace('$', '')), 0)
+                  .reduce((total, item) => total + parseInt(item.rate.replace('₱', '')), 0)
                 }
               </Text>
               <Text style={styles.summaryLabel}>Earned</Text>

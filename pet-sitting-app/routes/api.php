@@ -5,9 +5,11 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\BookingController;
 use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\PetController;
 use App\Http\Controllers\API\VerificationController;
 use App\Http\Controllers\API\WalletController;
 use App\Http\Controllers\API\SupportController;
+use App\Http\Controllers\API\LocationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,6 +47,12 @@ Route::post('/send-verification-code', [AuthController::class, 'sendPhoneVerific
 Route::post('/verify-phone-code', [AuthController::class, 'verifyPhoneCode']);
 Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationCode']);
 
+// Profile routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/profile/update', [App\Http\Controllers\API\ProfileController::class, 'updateProfile']);
+    Route::post('/profile/upload-image', [App\Http\Controllers\API\ProfileController::class, 'uploadProfileImage']);
+});
+
 // Verification routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/verification/submit', [VerificationController::class, 'submitVerification']);
@@ -67,6 +75,14 @@ Route::prefix('bookings')->middleware('auth:sanctum')->group(function () {
     Route::delete('/{booking}', [BookingController::class, 'destroy']);
 });
 
+// Notification routes
+Route::prefix('notifications')->middleware('auth:sanctum')->group(function () {
+    Route::get('/', [App\Http\Controllers\API\NotificationController::class, 'index']);
+    Route::get('/unread-count', [App\Http\Controllers\API\NotificationController::class, 'getUnreadCount']);
+    Route::put('/{id}/read', [App\Http\Controllers\API\NotificationController::class, 'markAsRead']);
+    Route::put('/mark-all-read', [App\Http\Controllers\API\NotificationController::class, 'markAllAsRead']);
+});
+
     // Payment routes
 Route::prefix('payments')->middleware('auth:sanctum')->group(function () {
     Route::get('/', [PaymentController::class, 'index']);
@@ -82,10 +98,32 @@ Route::prefix('wallet')->middleware('auth:sanctum')->group(function () {
     Route::post('/withdraw', [WalletController::class, 'withdraw']);
 });
 
+// Pet routes
+Route::prefix('pets')->middleware('auth:sanctum')->group(function () {
+    Route::get('/', [PetController::class, 'index']);
+    Route::post('/', [PetController::class, 'store']);
+    Route::get('/{pet}', [PetController::class, 'show']);
+    Route::put('/{pet}', [PetController::class, 'update']);
+    Route::delete('/{pet}', [PetController::class, 'destroy']);
+});
+
 // Support routes
 Route::prefix('support')->middleware('auth:sanctum')->group(function () {
     Route::get('/tickets', [SupportController::class, 'getTickets']);
     Route::post('/tickets', [SupportController::class, 'createTicket']);
     Route::get('/tickets/{ticket}', [SupportController::class, 'getTicket']);
     Route::post('/tickets/{ticket}/messages', [SupportController::class, 'sendMessage']);
-}); 
+});
+
+// Location sharing routes
+Route::prefix('location')->middleware('auth:sanctum')->group(function () {
+    Route::post('/update', [LocationController::class, 'updateLocation']);
+    Route::post('/status', [LocationController::class, 'setOnlineStatus']);
+});
+
+// Public route for getting nearby sitters (no auth required for pet owners)
+Route::post('/location/nearby-sitters', [LocationController::class, 'getNearbySitters']);
+
+// Sitter availability routes
+Route::get('/sitters/{sitterId}/availability', [LocationController::class, 'getSitterAvailability']);
+Route::post('/sitters/availability', [LocationController::class, 'saveSitterAvailability'])->middleware('auth:sanctum'); 

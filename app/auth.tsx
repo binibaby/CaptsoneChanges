@@ -111,6 +111,7 @@ export default function Auth() {
           selectedPetTypes: user.selected_pet_types || [],
           selectedBreeds: user.pet_breeds || [],  // Backend uses pet_breeds
           profileImage: user.profile_image || undefined,
+          token: user.token, // Add the authentication token
         };
         
         console.log('User object structured for updateUserProfile:', userForUpdate);
@@ -118,7 +119,7 @@ export default function Auth() {
       } else {
         console.log('Saving user data to backend in onAuthSuccess');
         // Save the user data to the backend
-        const response = await fetch('http://192.168.100.175:8000/api/register', {
+        const response = await fetch('http://172.20.10.2:8000/api/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -197,13 +198,13 @@ export default function Auth() {
     }
   };
 
-  // Modified completion handler for pet sitters
-  const onPetSitterComplete = async (userData: any) => {
+  // Modified completion handler for both pet sitters and pet owners
+  const onRegistrationComplete = async (userData: any) => {
     try {
       console.log('Saving complete user data to backend:', userData);
       
       // Save the complete user data to the backend
-      const response = await fetch('http://192.168.100.175:8000/api/register', {
+      const response = await fetch('http://172.20.10.2:8000/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -264,27 +265,24 @@ export default function Auth() {
           age: result.user.age,
           gender: result.user.gender,
           address: result.user.address,
-          experience: userData.experience || '',
-          hourlyRate: userData.hourlyRate || '',
+          experience: result.user.experience || userData.experience || '',
+          hourlyRate: result.user.hourly_rate || userData.hourlyRate || '',
           aboutMe: result.user.bio || '',
-          specialties: userData.specialties || [],
+          specialties: result.user.specialties || userData.specialties || [],
           email_verified: result.user.email_verified,
           phone_verified: result.user.phone_verified,
           selectedPetTypes: userData.selectedPetTypes,
           selectedBreeds: result.user.pet_breeds,
           profileImage: undefined,
+          token: result.token, // Add the authentication token
         };
 
         // Store the complete user data in the auth context
-        await storeUserFromBackend(result.user);
+        await storeUserFromBackend(completeUser);
 
-        // After breed selection, go to phone verification for pet sitters
-        if (signupData.userRole === 'Pet Sitter') {
-          setSignupData({ ...signupData, userData: completeUser });
-          setAuthStep('phone-verification');
-        } else {
-          onAuthSuccess(completeUser);
-        }
+        // After breed selection, go to phone verification for both pet sitters and pet owners
+        setSignupData({ ...signupData, userData: completeUser });
+        setAuthStep('phone-verification');
       } else {
         console.error('Failed to save user data to backend:', result);
         throw new Error(result.message || 'Failed to save user data');
@@ -293,12 +291,9 @@ export default function Auth() {
       console.error('Error saving user data to backend:', error);
       Alert.alert('Error', `Failed to save user data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       // Continue with the flow even if backend save fails
-      if (signupData.userRole === 'Pet Sitter') {
-        setSignupData({ ...signupData, userData });
-        setAuthStep('phone-verification');
-      } else {
-        onAuthSuccess(userData);
-      }
+      // Both pet sitters and pet owners need phone verification
+      setSignupData({ ...signupData, userData });
+      setAuthStep('phone-verification');
     }
   };
 
@@ -333,10 +328,13 @@ export default function Auth() {
     case 'signup3':
       return <SignUpScreen3_BreedPreferences userRole={signupData.userRole} selectedPetTypes={signupData.selectedPetTypes} onNext={goToSignup4} onBack={() => setAuthStep('signup2')} />;
     case 'signup4':
-      return <SignUpScreen4_FinalSteps userRole={signupData.userRole} selectedPetTypes={signupData.selectedPetTypes} selectedBreeds={signupData.selectedBreeds} onComplete={onPetSitterComplete} onBack={() => setAuthStep('signup3')} />;
-    // New multi-step registration flow (only for pet sitters)
+      return <SignUpScreen4_FinalSteps userRole={signupData.userRole} selectedPetTypes={signupData.selectedPetTypes} selectedBreeds={signupData.selectedBreeds} onComplete={onRegistrationComplete} onBack={() => setAuthStep('signup3')} />;
+    // Multi-step registration flow (phone verification for both, ID verification for pet sitters only)
     case 'phone-verification':
-      return <PhoneVerificationScreen userData={signupData.userData} onPhoneVerified={goToFrontID} />;
+      return <PhoneVerificationScreen 
+        userData={signupData.userData} 
+        onPhoneVerified={signupData.userRole === 'Pet Sitter' ? goToFrontID : () => onAuthSuccess(signupData.userData)} 
+      />;
     case 'front-id':
       return <FrontIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} onFrontIDComplete={goToBackID} />;
     case 'back-id':

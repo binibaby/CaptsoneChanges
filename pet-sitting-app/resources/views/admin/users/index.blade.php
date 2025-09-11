@@ -64,8 +64,8 @@
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10">
-                                        <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                                    <div class="flex-shrink-0 h-8 w-8">
+                                        <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
                                             <span class="text-sm font-medium text-gray-700">
                                                 {{ $user->first_name ? substr($user->first_name, 0, 1) : substr($user->name, 0, 1) }}
                                             </span>

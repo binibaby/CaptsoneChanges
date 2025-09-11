@@ -27,6 +27,10 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   onComplete, 
   onBack 
 }) => {
+  // Debug logging
+  console.log('SignUpScreen4_FinalSteps - userRole:', userRole);
+  console.log('SignUpScreen4_FinalSteps - isPetSitter:', userRole === 'Pet Sitter');
+  
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -292,6 +296,9 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
             {userRole === 'Pet Sitter' && (
               <>
                 <View style={styles.inputContainer}>
+                  <Text style={[styles.label, { color: '#F59E0B', fontSize: 18, fontWeight: 'bold' }]}>🐾 Pet Sitter Information</Text>
+                </View>
+                <View style={styles.inputContainer}>
                   <Text style={styles.label}>Hourly Rate (₱)</Text>
                   <TextInput
                     style={styles.input}
@@ -304,15 +311,14 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
                 </View>
 
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Experience (Years) *</Text>
+                  <Text style={styles.label}>Years of Experience *</Text>
                   <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="How many years of pet sitting experience do you have? (e.g., 3 years, 1.5 years, 6 months)"
+                    style={styles.input}
+                    placeholder="e.g., 3, 1.5, 0.5"
                     placeholderTextColor="#999"
                     value={experience}
                     onChangeText={setExperience}
-                    multiline
-                    numberOfLines={3}
+                    keyboardType="numeric"
                   />
                   {userRole === 'Pet Sitter' && experience.length === 0 && (
                     <Text style={styles.errorText}>Experience is required for pet sitters</Text>
@@ -364,6 +370,7 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
                 </View>
               </>
             )}
+
           </View>
 
           <View style={styles.formGroup}>

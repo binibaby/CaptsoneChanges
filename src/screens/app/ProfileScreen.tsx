@@ -74,8 +74,19 @@ const ProfileScreen = () => {
   // Update profileData when user changes
   React.useEffect(() => {
     console.log('ProfileScreen: useEffect triggered with user:', user);
+    console.log('ProfileScreen: Current profileImage state:', profileImage);
     if (user) {
       console.log('Profile screen: Loading user data from auth context:', user);
+      console.log('Profile screen: User profileImage field:', user.profileImage);
+      
+      // Set profile image from user data
+      if (user.profileImage) {
+        console.log('ProfileScreen: Setting profile image from user data:', user.profileImage);
+        setProfileImage(user.profileImage);
+      } else {
+        console.log('ProfileScreen: No profile image in user data');
+        setProfileImage(null);
+      }
       
       // Safely extract name parts with proper fallbacks
       const userName = user.name || '';
@@ -105,6 +116,7 @@ const ProfileScreen = () => {
     } else {
       console.log('Profile screen: No user data, starting fresh');
       // Clear all profile data if no user
+      setProfileImage(null);
       setProfileData({
         firstName: '',
         lastName: '',
@@ -196,10 +208,66 @@ const ProfileScreen = () => {
         selectionLimit: 1,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProfileImage(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        setProfileImage(imageUri);
+        
+        // Upload image to backend
+        await uploadProfileImage(imageUri);
       }
     } catch (error) {
       Alert.alert('Camera Error', 'Failed to open camera. Please try again.');
+    }
+  };
+
+  const uploadProfileImage = async (imageUri: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('profile_image', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'profile_image.jpg',
+      } as any);
+
+      console.log('Uploading profile image to:', 'http://172.20.10.2:8000/api/profile/upload-image');
+      console.log('User token:', user?.token ? 'Present' : 'Missing');
+
+      const response = await fetch('http://172.20.10.2:8000/api/profile/upload-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user?.token || ''}`,
+          'Accept': 'application/json',
+        },
+        body: formData,
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Upload result:', result);
+      
+      if (result.success) {
+        console.log('Profile image uploaded successfully:', result.profile_image);
+        // Update the local state immediately to show the new image
+        setProfileImage(result.profile_image);
+        // Update the user context with the new profile image
+        await updateUserProfile({ profileImage: result.profile_image });
+        Alert.alert('Success', 'Profile image updated successfully!');
+      } else {
+        console.error('Failed to upload profile image:', result.message);
+        Alert.alert('Error', result.message || 'Failed to upload profile image');
+      }
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to upload profile image: ${errorMessage}`);
     }
   };
 
@@ -346,10 +414,10 @@ const ProfileScreen = () => {
             <>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>{profileData.experience || '0'}</Text>
-                <Text style={styles.statLabel}>Experience</Text>
+                <Text style={styles.statLabel}>Years of Experience</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{profileData.hourlyRate ? `$${profileData.hourlyRate}` : '$0'}</Text>
+                <Text style={styles.statNumber}>{profileData.hourlyRate ? `₱${profileData.hourlyRate}` : '₱0'}</Text>
                 <Text style={styles.statLabel}>Per Hour</Text>
               </View>
               <View style={styles.statItem}>
@@ -445,18 +513,19 @@ const ProfileScreen = () => {
           {user?.userRole === 'Pet Sitter' && (
             <>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Experience (Years)</Text>
+                <Text style={styles.inputLabel}>Years of Experience</Text>
                 <TextInput
                   style={[styles.input, !isEditing && styles.disabledInput]}
                   value={profileData.experience}
                   onChangeText={(text) => setProfileData({...profileData, experience: text})}
                   editable={isEditing}
-                  placeholder="e.g., 3 years, 1.5 years, 6 months"
+                  placeholder="e.g., 3, 1.5, 0.5"
+                  keyboardType="numeric"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Hourly Rate ($)</Text>
+                <Text style={styles.inputLabel}>Hourly Rate (₱)</Text>
                 <TextInput
                   style={[styles.input, !isEditing && styles.disabledInput]}
                   value={profileData.hourlyRate}

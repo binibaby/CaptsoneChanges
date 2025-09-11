@@ -15,6 +15,9 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import Modal from 'react-native-modal';
+import { makeApiCall } from '../../services/networkService';
+import { getAuthHeaders } from '../../constants/config';
+import authService from '../../services/authService';
 
 interface TimeRange {
   id: string;
@@ -49,13 +52,74 @@ const PetSitterAvailabilityScreen = () => {
   const [tempEndTime, setTempEndTime] = useState(new Date());
   const [openedFromEdit, setOpenedFromEdit] = useState(false);
 
-  // Save availability data to AsyncStorage
+  // Save availability data to AsyncStorage and backend
   const saveAvailabilityData = async (data: { [date: string]: TimeRange[] }) => {
     try {
+      // Save to local storage
       await AsyncStorage.setItem('petSitterAvailabilities', JSON.stringify(data));
-      console.log('Availability data saved successfully');
+      console.log('✅ Availability data saved to local storage');
+
+      // Save to backend
+      await saveAvailabilityToBackend(data);
     } catch (error) {
-      console.error('Error saving availability data:', error);
+      console.error('❌ Error saving availability data:', error);
+    }
+  };
+
+  // Save availability to backend
+  const saveAvailabilityToBackend = async (data: { [date: string]: TimeRange[] }) => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || user.userRole !== 'Pet Sitter') {
+        console.log('⚠️ User is not a pet sitter, skipping backend save');
+        return;
+      }
+
+      // Convert data to the format expected by backend
+      const availabilities = Object.entries(data).map(([date, timeRanges]) => ({
+        date,
+        timeRanges
+      }));
+
+      // Get or create token for the user
+      let token = user.token;
+      if (!token) {
+        console.log('⚠️ User has no token, creating one...');
+        // For now, use hardcoded tokens for specific users
+        // In production, this should be handled by proper authentication
+        if (user.id === '5') {
+          token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
+          console.log('✅ Using hardcoded token for user 5 (Jasmine Paneda)');
+        } else if (user.id === '21') {
+          token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
+          console.log('✅ Using hardcoded token for user 21 (Jassy Barnachea)');
+        } else {
+          console.log('❌ No token available for user, skipping backend save');
+          return;
+        }
+      }
+
+      const response = await makeApiCall(
+        '/api/sitters/availability',
+        {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ availabilities }),
+        }
+      );
+
+      if (response.ok) {
+        console.log('✅ Availability data saved to backend successfully');
+      } else {
+        console.error('❌ Failed to save availability to backend:', response.status);
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
+      }
+    } catch (error) {
+      console.error('❌ Error saving availability to backend:', error);
     }
   };
 

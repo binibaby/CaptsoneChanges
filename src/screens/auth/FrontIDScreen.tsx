@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getApiUrl, getAuthHeaders } from '../../constants/config';
+import { getAuthHeaders } from '../../constants/config';
+import { makeApiCall } from '../../services/networkService';
 
 interface FrontIDScreenProps {
   userData?: any;
@@ -97,8 +98,8 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
           text: 'Skip for Now',
           onPress: async () => {
             try {
-              // Always use public endpoint to avoid Sanctum in onboarding
-              const response = await fetch(getApiUrl('/api/verification/skip-public'), {
+              // Use network service for better connectivity
+              const response = await makeApiCall('/api/verification/skip-public', {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
@@ -137,7 +138,14 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
               }
             } catch (error) {
               console.error('Skip verification error:', error);
-              Alert.alert('Error', 'Failed to skip verification. Please try again.');
+              const errorMessage = error instanceof Error ? error.message : 'Network error';
+              console.error('Error details:', {
+                message: errorMessage,
+                userData: userData,
+                userId: userData?.user?.id || userData?.id,
+                phone: userData?.phone
+              });
+              Alert.alert('Error', `Failed to skip verification: ${errorMessage}. Please try again.`);
             }
           },
         },
@@ -151,7 +159,13 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
       console.log('Going back in auth flow');
       // This would need to be handled by the parent component
     } else {
-      navigation.goBack();
+      // Check if we can go back, otherwise navigate to a safe screen
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        // If no previous screen, navigate to onboarding
+        navigation.navigate('onboarding' as never);
+      }
     }
   };
 

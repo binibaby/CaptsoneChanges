@@ -136,7 +136,7 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             @if($verification->document_image)
                                 <a href="{{ asset('storage/' . $verification->document_image) }}" target="_blank">
-                                    <img src="{{ asset('storage/' . $verification->document_image) }}" alt="ID Image" class="h-12 w-12 object-cover rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';" />
+                                    <img src="{{ asset('storage/' . $verification->document_image) }}" alt="ID Image" class="h-8 w-8 object-cover rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';" />
                                     <span class="text-gray-400" style="display: none;">Image not found</span>
                                 </a>
                             @else

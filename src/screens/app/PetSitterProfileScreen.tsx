@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const PetSitterProfileScreen = () => {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
     name: '',
@@ -48,8 +48,21 @@ const PetSitterProfileScreen = () => {
 
   // Update profile data when user changes
   useEffect(() => {
+    console.log('PetSitterProfileScreen: useEffect triggered with user:', user);
+    console.log('PetSitterProfileScreen: Current profileImage state:', profileImage);
     if (user) {
       console.log('PetSitterProfileScreen: Loading user data from auth context:', user);
+      console.log('PetSitterProfileScreen: User profileImage field:', user.profileImage);
+      
+      // Set profile image from user data
+      if (user.profileImage) {
+        console.log('PetSitterProfileScreen: Setting profile image from user data:', user.profileImage);
+        setProfileImage(user.profileImage);
+      } else {
+        console.log('PetSitterProfileScreen: No profile image in user data');
+        setProfileImage(null);
+      }
+      
       setProfile({
         name: user.name || '',
         email: user.email || '',
@@ -116,11 +129,66 @@ const PetSitterProfileScreen = () => {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProfileImage(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        setProfileImage(imageUri);
+        
+        // Upload image to backend
+        await uploadProfileImage(imageUri);
       }
     } catch (error) {
       console.error('Image picker error:', error);
       Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const uploadProfileImage = async (imageUri: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('profile_image', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'profile_image.jpg',
+      } as any);
+
+      console.log('Uploading profile image to:', 'http://172.20.10.2:8000/api/profile/upload-image');
+      console.log('User token:', user?.token ? 'Present' : 'Missing');
+
+      const response = await fetch('http://172.20.10.2:8000/api/profile/upload-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user?.token || ''}`,
+          'Accept': 'application/json',
+        },
+        body: formData,
+      });
+
+      console.log('Response status:', response.status);
+
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Upload result:', result);
+      
+      if (result.success) {
+        console.log('Profile image uploaded successfully:', result.profile_image);
+        // Update the local state immediately to show the new image
+        setProfileImage(result.profile_image);
+        // Update the user context with the new profile image
+        await updateUserProfile({ profileImage: result.profile_image });
+        Alert.alert('Success', 'Profile image updated successfully!');
+      } else {
+        console.error('Failed to upload profile image:', result.message);
+        Alert.alert('Error', result.message || 'Failed to upload profile image');
+      }
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to upload profile image: ${errorMessage}`);
     }
   };
 
@@ -218,27 +286,45 @@ const PetSitterProfileScreen = () => {
           </View>
         </View>
 
-        {/* Verify Your ID Button */}
-        <TouchableOpacity 
-          style={styles.verifyButton} 
-          onPress={openVerifyModal}
-          activeOpacity={0.8}
-        >
-          <View style={styles.verifyButtonContent}>
-            <Ionicons name="shield-checkmark" size={16} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={styles.verifyButtonText}>Verify Your ID</Text>
-            <Ionicons name="chevron-forward" size={14} color="#fff" style={{ marginLeft: 6 }} />
-          </View>
-        </TouchableOpacity>
+        {/* Verify Your ID and Add Certificates Buttons */}
+        <View style={styles.verificationButtonsContainer}>
+          <TouchableOpacity 
+            style={styles.verifyButton} 
+            onPress={openVerifyModal}
+            activeOpacity={0.8}
+          >
+            <View style={styles.verifyButtonContent}>
+              <Ionicons name="shield-checkmark" size={16} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.verifyButtonText}>Verify Your ID</Text>
+              <Ionicons name="chevron-forward" size={14} color="#fff" style={{ marginLeft: 6 }} />
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.certificatesButton} 
+            onPress={() => {
+              console.log('🔴 Add Certificates button pressed!');
+              // TODO: Navigate to certificates screen or open certificates modal
+              Alert.alert('Add Certificates', 'Certificate upload feature coming soon!');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.certificatesButtonContent}>
+              <Ionicons name="ribbon" size={16} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.certificatesButtonText}>Add Certificates</Text>
+              <Ionicons name="chevron-forward" size={14} color="#fff" style={{ marginLeft: 6 }} />
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{profile.experience}</Text>
-            <Text style={styles.statLabel}>Experience</Text>
+            <Text style={styles.statLabel}>Years of Experience</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>${profile.hourlyRate}</Text>
+            <Text style={styles.statNumber}>₱{profile.hourlyRate}</Text>
             <Text style={styles.statLabel}>Per Hour</Text>
           </View>
           <View style={styles.statItem}>
@@ -312,7 +398,7 @@ const PetSitterProfileScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Hourly Rate ($)</Text>
+            <Text style={styles.inputLabel}>Hourly Rate (₱)</Text>
             <TextInput
               style={[styles.input, !isEditing && styles.disabledInput]}
               value={profile.hourlyRate}
@@ -326,14 +412,14 @@ const PetSitterProfileScreen = () => {
 
         {/* Experience Section */}
         <View style={[styles.section, { marginBottom: 30, paddingBottom: 25 }]}>
-          <Text style={styles.sectionTitle}>Experience</Text>
+          <Text style={styles.sectionTitle}>Years of Experience</Text>
           <TextInput
             style={[styles.bioInput, !isEditing && styles.disabledInput]}
             value={profile.experience}
             onChangeText={(text) => setProfile({...profile, experience: text})}
             editable={isEditing}
-            placeholder="Tell us about your pet sitting experience..."
-            multiline
+            placeholder="e.g., 3, 1.5, 0.5"
+            keyboardType="numeric"
             numberOfLines={4}
           />
         </View>
@@ -624,13 +710,18 @@ const styles = StyleSheet.create({
     color: '#333',
     marginLeft: 15,
   },
-  verifyButton: {
+  verificationButtonsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
     marginTop: 12,
     marginBottom: 12,
-    alignSelf: 'flex-start',
+    gap: 12,
+  },
+  verifyButton: {
+    flex: 1,
     backgroundColor: '#F59E0B',
     borderRadius: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 2 },
@@ -646,7 +737,29 @@ const styles = StyleSheet.create({
   verifyButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
+  },
+  certificatesButton: {
+    flex: 1,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  certificatesButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  certificatesButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   profileImageContainer: {
     position: 'relative',

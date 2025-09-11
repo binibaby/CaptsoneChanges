@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -12,11 +11,17 @@ import {
     View
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
+import LocationPermissionHelper from '../../components/LocationPermissionHelper';
+import SitterProfilePopup from '../../components/SitterProfilePopup';
 import { useAuth } from '../../contexts/AuthContext';
+import realtimeLocationService from '../../services/realtimeLocationService';
 
 // Web-only version - no react-native-maps imports
 const FindSitterMapScreen = () => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  const [sitters, setSitters] = useState<any[]>([]);
+  const [selectedSitter, setSelectedSitter] = useState<any>(null);
+  const [showProfilePopup, setShowProfilePopup] = useState<boolean>(false);
   const router = useRouter();
   const { currentLocation, userAddress, isLocationTracking, startLocationTracking } = useAuth();
 
@@ -24,28 +29,169 @@ const FindSitterMapScreen = () => {
     router.back();
   };
 
-  const handleSitterPress = (sitterId: string) => {
-    // Navigate to sitter profile
-    console.log('Navigate to sitter profile:', sitterId);
+  const handleSitterPress = async (sitterId: string) => {
+    // Find and show sitter profile popup from real-time data
+    const sitter = sitters.find(s => s.id === sitterId);
+    if (sitter) {
+      setSelectedSitter(sitter);
+      setShowProfilePopup(true);
+    }
+  };
+
+  const handleClosePopup = () => {
+    setShowProfilePopup(false);
+    setSelectedSitter(null);
+  };
+
+  const handleFollow = (sitterId: string) => {
+    console.log('Follow sitter:', sitterId);
+    // TODO: Implement follow functionality
+  };
+
+  const handleMessage = (sitterId: string) => {
+    console.log('Message sitter:', sitterId);
+    // TODO: Navigate to messaging
+  };
+
+  const handleViewBadges = (sitterId: string) => {
+    console.log('View badges for sitter:', sitterId);
+    // TODO: Navigate to badges view
+  };
+
+  const handleViewCertificates = (sitterId: string) => {
+    console.log('View certificates for sitter:', sitterId);
+    // TODO: Navigate to certificates view
+  };
+
+  // Helper function to get proper image source
+  const getImageSource = (sitter: any) => {
+    const imageSource = sitter.imageSource || sitter.images?.[0] || sitter.profileImage;
+    
+    console.log(`🖼️ Getting image source for ${sitter.name}:`, {
+      imageSource,
+      type: typeof imageSource,
+      isString: typeof imageSource === 'string',
+      isUrl: typeof imageSource === 'string' && (imageSource.startsWith('http') || imageSource.startsWith('https'))
+    });
+    
+    if (!imageSource) {
+      console.log('📷 No image source found, using default avatar');
+      return require('../../assets/images/default-avatar.png');
+    }
+    
+    // If it's a URL (starts with http), use it directly
+    if (typeof imageSource === 'string' && (imageSource.startsWith('http') || imageSource.startsWith('https'))) {
+      console.log('🌐 Using URL image:', imageSource);
+      return { uri: imageSource };
+    }
+    
+    // If it's already a require() object, use it directly
+    if (typeof imageSource === 'object' && imageSource.uri !== undefined) {
+      console.log('✅ Using existing URI object');
+      return imageSource;
+    }
+    
+    // For any other string (local paths), treat as URI
+    if (typeof imageSource === 'string') {
+      console.log('📁 Using string as URI:', imageSource);
+      return { uri: imageSource };
+    }
+    
+    // If it's already a require() object, use it directly
+    console.log('✅ Using existing image object');
+    return imageSource;
   };
 
   const handleFilterPress = (filter: string) => {
     setSelectedFilter(filter);
   };
 
-  // Filter sitters if needed (for now, show all)
-  const filteredSitters = PET_SITTERS;
+  // Load sitters from real-time location service
+  useEffect(() => {
+    if (currentLocation) {
+      // Get nearby sitters from real-time service via API
+      realtimeLocationService.getSittersNearby(
+        currentLocation.coords.latitude,
+        currentLocation.coords.longitude,
+        2 // 2km radius for testing
+      ).then((nearbySitters) => {
+        setSitters(nearbySitters);
+        console.log('📍 Found nearby sitters:', nearbySitters.length);
+        nearbySitters.forEach((sitter, index) => {
+          console.log(`🗺️ Sitter ${index + 1} (${sitter.name}):`, {
+            hasImages: !!sitter.images,
+            imageCount: sitter.images?.length || 0,
+            firstImage: sitter.images?.[0],
+            hasProfileImage: !!sitter.profileImage,
+            profileImage: sitter.profileImage,
+            allKeys: Object.keys(sitter)
+          });
+        });
+      }).catch((error) => {
+        console.error('❌ Error loading nearby sitters:', error);
+        setSitters([]);
+      });
+    }
+  }, [currentLocation]);
 
-  // Compute a sensible initial region around the first sitter
+  // Subscribe to real-time updates (only once, not dependent on currentLocation)
+  useEffect(() => {
+    const unsubscribe = realtimeLocationService.subscribe((allSitters) => {
+      // Only update if we have a current location and the sitters data has changed
+      if (currentLocation && allSitters.length > 0) {
+        // Filter sitters based on current location instead of making another API call
+        const nearbySitters = allSitters.filter(sitter => {
+          if (!sitter.location) return false;
+          
+          // Calculate distance (simple approximation)
+          const latDiff = Math.abs(sitter.location.latitude - currentLocation.coords.latitude);
+          const lonDiff = Math.abs(sitter.location.longitude - currentLocation.coords.longitude);
+          const distance = Math.sqrt(latDiff * latDiff + lonDiff * lonDiff) * 111; // Rough km conversion
+          
+          return distance <= 2; // 2km radius
+        });
+        
+        setSitters(nearbySitters);
+        console.log('🔄 Real-time update - nearby sitters:', nearbySitters.length);
+      }
+    });
+
+    return unsubscribe;
+  }, []); // Remove currentLocation dependency to prevent infinite loop
+
+  // Filter sitters based on selected filter
+  const filteredSitters = useMemo(() => {
+    if (selectedFilter === 'all') return sitters;
+    return sitters.filter(sitter => sitter.petTypes.includes(selectedFilter as 'dogs' | 'cats'));
+  }, [sitters, selectedFilter]);
+
+  // Compute a sensible initial region around the first sitter or user location
   const initialRegion: Region = useMemo(() => {
-    const first = PET_SITTERS[0];
+    if (currentLocation) {
+      return {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+    }
+    if (filteredSitters.length > 0) {
+      const first = filteredSitters[0];
+      return {
+        latitude: first.location.latitude,
+        longitude: first.location.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+    }
+    // Default to San Francisco
     return {
-      latitude: first.latlng.latitude,
-      longitude: first.latlng.longitude,
+      latitude: 37.7749,
+      longitude: -122.4194,
       latitudeDelta: 0.02,
       longitudeDelta: 0.02,
     };
-  }, []);
+  }, [currentLocation, filteredSitters]);
 
   const [userRegion, setUserRegion] = useState<Region | null>(null);
   const mapRef = useRef<MapView | null>(null);
@@ -118,8 +264,6 @@ const FindSitterMapScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Location Status Indicator */}
-      {renderLocationStatus()}
 
       {/* Map View */}
       <View style={styles.mapContainer}>
@@ -128,6 +272,17 @@ const FindSitterMapScreen = () => {
             <Text style={{ fontSize: 18, color: '#666' }}>🗺️ Interactive Map</Text>
             <Text style={{ fontSize: 14, color: '#999', marginTop: 8 }}>Available on mobile devices</Text>
             <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>Tap on sitters below to view profiles</Text>
+          </View>
+        ) : !currentLocation ? (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+            <LocationPermissionHelper
+              onPermissionGranted={() => {
+                console.log('Location permission granted for map');
+              }}
+              onPermissionDenied={() => {
+                console.log('Location permission denied for map');
+              }}
+            />
           </View>
         ) : (
           <MapView
@@ -140,11 +295,23 @@ const FindSitterMapScreen = () => {
             {filteredSitters.map((sitter) => (
               <Marker
                 key={sitter.id}
-                coordinate={sitter.latlng}
+                coordinate={sitter.location}
                 title={sitter.name}
-                description={`${sitter.distance} • $${sitter.rate}/hr`}
+                description={`₱${sitter.hourlyRate}/hr • ${sitter.rating}⭐ • ${sitter.isOnline ? 'Available' : 'Offline'}`}
                 onPress={() => handleSitterPress(sitter.id)}
-              />
+              >
+                <View style={styles.markerContainer}>
+                  <View style={[styles.markerIcon, { backgroundColor: sitter.isOnline ? '#10B981' : '#6B7280' }]}>
+                    <Image 
+                      source={getImageSource(sitter)} 
+                      style={styles.markerProfileImage}
+                    />
+                  </View>
+                  {sitter.isOnline && (
+                    <View style={styles.onlinePulse} />
+                  )}
+                </View>
+              </Marker>
             ))}
           </MapView>
         )}
@@ -204,26 +371,49 @@ const FindSitterMapScreen = () => {
         <Text style={styles.sittersTitle}>Nearby Pet Sitters</Text>
         {filteredSitters.map((sitter) => (
           <TouchableOpacity key={sitter.id} style={styles.sitterCard} onPress={() => handleSitterPress(sitter.id)}>
-            <Image source={sitter.avatar} style={styles.sitterAvatar} />
+            <View style={styles.avatarContainer}>
+              <View style={[styles.onlineIndicator, { backgroundColor: sitter.isOnline ? '#10B981' : '#6B7280' }]} />
+              <Image 
+                source={getImageSource(sitter)} 
+                style={styles.sitterAvatar} 
+              />
+            </View>
             <View style={styles.sitterInfo}>
               <Text style={styles.sitterName}>{sitter.name}</Text>
-              <Text style={styles.sitterLocation}>📍 {sitter.distance}</Text>
+              <Text style={styles.sitterLocation}>📍 {sitter.location.address}</Text>
               <View style={styles.sitterBadges}>
-                {sitter.badges.map((badge, idx) => (
-                  <View key={idx} style={styles.badge}>
-                    <Ionicons name={badge.icon as any} size={12} color={badge.color} />
-                    <Text style={styles.badgeText}>{badge.label}</Text>
-                  </View>
-                ))}
+                <View style={styles.badge}>
+                  <Ionicons name="star" size={12} color="#FFD700" />
+                  <Text style={styles.badgeText}>{sitter.rating}</Text>
+                </View>
+                <View style={styles.badge}>
+                  <Ionicons name="time" size={12} color="#F59E0B" />
+                  <Text style={styles.badgeText}>{sitter.experience}</Text>
+                </View>
+                <View style={styles.badge}>
+                  <Ionicons name="paw" size={12} color="#10B981" />
+                  <Text style={styles.badgeText}>{sitter.petTypes.join(', ')}</Text>
+                </View>
               </View>
             </View>
             <View style={styles.sitterRate}>
-              <Text style={styles.rateText}>${sitter.rate}</Text>
+              <Text style={styles.rateText}>₱{sitter.hourlyRate}</Text>
               <Text style={styles.rateUnit}>/hour</Text>
             </View>
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Sitter Profile Popup */}
+      <SitterProfilePopup
+        sitter={selectedSitter}
+        visible={showProfilePopup}
+        onClose={handleClosePopup}
+        onFollow={handleFollow}
+        onMessage={handleMessage}
+        onViewBadges={handleViewBadges}
+        onViewCertificates={handleViewCertificates}
+      />
     </SafeAreaView>
   );
 };
@@ -335,6 +525,65 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
+  },
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  markerIcon: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 3,
+    borderColor: '#fff',
+    overflow: 'hidden',
+  },
+  markerProfileImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  onlinePulse: {
+    position: 'absolute',
+    top: -5,
+    left: -5,
+    right: -5,
+    bottom: -5,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 15,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#fff',
+    zIndex: 1,
   },
   sitterLocation: {
     fontSize: 14,

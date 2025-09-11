@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import authService, { User } from '../services/authService';
@@ -53,28 +54,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLocationTracking, setIsLocationTracking] = useState(false);
 
   useEffect(() => {
-    // Check if user is already logged in on app start
-    const checkExistingAuth = async () => {
+    // Force fresh start - no auto-login
+    const forceFreshStart = async () => {
       try {
-        console.log('App started - checking existing authentication');
-        const existingUser = await authService.getCurrentUser();
-        if (existingUser) {
-          console.log('Found existing user:', existingUser.email);
-          setUser(existingUser);
-        } else {
-          console.log('No existing user found');
-          setUser(null);
-        }
+        console.log('App started - FORCING FRESH START (no auto-login)');
+        
+        // Clear any existing user data to ensure fresh start
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('user_logged_out');
+        authService.clearCurrentUser();
+        setUser(null);
         setIsLoading(false);
+        
+        console.log('AuthContext: Fresh start completed - no auto-login');
       } catch (error) {
-        console.error('Error checking existing auth:', error);
+        console.error('Error in fresh start:', error);
         setUser(null);
         setIsLoading(false);
       }
     };
     
-    checkExistingAuth();
+    forceFreshStart();
   }, []);
+
+  // Auto-start location tracking when user logs in
+  useEffect(() => {
+    if (user && !isLocationTracking) {
+      console.log('User logged in, starting location tracking automatically');
+      startLocationTracking(1000); // Start with 1km radius
+    }
+  }, [user, isLocationTracking, startLocationTracking]);
 
   const checkAuthState = async () => {
     try {
@@ -192,10 +201,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await authService.logout();
+      console.log('AuthContext: Logging out user');
+      // Clear all user data completely
+      await authService.clearAllData();
+      // Clear user from AuthService memory
+      authService.clearCurrentUser();
       setUser(null);
+      console.log('AuthContext: User logged out and data cleared');
     } catch (error) {
       console.error('Logout error:', error);
+      // Even if there's an error, clear the user state
+      authService.clearCurrentUser();
+      setUser(null);
     }
   };
 

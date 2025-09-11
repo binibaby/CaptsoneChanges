@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 import { getApiUrl, getAuthHeaders } from '../../constants/config';
+import { networkService } from '../../services/networkService';
 import { RootStackParamList } from '../../navigation/types';
 
 type PhoneVerificationScreenNavigationProp = StackNavigationProp<RootStackParamList, 'PhoneVerification'>;
@@ -59,7 +60,13 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     try {
       console.log('LOG PhoneVerificationScreen - Sending code to:', phoneNumber);
       
-      const apiUrl = getApiUrl('/api/send-verification-code');
+      // Ensure network service is initialized
+      let baseUrl = networkService.getBaseUrl();
+      if (!baseUrl) {
+        console.log('Network service not initialized, detecting working IP...');
+        baseUrl = await networkService.detectWorkingIP();
+      }
+      const apiUrl = `${baseUrl}/api/send-verification-code`;
       console.log('Using API URL:', apiUrl);
       console.log('Network check - testing connection...');
       
@@ -191,7 +198,13 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     try {
       console.log('LOG PhoneVerificationScreen - Verifying code:', verificationCode);
       
-      const apiUrl = getApiUrl('/api/verify-phone-code');
+      // Ensure network service is initialized
+      let baseUrl = networkService.getBaseUrl();
+      if (!baseUrl) {
+        console.log('Network service not initialized, detecting working IP...');
+        baseUrl = await networkService.detectWorkingIP();
+      }
+      const apiUrl = `${baseUrl}/api/verify-phone-code`;
       console.log('Using API URL:', apiUrl);
       
       // Create AbortController and set timeout (30 seconds)

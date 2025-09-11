@@ -119,6 +119,11 @@ class User extends Authenticatable
         return $this->hasMany(WalletTransaction::class);
     }
 
+    public function pets()
+    {
+        return $this->hasMany(Pet::class);
+    }
+
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');

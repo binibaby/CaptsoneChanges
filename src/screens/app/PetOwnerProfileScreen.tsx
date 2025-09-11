@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -15,15 +16,15 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const PetOwnerProfileScreen = () => {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [profile, setProfile] = useState({
     name: '',
     email: '',
     phone: '',
     address: '',
     bio: '',
-    pets: [] as any[],
     emergencyContact: '',
     emergencyPhone: '',
   });
@@ -38,15 +39,13 @@ const PetOwnerProfileScreen = () => {
         phone: user.phone || '',
         address: user.address || '',
         bio: user.aboutMe || '',
-        pets: [], // New users start with no pets
         emergencyContact: '', // New users start with no emergency contact
         emergencyPhone: '',
       });
+      setProfileImage(user.profileImage || null);
     }
   }, [user]);
 
-  const [selectedPet, setSelectedPet] = useState<null | typeof profile.pets[0]>(null);
-  const [modalVisible, setModalVisible] = useState(false);
 
   const handleBack = () => {
     router.back();
@@ -76,8 +75,115 @@ const PetOwnerProfileScreen = () => {
     );
   };
 
-  const handleAddPet = () => {
-    Alert.alert('Add Pet', 'This feature will be available soon!');
+
+  const pickProfileImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant camera roll permissions to upload a profile image.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const takeProfilePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant camera permissions to take a profile photo.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Camera Error', 'Failed to open camera. Please try again.');
+    }
+  };
+
+  const uploadProfileImage = async (imageUri: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('profile_image', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'profile_image.jpg',
+      } as any);
+
+      console.log('Uploading profile image to:', 'http://172.20.10.2:8000/api/profile/upload-image');
+      console.log('User token:', user?.token ? 'Present' : 'Missing');
+
+      const response = await fetch('http://172.20.10.2:8000/api/profile/upload-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user?.token || ''}`,
+          'Accept': 'application/json',
+        },
+        body: formData,
+      });
+
+      console.log('Response status:', response.status);
+
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Upload result:', result);
+      
+      if (result.success) {
+        console.log('Profile image uploaded successfully:', result.profile_image);
+        // Update the local state immediately to show the new image
+        setProfileImage(result.profile_image);
+        // Update the user context with the new profile image
+        await updateUserProfile({ profileImage: result.profile_image });
+        Alert.alert('Success', 'Profile image updated successfully!');
+      } else {
+        console.error('Failed to upload profile image:', result.message);
+        Alert.alert('Error', result.message || 'Failed to upload profile image');
+      }
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to upload profile image: ${errorMessage}`);
+    }
+  };
+
+  const pickImage = async () => {
+    Alert.alert(
+      'Select Profile Image',
+      'Choose how you want to add a profile image',
+      [
+        { text: 'Camera', onPress: takeProfilePhoto },
+        { text: 'Photo Library', onPress: pickProfileImage },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   return (
@@ -95,11 +201,20 @@ const PetOwnerProfileScreen = () => {
       <ScrollView style={styles.content}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
+          <TouchableOpacity onPress={pickImage} style={styles.profileImageContainer}>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            ) : (
           <Image source={require('../../assets/images/default-avatar.png')} style={styles.profileImage} />
+            )}
+            <View style={styles.profileImageOverlay}>
+              <Ionicons name="camera" size={20} color="#FFF" />
+            </View>
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile.name}</Text>
             <Text style={styles.profileSubtitle}>Pet Owner</Text>
-            <Text style={styles.locationText}>📍 San Francisco, CA</Text>
+            <Text style={styles.locationText}>📍 {profile.address || 'No address set'}</Text>
           </View>
         </View>
         {/* Edit/Save Buttons */}
@@ -144,33 +259,13 @@ const PetOwnerProfileScreen = () => {
           <Text style={styles.sectionTitle}>About Me</Text>
           <Text style={[styles.bioInput, styles.disabledInput]}>{profile.bio}</Text>
         </View>
-        {/* My Pets */}
+        {/* My Pets Navigation */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Pets</Text>
-            {isEditing && (
-              <TouchableOpacity style={styles.addButton} onPress={handleAddPet}>
-                <Ionicons name="add" size={20} color="#F59E0B" />
-              </TouchableOpacity>
-            )}
-          </View>
-          {profile.pets.map((pet, index) => (
-            <View key={index} style={styles.petCard}>
-              <Image 
-                source={pet.type === 'Dog' ? require('../../assets/images/dog.png') : require('../../assets/images/cat.png')} 
-                style={styles.petImage} 
-              />
-              <View style={styles.petInfo}>
-                <Text style={styles.petName}>{pet.name}</Text>
-                <Text style={styles.petDetails}>{pet.breed} • {pet.age}</Text>
-              </View>
-              {isEditing && (
-                <TouchableOpacity style={styles.editPetButton}>
-                  <Ionicons name="pencil" size={16} color="#666" />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
+          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/my-pets')}>
+            <Ionicons name="paw" size={24} color="#F59E0B" />
+            <Text style={styles.actionText}>My Pets</Text>
+            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          </TouchableOpacity>
         </View>
         {/* Emergency Contact */}
         <View style={styles.section}>
@@ -204,6 +299,7 @@ const PetOwnerProfileScreen = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
     </SafeAreaView>
   );
 };
@@ -244,11 +340,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginBottom: 10,
   },
+  profileImageContainer: {
+    position: 'relative',
+    marginRight: 15,
+  },
   profileImage: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    marginRight: 15,
+  },
+  profileImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#F59E0B',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
   profileInfo: {
     flex: 1,
@@ -331,7 +443,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   addButton: {
-    padding: 5,
+    padding: 8,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inputGroup: {
     marginBottom: 15,
@@ -365,42 +483,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     minHeight: 100,
     textAlignVertical: 'top',
-  },
-  petCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  petImage: {
-    width: 54,
-    height: 54,
-    borderRadius: 12,
-    marginRight: 15,
-  },
-  petInfo: {
-    flex: 1,
-  },
-  petName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  petDetails: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  editPetButton: {
-    padding: 8,
   },
   actionItem: {
     flexDirection: 'row',
