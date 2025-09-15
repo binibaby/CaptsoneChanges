@@ -185,7 +185,7 @@ class AuthService {
           gender: userData.gender || '',
           age: userData.age || null,
           experience: userData.experience || '',
-          hourly_rate: null,
+          hourly_rate: userData.hourlyRate || null,
           pet_breeds: userData.selectedBreeds || [],
           specialties: userData.specialties || [],
           selected_pet_types: userData.selectedPetTypes || [],

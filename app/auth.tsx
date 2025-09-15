@@ -90,6 +90,8 @@ export default function Auth() {
         console.log('User object being passed to updateUserProfile:', user);
         console.log('User profileImage field:', user.profileImage);
         console.log('User profile_image field:', user.profile_image);
+        console.log('User hourlyRate field:', user.hourlyRate);
+        console.log('User hourly_rate field:', user.hourly_rate);
         
         // Map backend user object to frontend user structure
         const userForUpdate = {
@@ -105,7 +107,7 @@ export default function Auth() {
           gender: user.gender || '',
           address: user.address || '',
           experience: user.experience || '',
-          hourlyRate: user.hourly_rate || '',  // Backend uses hourly_rate
+          hourlyRate: user.hourlyRate || user.hourly_rate || '',  // Check both field names
           aboutMe: user.bio || '',             // Backend uses bio
           specialties: user.specialties || [],
           email_verified: user.email_verified || false,
@@ -117,6 +119,7 @@ export default function Auth() {
         };
         
         console.log('User object structured for updateUserProfile:', userForUpdate);
+        console.log('UserForUpdate hourlyRate:', userForUpdate.hourlyRate);
         await updateUserProfile(userForUpdate);
       } else {
         console.log('Saving user data to backend in onAuthSuccess');
@@ -225,7 +228,7 @@ export default function Auth() {
         gender: userData.gender || '',
         age: userData.age || null,
         experience: userData.experience || '',
-          hourly_rate: null,
+        hourly_rate: userData.hourlyRate || null,
         pet_breeds: userData.selectedBreeds || [],
         specialties: userData.specialties || [],
         selected_pet_types: userData.selectedPetTypes || [],
