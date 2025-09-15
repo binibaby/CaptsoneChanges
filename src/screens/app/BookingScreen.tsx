@@ -259,21 +259,34 @@ const BookingScreen: React.FC = () => {
 
   // Helper function to get proper image source
   const getImageSource = () => {
+    console.log('🖼️ BookingScreen - Getting image source for sitterImage:', sitterImage);
+    
     if (!sitterImage) {
+      console.log('🖼️ BookingScreen - No sitterImage, using default avatar');
       return require('../../assets/images/default-avatar.png');
     }
     
     // If it's a URL (starts with http), use it directly
     if (typeof sitterImage === 'string' && (sitterImage.startsWith('http') || sitterImage.startsWith('https'))) {
+      console.log('🖼️ BookingScreen - Using HTTP URL:', sitterImage);
       return { uri: sitterImage };
+    }
+    
+    // If it's a storage path (starts with /storage/), construct full URL
+    if (typeof sitterImage === 'string' && sitterImage.startsWith('/storage/')) {
+      const fullUrl = `http://192.168.100.184:8000${sitterImage}`;
+      console.log('🖼️ BookingScreen - Using storage path, full URL:', fullUrl);
+      return { uri: fullUrl };
     }
     
     // For any other string (local paths), treat as URI
     if (typeof sitterImage === 'string') {
+      console.log('🖼️ BookingScreen - Using string as URI:', sitterImage);
       return { uri: sitterImage };
     }
     
     // Default fallback
+    console.log('🖼️ BookingScreen - Using default fallback');
     return require('../../assets/images/default-avatar.png');
   };
 
@@ -323,7 +336,19 @@ const BookingScreen: React.FC = () => {
         <View style={styles.sitterInfoCard}>
           <View style={styles.sitterInfoHeader}>
             <View style={styles.sitterAvatar}>
-              <Image source={getImageSource()} style={styles.avatarImage} />
+              <Image 
+                source={getImageSource()} 
+                style={styles.avatarImage}
+                onError={(error) => {
+                  console.log('❌ BookingScreen - Sitter image failed to load:', error.nativeEvent.error);
+                  console.log('❌ BookingScreen - Image source was:', getImageSource());
+                }}
+                onLoad={() => {
+                  console.log('✅ BookingScreen - Sitter image loaded successfully');
+                }}
+                defaultSource={require('../../assets/images/default-avatar.png')}
+                resizeMode="cover"
+              />
             </View>
             <View style={styles.sitterInfo}>
               <Text style={styles.sitterName}>{sitterName || 'Sitter'}</Text>
