@@ -88,6 +88,8 @@ export default function Auth() {
       if (user && user.id && user.email && user.id !== Date.now().toString()) {
         console.log('User data already saved to backend, updating profile');
         console.log('User object being passed to updateUserProfile:', user);
+        console.log('User profileImage field:', user.profileImage);
+        console.log('User profile_image field:', user.profile_image);
         
         // Map backend user object to frontend user structure
         const userForUpdate = {
@@ -110,7 +112,7 @@ export default function Auth() {
           phone_verified: user.phone_verified || false,
           selectedPetTypes: user.selected_pet_types || [],
           selectedBreeds: user.pet_breeds || [],  // Backend uses pet_breeds
-          profileImage: user.profile_image || undefined,
+          profileImage: user.profileImage || user.profile_image || undefined,
           token: user.token, // Add the authentication token
         };
         
