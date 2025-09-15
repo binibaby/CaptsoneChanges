@@ -81,23 +81,42 @@ const PetSitterAvailabilityScreen = () => {
         timeRanges
       }));
 
-      // Get or create token for the user
-      let token = user.token;
-      if (!token) {
-        console.log('⚠️ User has no token, creating one...');
-        // For now, use hardcoded tokens for specific users
-        // In production, this should be handled by proper authentication
-        if (user.id === '5') {
-          token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
-          console.log('✅ Using hardcoded token for user 5 (Jasmine Paneda)');
-        } else if (user.id === '21') {
-          token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
-          console.log('✅ Using hardcoded token for user 21 (Jassy Barnachea)');
-        } else {
-          console.log('❌ No token available for user, skipping backend save');
+      console.log('🔄 Saving availability for user:', user.id, user.name);
+      console.log('🔄 Availability data:', availabilities);
+
+      // Check if we have any availability data
+      if (availabilities.length === 0) {
+        console.log('⚠️ No availability data to save');
+        return;
+      }
+
+      // Validate that each availability has the required fields
+      for (const availability of availabilities) {
+        if (!availability.date || !availability.timeRanges || availability.timeRanges.length === 0) {
+          console.error('❌ Invalid availability data:', availability);
           return;
         }
+        
+        for (const timeRange of availability.timeRanges) {
+          if (!timeRange.startTime || !timeRange.endTime) {
+            console.error('❌ Invalid time range:', timeRange);
+            return;
+          }
+        }
       }
+
+      // Get token for the user
+      const token = user.token;
+      if (!token) {
+        console.error('❌ No authentication token available for user:', user.id);
+        console.log('❌ User needs to be properly authenticated to save availability');
+        return;
+      }
+
+      console.log('✅ Using token for user:', user.id);
+
+      const requestBody = { availabilities };
+      console.log('🔄 Request body being sent:', JSON.stringify(requestBody, null, 2));
 
       const response = await makeApiCall(
         '/api/sitters/availability',
@@ -107,16 +126,28 @@ const PetSitterAvailabilityScreen = () => {
             ...getAuthHeaders(token),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ availabilities }),
+          body: JSON.stringify(requestBody),
         }
       );
 
+      console.log('🔄 Response status:', response.status);
+      console.log('🔄 Response ok:', response.ok);
+
       if (response.ok) {
-        console.log('✅ Availability data saved to backend successfully');
+        const responseData = await response.json();
+        console.log('✅ Availability data saved to backend successfully:', responseData);
       } else {
         console.error('❌ Failed to save availability to backend:', response.status);
         const errorText = await response.text();
         console.error('❌ Error response:', errorText);
+        
+        // Try to parse error as JSON for better error handling
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error('❌ Parsed error data:', errorData);
+        } catch (parseError) {
+          console.error('❌ Could not parse error response as JSON');
+        }
       }
     } catch (error) {
       console.error('❌ Error saving availability to backend:', error);
