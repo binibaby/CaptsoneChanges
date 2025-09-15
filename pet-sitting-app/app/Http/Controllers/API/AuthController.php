@@ -51,6 +51,15 @@ class AuthController extends Controller
             // Generate phone verification code only
             $phoneVerificationCode = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
 
+            \Log::info('🔍 Creating user with data:', [
+                'name' => $request->name,
+                'role' => $request->role,
+                'experience' => $request->experience,
+                'hourly_rate' => $request->hourly_rate,
+                'hourly_rate_type' => gettype($request->hourly_rate),
+                'specialties' => $request->specialties,
+            ]);
+
             $user = User::create([
                 'name' => $request->name,
                 'first_name' => $request->first_name,
@@ -72,6 +81,16 @@ class AuthController extends Controller
                 'phone_verification_code' => $phoneVerificationCode,
                 'email_verified_at' => now(), // Auto-verify email
                 'phone_verified_at' => null,
+            ]);
+
+            \Log::info('✅ User created successfully:', [
+                'id' => $user->id,
+                'name' => $user->name,
+                'role' => $user->role,
+                'experience' => $user->experience,
+                'hourly_rate' => $user->hourly_rate,
+                'hourly_rate_type' => gettype($user->hourly_rate),
+                'specialties' => $user->specialties,
             ]);
 
             \Log::info('✅ User created successfully - ID: ' . $user->id);
@@ -383,11 +402,20 @@ class AuthController extends Controller
             $profile['specialties'] = $user->specialties;
             $profile['selected_pet_types'] = $user->selected_pet_types;
             $profile['pet_breeds'] = $user->pet_breeds;
+            
+            \Log::info('🔍 buildUserProfile - Pet sitter fields:', [
+                'user_id' => $user->id,
+                'experience' => $user->experience,
+                'hourly_rate' => $user->hourly_rate,
+                'hourly_rate_type' => gettype($user->hourly_rate),
+                'specialties' => $user->specialties,
+            ]);
         } else {
             // Pet owner specific fields (no sitter-specific fields)
             $profile['pet_breeds'] = $user->pet_breeds; // Pet owners can have pet breeds they own
         }
 
+        \Log::info('🔍 buildUserProfile - Final profile:', $profile);
         return $profile;
     }
 

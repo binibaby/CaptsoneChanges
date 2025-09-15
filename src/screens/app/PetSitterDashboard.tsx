@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Image,
     SafeAreaView,
@@ -59,6 +59,14 @@ const PetSitterDashboard = () => {
   useEffect(() => {
     loadUserData();
   }, []);
+
+  // Refresh user data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 PetSitterDashboard: Screen focused, refreshing user data');
+      loadUserData();
+    }, [])
+  );
 
   useEffect(() => {
     if (currentUserId) {
@@ -420,8 +428,8 @@ const PetSitterDashboard = () => {
                 const diffMs = end.getTime() - start.getTime();
                 const hours = diffMs / (1000 * 60 * 60);
                 
-                // Use ₱250 per hour as the standard rate
-                const hourlyRate = 250;
+                // Use the user's actual hourly rate from profile
+                const hourlyRate = user?.hourlyRate || 25;
                 totalEarnings = Math.ceil(hours * hourlyRate);
                 
                 console.log('💰 Dashboard earnings calculated:', { 

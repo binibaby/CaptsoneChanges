@@ -146,12 +146,15 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
         selectedPetTypes,
         selectedBreeds,
         experience: userRole === 'Pet Sitter' ? experience : '',
-        hourlyRate: userRole === 'Pet Sitter' ? hourlyRate : '',
         specialties: userRole === 'Pet Sitter' ? specialties : [],
         isVerified: false,
         verificationPending: userRole === 'Pet Sitter',
         createdAt: new Date().toISOString(),
       };
+
+      console.log('🚀 SignUpScreen4_FinalSteps: User object created:', user);
+      console.log('🚀 SignUpScreen4_FinalSteps: userRole:', userRole);
+      console.log('🚀 SignUpScreen4_FinalSteps: isPetSitter:', userRole === 'Pet Sitter');
 
       onComplete(user);
     } catch (error) {
@@ -297,17 +300,6 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
               <>
                 <View style={styles.inputContainer}>
                   <Text style={[styles.label, { color: '#F59E0B', fontSize: 18, fontWeight: 'bold' }]}>🐾 Pet Sitter Information</Text>
-                </View>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Hourly Rate (₱)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your hourly rate (e.g., 250)"
-                    placeholderTextColor="#999"
-                    value={hourlyRate}
-                    onChangeText={setHourlyRate}
-                    keyboardType="numeric"
-                  />
                 </View>
 
                 <View style={styles.inputContainer}>

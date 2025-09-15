@@ -107,7 +107,7 @@ class AuthService {
           gender: result.user.gender || '',
           address: result.user.address || '',
           experience: result.user.experience || '',
-          hourlyRate: result.user.hourly_rate || '',
+          hourlyRate: result.user.hourly_rate !== null && result.user.hourly_rate !== undefined ? String(result.user.hourly_rate) : '',
           aboutMe: result.user.bio || '',
           specialties: result.user.specialties || [],
           email_verified: result.user.email_verified || false,
@@ -120,7 +120,10 @@ class AuthService {
 
         this.currentUser = user;
         await this.saveUserToStorage(user);
-        return user;
+        
+        // Restore profile data if available
+        const userWithProfileData = await this.restoreProfileData(user);
+        return userWithProfileData;
       } else {
         console.error('Login failed:', result.message);
         throw new Error(result.message || 'Login failed');
@@ -148,6 +151,13 @@ class AuthService {
     userRole: 'Pet Owner' | 'Pet Sitter';
     selectedPetTypes?: ('dogs' | 'cats')[];
     selectedBreeds?: string[];
+    phone?: string;
+    address?: string;
+    gender?: string;
+    age?: number;
+    experience?: string;
+    specialties?: string[];
+    aboutMe?: string;
   }): Promise<User> {
     try {
       console.log('Attempting to register with backend API');
@@ -170,6 +180,16 @@ class AuthService {
           password: userData.password,
           password_confirmation: userData.password,
           role: userData.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
+          phone: userData.phone || '',
+          address: userData.address || '',
+          gender: userData.gender || '',
+          age: userData.age || null,
+          experience: userData.experience || '',
+          hourly_rate: null,
+          pet_breeds: userData.selectedBreeds || [],
+          specialties: userData.specialties || [],
+          selected_pet_types: userData.selectedPetTypes || [],
+          bio: userData.aboutMe || '',
         }),
         signal: controller.signal,
       });
@@ -197,6 +217,9 @@ class AuthService {
       
       if (result.success) {
         console.log('Registration successful, user data from backend:', result.user);
+        console.log('Backend hourly_rate:', result.user.hourly_rate);
+        console.log('Backend hourly_rate type:', typeof result.user.hourly_rate);
+        console.log('Backend hourly_rate value:', JSON.stringify(result.user.hourly_rate));
         
         // Check if user data exists and has required fields
         if (!result.user || !result.user.id) {
@@ -218,7 +241,7 @@ class AuthService {
           gender: result.user.gender || '',
           address: result.user.address || '',
           experience: result.user.experience || '',
-          hourlyRate: result.user.hourly_rate || '',
+          hourlyRate: result.user.hourly_rate !== null && result.user.hourly_rate !== undefined ? String(result.user.hourly_rate) : '',
           aboutMe: result.user.bio || '',
           specialties: result.user.specialties || [],
           email_verified: result.user.email_verified || false,
@@ -231,7 +254,10 @@ class AuthService {
 
         this.currentUser = user;
         await this.saveUserToStorage(user);
-        return user;
+        
+        // Restore profile data if available
+        const userWithProfileData = await this.restoreProfileData(user);
+        return userWithProfileData;
       } else {
         console.error('Registration failed:', result.message);
         throw new Error(result.message || 'Registration failed');
@@ -254,13 +280,41 @@ class AuthService {
 
   async logout(): Promise<void> {
     console.log('AuthService: Logging out user');
+    
+    try {
+      // Save profile data before clearing user data
+      if (this.currentUser) {
+        const profileData = {
+          profileImage: this.currentUser.profileImage,
+          hourlyRate: this.currentUser.hourlyRate,
+          experience: this.currentUser.experience,
+          specialties: this.currentUser.specialties,
+          aboutMe: this.currentUser.aboutMe,
+          selectedPetTypes: this.currentUser.selectedPetTypes,
+          selectedBreeds: this.currentUser.selectedBreeds,
+          firstName: this.currentUser.firstName,
+          lastName: this.currentUser.lastName,
+          phone: this.currentUser.phone,
+          age: this.currentUser.age,
+          gender: this.currentUser.gender,
+          address: this.currentUser.address,
+        };
+        
+        // Store profile data separately for persistence
+        await AsyncStorage.setItem('user_profile_data', JSON.stringify(profileData));
+        console.log('AuthService: Profile data saved for persistence');
+      }
+    } catch (error) {
+      console.error('Error saving profile data during logout:', error);
+    }
+    
     this.currentUser = null;
     
     try {
-      // Clear all user data to ensure complete logout
+      // Clear authentication data but preserve profile data
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('user_logged_out');
-      console.log('AuthService: All user data cleared');
+      console.log('AuthService: Authentication data cleared, profile data preserved');
       
       console.log('AuthService: User logged out successfully');
     } catch (error) {
@@ -272,12 +326,12 @@ class AuthService {
   async clearAllData(): Promise<void> {
     this.currentUser = null;
     try {
-      // Clear all user data to ensure complete cleanup
+      // Clear authentication data but preserve profile data
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('user_logged_out');
-      console.log('clearAllData: All user data cleared');
+      console.log('clearAllData: Authentication data cleared, profile data preserved');
       
-      console.log('All user data cleared successfully');
+      console.log('Authentication data cleared successfully');
     } catch (error) {
       console.error('Error clearing user data:', error);
       // Continue even if there's an error
@@ -288,6 +342,20 @@ class AuthService {
   clearCurrentUser(): void {
     this.currentUser = null;
     console.log('AuthService: Current user cleared from memory');
+  }
+
+  // Method to completely clear all data including profile data (for "Start Fresh")
+  async clearAllDataIncludingProfile(): Promise<void> {
+    this.currentUser = null;
+    try {
+      // Clear all data including profile data
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('user_logged_out');
+      await AsyncStorage.removeItem('user_profile_data');
+      console.log('clearAllDataIncludingProfile: All data cleared including profile data');
+    } catch (error) {
+      console.error('Error clearing all data including profile:', error);
+    }
   }
 
   async getCurrentUser(): Promise<User | null> {
@@ -312,6 +380,50 @@ class AuthService {
     
     console.log('getCurrentUser: No user found');
     return null;
+  }
+
+  // Method to restore profile data from persistent storage
+  async restoreProfileData(user: User): Promise<User> {
+    try {
+      const storedProfileData = await AsyncStorage.getItem('user_profile_data');
+      if (storedProfileData) {
+        const profileData = JSON.parse(storedProfileData);
+        console.log('AuthService: Restoring profile data:', profileData);
+        
+        // Merge profile data with user data, prioritizing backend data for critical fields
+        const restoredUser = {
+          ...user,
+          ...profileData,
+          // Ensure authentication data is not overwritten
+          id: user.id,
+          email: user.email,
+          userRole: user.userRole,
+          role: user.role,
+          token: user.token,
+          email_verified: user.email_verified,
+          phone_verified: user.phone_verified,
+          // Prioritize backend data for critical fields if they exist
+          hourlyRate: user.hourlyRate || profileData.hourlyRate || '',
+          experience: user.experience || profileData.experience || '',
+          specialties: user.specialties || profileData.specialties || [],
+        };
+        
+        console.log('AuthService: Original user hourlyRate:', user.hourlyRate);
+        console.log('AuthService: Stored profileData hourlyRate:', profileData.hourlyRate);
+        console.log('AuthService: Restored user hourlyRate:', restoredUser.hourlyRate);
+        
+        this.currentUser = restoredUser;
+        await this.saveUserToStorage(restoredUser);
+        console.log('AuthService: Profile data restored successfully');
+        console.log('AuthService: Restored hourlyRate:', restoredUser.hourlyRate);
+        console.log('AuthService: Restored profileImage:', restoredUser.profileImage);
+        return restoredUser;
+      }
+    } catch (error) {
+      console.error('Error restoring profile data:', error);
+    }
+    
+    return user;
   }
 
 
@@ -393,14 +505,45 @@ class AuthService {
 
     this.currentUser = updatedUser;
     await this.saveUserToStorage(updatedUser);
+    
+    // Also save profile data persistently
+    try {
+      const profileData = {
+        profileImage: updatedUser.profileImage,
+        hourlyRate: updatedUser.hourlyRate,
+        experience: updatedUser.experience,
+        specialties: updatedUser.specialties,
+        aboutMe: updatedUser.aboutMe,
+        selectedPetTypes: updatedUser.selectedPetTypes,
+        selectedBreeds: updatedUser.selectedBreeds,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        phone: updatedUser.phone,
+        age: updatedUser.age,
+        gender: updatedUser.gender,
+        address: updatedUser.address,
+      };
+      
+      await AsyncStorage.setItem('user_profile_data', JSON.stringify(profileData));
+      console.log('AuthService: Profile data saved persistently');
+    } catch (error) {
+      console.error('Error saving profile data persistently:', error);
+    }
+    
     console.log('Updated user profile:', updatedUser);
     console.log('AuthService: Final user profileImage after save:', updatedUser.profileImage);
     return updatedUser;
   }
 
+
   // New method to store complete user data from backend registration
   async storeUserFromBackend(backendUser: any): Promise<User> {
     console.log('Storing user data from backend:', backendUser);
+    console.log('Backend user hourly_rate:', backendUser.hourly_rate);
+    console.log('Backend user role:', backendUser.role);
+    console.log('Backend user object keys:', Object.keys(backendUser));
+    console.log('Backend user role type:', typeof backendUser.role);
+    console.log('Backend user role === pet_sitter:', backendUser.role === 'pet_sitter');
     
     // Clear logout flag when user logs in
     await AsyncStorage.removeItem('user_logged_out');
@@ -430,18 +573,27 @@ class AuthService {
       selectedBreeds: backendUser.pet_breeds || [],
       profileImage: backendUser.profile_image || undefined,
       token: backendUser.token || undefined,
-      // Only include sitter-specific fields for pet sitters
-      ...(backendUser.role === 'pet_sitter' && {
-        experience: backendUser.experience || '',
-        hourlyRate: backendUser.hourly_rate || '',
-        specialties: backendUser.specialties || [],
-      }),
+      // Always include sitter-specific fields for pet sitters
+      experience: (backendUser.role === 'pet_sitter' || backendUser.role === 'Pet Sitter') ? (backendUser.experience || '') : '',
+      hourlyRate: (backendUser.role === 'pet_sitter' || backendUser.role === 'Pet Sitter') ? (backendUser.hourly_rate !== null && backendUser.hourly_rate !== undefined ? String(backendUser.hourly_rate) : '') : '',
+      specialties: (backendUser.role === 'pet_sitter' || backendUser.role === 'Pet Sitter') ? (backendUser.specialties || []) : [],
     };
+
+    console.log('Created user object:', user);
+    console.log('User hourlyRate:', user.hourlyRate);
+    console.log('User hourlyRate type:', typeof user.hourlyRate);
+    console.log('User hourlyRate value:', JSON.stringify(user.hourlyRate));
+    console.log('User role:', user.role);
 
     this.currentUser = user;
     await this.saveUserToStorage(user);
-    console.log('User data stored from backend successfully:', user);
-    return user;
+    
+    // Restore profile data if available (this will merge with backend data)
+    const userWithProfileData = await this.restoreProfileData(user);
+    console.log('User data stored from backend successfully:', userWithProfileData);
+    console.log('Final hourlyRate after merge:', userWithProfileData.hourlyRate);
+    console.log('Final profileImage after merge:', userWithProfileData.profileImage);
+    return userWithProfileData;
   }
 
   async isAuthenticated(): Promise<boolean> {

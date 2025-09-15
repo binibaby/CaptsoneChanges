@@ -9,6 +9,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -52,9 +53,23 @@ const PetOwnerProfileScreen = () => {
     router.back();
   };
 
-  const handleSave = () => {
-    setIsEditing(false);
-    Alert.alert('Success', 'Profile updated successfully!');
+  const handleSave = async () => {
+    try {
+      // Update the user profile with the new data
+      await updateUserProfile({
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        address: profile.address,
+        aboutMe: profile.bio,
+      });
+      
+      setIsEditing(false);
+      Alert.alert('Success', 'Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    }
   };
 
   const handleEdit = () => {
@@ -302,25 +317,75 @@ const PetOwnerProfileScreen = () => {
           <Text style={styles.sectionTitle}>Personal Information</Text>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Full Name</Text>
-            <Text style={[styles.input, styles.disabledInput]}>{profile.name}</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={profile.name}
+                onChangeText={(text) => setProfile({...profile, name: text})}
+                placeholder="Enter your full name"
+              />
+            ) : (
+              <Text style={[styles.input, styles.disabledInput]}>{profile.name}</Text>
+            )}
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Email</Text>
-            <Text style={[styles.input, styles.disabledInput]}>{profile.email}</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={profile.email}
+                onChangeText={(text) => setProfile({...profile, email: text})}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+              />
+            ) : (
+              <Text style={[styles.input, styles.disabledInput]}>{profile.email}</Text>
+            )}
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Phone</Text>
-            <Text style={[styles.input, styles.disabledInput]}>{profile.phone}</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={profile.phone}
+                onChangeText={(text) => setProfile({...profile, phone: text})}
+                placeholder="Enter your phone number"
+                keyboardType="phone-pad"
+              />
+            ) : (
+              <Text style={[styles.input, styles.disabledInput]}>{profile.phone}</Text>
+            )}
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Address</Text>
-            <Text style={[styles.input, styles.disabledInput]}>{profile.address}</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={profile.address}
+                onChangeText={(text) => setProfile({...profile, address: text})}
+                placeholder="Enter your address"
+                multiline
+              />
+            ) : (
+              <Text style={[styles.input, styles.disabledInput]}>{profile.address}</Text>
+            )}
           </View>
         </View>
         {/* Bio */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About Me</Text>
-          <Text style={[styles.bioInput, styles.disabledInput]}>{profile.bio}</Text>
+          {isEditing ? (
+            <TextInput
+              style={styles.bioInput}
+              value={profile.bio}
+              onChangeText={(text) => setProfile({...profile, bio: text})}
+              placeholder="Tell us about yourself..."
+              multiline
+              numberOfLines={4}
+            />
+          ) : (
+            <Text style={[styles.bioInput, styles.disabledInput]}>{profile.bio}</Text>
+          )}
         </View>
         {/* My Pets Navigation */}
         <View style={styles.section}>

@@ -53,8 +53,11 @@ const PetSitterProfileScreen = () => {
       console.log('📱 PetSitterProfileScreen: Updating profile data from user:', user);
       console.log('📱 PetSitterProfileScreen: user.hourlyRate:', user.hourlyRate);
       console.log('📱 PetSitterProfileScreen: user.experience:', user.experience);
+      console.log('📱 PetSitterProfileScreen: user.role:', user.role);
+      console.log('📱 PetSitterProfileScreen: user.userRole:', user.userRole);
+      console.log('📱 PetSitterProfileScreen: user object keys:', Object.keys(user));
       
-      setProfile({
+      const updatedProfile = {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
@@ -65,17 +68,69 @@ const PetSitterProfileScreen = () => {
         experience: user.experience || '',
         rating: 0,
         reviews: 0,
-      });
+      };
+      
+      console.log('📱 PetSitterProfileScreen: Updated profile object:', updatedProfile);
+      console.log('📱 PetSitterProfileScreen: Profile hourlyRate:', updatedProfile.hourlyRate);
+      
+      setProfile(updatedProfile);
+    } else {
+      console.log('📱 PetSitterProfileScreen: No user data available');
     }
   }, [user]);
+
+  // Refresh user data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 PetSitterProfileScreen: Screen focused, refreshing user data');
+      console.log('📱 PetSitterProfileScreen: Current user:', user);
+      console.log('📱 PetSitterProfileScreen: Current user hourlyRate:', user?.hourlyRate);
+      
+      // Force update profile data when screen comes into focus
+      if (user) {
+        const updatedProfile = {
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          bio: user.aboutMe || '',
+          hourlyRate: user.hourlyRate || '',
+          location: user.address || '',
+          specialties: user.specialties || [],
+          experience: user.experience || '',
+          rating: 0,
+          reviews: 0,
+        };
+        
+        console.log('📱 PetSitterProfileScreen: Force updating profile on focus:', updatedProfile);
+        setProfile(updatedProfile);
+      }
+    }, [user])
+  );
 
   const handleBack = () => {
     router.back();
   };
 
-  const handleSave = () => {
-    setIsEditing(false);
-    Alert.alert('Success', 'Profile updated successfully!');
+  const handleSave = async () => {
+    try {
+      // Update the user profile with the new data
+      await updateUserProfile({
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        aboutMe: profile.bio,
+        hourlyRate: profile.hourlyRate,
+        address: profile.location,
+        specialties: profile.specialties,
+        experience: profile.experience,
+      });
+      
+      setIsEditing(false);
+      Alert.alert('Success', 'Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    }
   };
 
   const handleEdit = () => {
@@ -373,8 +428,9 @@ const PetSitterProfileScreen = () => {
             <Text style={styles.statLabel}>Years of Experience</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>₱{profile.hourlyRate}</Text>
+            <Text style={styles.statNumber}>₱{profile.hourlyRate || '0'}</Text>
             <Text style={styles.statLabel}>Per Hour</Text>
+            {/* Debug info - remove this later */}
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{profile.specialties.length}</Text>

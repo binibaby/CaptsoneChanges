@@ -285,7 +285,7 @@ const PetSitterNotificationsScreen = () => {
 
   // Calculate total cost based on time duration and hourly rate
   const calculateTotalCost = (startTime: string, endTime: string, hourlyRate: number): string => {
-    if (!startTime || !endTime || !hourlyRate) return '2,250';
+    if (!startTime || !endTime || !hourlyRate) return '225';
     
     try {
       const start = new Date(`2000-01-01 ${startTime}`);
@@ -302,7 +302,7 @@ const PetSitterNotificationsScreen = () => {
       
       return totalCost.toLocaleString();
     } catch (error) {
-      return '2,250'; // Default fallback
+      return '225'; // Default fallback
     }
   };
 
@@ -512,7 +512,7 @@ const PetSitterNotificationsScreen = () => {
                     <Text style={styles.infoValue}>
                       {selectedBooking.data?.hourlyRate 
                         ? `₱${selectedBooking.data.hourlyRate}/hour`
-                        : '₱250/hour'
+                        : '₱25/hour'
                       }
                     </Text>
                   </View>
@@ -526,7 +526,7 @@ const PetSitterNotificationsScreen = () => {
                     <Text style={styles.totalCostValue}>
                       {selectedBooking.data?.hourlyRate 
                         ? `₱${calculateTotalCost(selectedBooking.data.startTime, selectedBooking.data.endTime, selectedBooking.data.hourlyRate)}`
-                        : '₱2,250'
+                        : '₱225'
                       }
                     </Text>
                   </View>

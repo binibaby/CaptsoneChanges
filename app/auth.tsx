@@ -135,6 +135,10 @@ export default function Auth() {
             address: user.address,
             gender: user.gender,
             age: user.age,
+            experience: user.experience || '',
+            hourly_rate: user.hourlyRate || '',
+            specialties: user.specialties || [],
+            selected_pet_types: user.selectedPetTypes || [],
             pet_breeds: user.selectedBreeds || [],
             bio: user.aboutMe || '',
           }),
@@ -202,7 +206,34 @@ export default function Auth() {
   const onRegistrationComplete = async (userData: any) => {
     try {
       console.log('Saving complete user data to backend:', userData);
+      console.log('UserData hourlyRate:', userData.hourlyRate);
+      console.log('UserData role:', userData.userRole);
       
+      // Prepare the request body
+      const requestBody = {
+        name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+        first_name: userData.firstName || '',
+        last_name: userData.lastName || '',
+        email: userData.email,
+        password: userData.password,
+        password_confirmation: userData.password, // Add password confirmation
+        role: userData.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
+        phone: userData.phone || '',
+        address: userData.address || '',
+        gender: userData.gender || '',
+        age: userData.age || null,
+        experience: userData.experience || '',
+          hourly_rate: null,
+        pet_breeds: userData.selectedBreeds || [],
+        specialties: userData.specialties || [],
+        selected_pet_types: userData.selectedPetTypes || [],
+        bio: userData.aboutMe || '',
+      };
+
+      console.log('🚀 Request body being sent to backend:', requestBody);
+      console.log('🚀 hourly_rate in request body:', requestBody.hourly_rate);
+      console.log('🚀 hourly_rate type:', typeof requestBody.hourly_rate);
+
       // Save the complete user data to the backend
       const response = await fetch('http://192.168.100.184:8000/api/register', {
         method: 'POST',
@@ -210,25 +241,7 @@ export default function Auth() {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-          first_name: userData.firstName || '',
-          last_name: userData.lastName || '',
-          email: userData.email,
-          password: userData.password,
-          password_confirmation: userData.password, // Add password confirmation
-          role: userData.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
-          phone: userData.phone || '',
-          address: userData.address || '',
-          gender: userData.gender || '',
-          age: userData.age || null,
-          experience: userData.experience || '',
-          hourly_rate: userData.hourlyRate || null,
-          pet_breeds: userData.selectedBreeds || [],
-          specialties: userData.specialties || [],
-          selected_pet_types: userData.selectedPetTypes || [],
-          bio: userData.aboutMe || '',
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       // Check if response is ok before trying to parse JSON
@@ -251,6 +264,11 @@ export default function Auth() {
       
       if (result.success) {
         console.log('User data saved to backend successfully:', result);
+        console.log('Backend user object:', result.user);
+        console.log('Backend hourly_rate:', result.user.hourly_rate);
+        console.log('Backend hourly_rate type:', typeof result.user.hourly_rate);
+        console.log('Backend hourly_rate value:', JSON.stringify(result.user.hourly_rate));
+        console.log('Frontend userData.hourlyRate:', userData.hourlyRate);
         
         // Create a complete user object for the auth context
         const completeUser = {
@@ -266,7 +284,7 @@ export default function Auth() {
           gender: result.user.gender,
           address: result.user.address,
           experience: result.user.experience || userData.experience || '',
-          hourlyRate: result.user.hourly_rate || userData.hourlyRate || '',
+          hourlyRate: result.user.hourly_rate !== null && result.user.hourly_rate !== undefined ? String(result.user.hourly_rate) : (userData.hourlyRate || ''),
           aboutMe: result.user.bio || '',
           specialties: result.user.specialties || userData.specialties || [],
           email_verified: result.user.email_verified,
@@ -277,8 +295,22 @@ export default function Auth() {
           token: result.token, // Add the authentication token
         };
 
+        console.log('Complete user object before storing:', completeUser);
+        console.log('Complete user hourlyRate:', completeUser.hourlyRate);
+        console.log('Complete user hourlyRate type:', typeof completeUser.hourlyRate);
+        console.log('Complete user hourlyRate value:', JSON.stringify(completeUser.hourlyRate));
+
         // Store the complete user data in the auth context
-        await storeUserFromBackend(completeUser);
+        // Convert completeUser to backend format for storeUserFromBackend
+        const backendUser = {
+          ...result.user,
+          hourly_rate: completeUser.hourlyRate !== null && completeUser.hourlyRate !== undefined ? completeUser.hourlyRate : (result.user.hourly_rate || userData.hourlyRate || ''),
+        };
+        console.log('Backend user object for storage:', backendUser);
+        console.log('Backend user hourly_rate:', backendUser.hourly_rate);
+        console.log('Backend user hourly_rate type:', typeof backendUser.hourly_rate);
+        console.log('Backend user hourly_rate value:', JSON.stringify(backendUser.hourly_rate));
+        await storeUserFromBackend(backendUser);
 
         // After breed selection, go to phone verification for both pet sitters and pet owners
         setSignupData({ ...signupData, userData: completeUser });

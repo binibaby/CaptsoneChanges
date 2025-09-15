@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   Image,
@@ -125,6 +125,9 @@ const FindSitterMapScreen = () => {
 
   // Load sitters from real-time location service
   const loadSittersFromAPI = async (forceRefresh: boolean = false) => {
+    console.log('🔄 loadSittersFromAPI called with forceRefresh:', forceRefresh);
+    console.log('📍 Current location:', currentLocation);
+    
     if (!currentLocation) {
       console.log('📍 No location available, showing empty state');
       setSitters([]);
@@ -140,24 +143,28 @@ const FindSitterMapScreen = () => {
         forceRefresh
       );
       
+      console.log('📍 API returned sitters:', nearbySitters?.length || 0);
+      console.log('📍 Raw sitters data:', nearbySitters);
+      
       if (nearbySitters && nearbySitters.length > 0) {
         setSitters(nearbySitters);
         console.log('📍 Found nearby sitters from API:', nearbySitters.length);
+        
+        nearbySitters.forEach((sitter, index) => {
+          console.log(`🗺️ Sitter ${index + 1} (${sitter.name}):`, {
+            hasImages: !!sitter.images,
+            imageCount: sitter.images?.length || 0,
+            firstImage: sitter.images?.[0],
+            hasProfileImage: !!sitter.profileImage,
+            profileImage: sitter.profileImage,
+            imageSource: sitter.imageSource,
+            allKeys: Object.keys(sitter)
+          });
+        });
       } else {
         console.log('📍 No sitters from API, showing empty state');
         setSitters([]);
       }
-      
-      nearbySitters.forEach((sitter, index) => {
-        console.log(`🗺️ Sitter ${index + 1} (${sitter.name}):`, {
-          hasImages: !!sitter.images,
-          imageCount: sitter.images?.length || 0,
-          firstImage: sitter.images?.[0],
-          hasProfileImage: !!sitter.profileImage,
-          profileImage: sitter.profileImage,
-          allKeys: Object.keys(sitter)
-        });
-      });
     } catch (error) {
       console.error('❌ Error loading nearby sitters, showing empty state:', error);
       setSitters([]);
@@ -167,6 +174,27 @@ const FindSitterMapScreen = () => {
   // Initial load
   useEffect(() => {
     loadSittersFromAPI();
+  }, [currentLocation]);
+
+  // Refresh sitter data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🗺️ FindSitterMapScreen: Screen focused, refreshing sitter data');
+      loadSittersFromAPI(true); // Force refresh to get latest data
+    }, [currentLocation])
+  );
+
+  // Also refresh when app state changes (user might have updated profile)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        console.log('🗺️ FindSitterMapScreen: App became active, refreshing sitter data');
+        loadSittersFromAPI(true); // Force refresh to get latest data
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
   }, [currentLocation]);
 
   // Periodic refresh to ensure we get the latest sitter status

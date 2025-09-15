@@ -191,7 +191,7 @@ const BookingScreen: React.FC = () => {
           date: selectedDate, // Use the actual selected date
           startTime: selectedTimeRange.startTime,
           endTime: selectedTimeRange.endTime,
-          hourlyRate: parseFloat(sitterRate || '250'),
+          hourlyRate: parseFloat(sitterRate || '25'),
           status: 'pending',
         });
         
@@ -207,7 +207,7 @@ const BookingScreen: React.FC = () => {
           date: selectedDate, // Use the actual selected date
           startTime: selectedTimeRange.startTime,
           endTime: selectedTimeRange.endTime,
-          hourlyRate: parseFloat(sitterRate || '250'),
+          hourlyRate: parseFloat(sitterRate || '25'),
         });
 
         // Create message for the sitter
@@ -220,7 +220,7 @@ const BookingScreen: React.FC = () => {
           date: selectedDate, // Use the actual selected date
           startTime: selectedTimeRange.startTime,
           endTime: selectedTimeRange.endTime,
-          hourlyRate: parseFloat(sitterRate || '250'),
+          hourlyRate: parseFloat(sitterRate || '25'),
         });
 
         Alert.alert(

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Image,
     Modal,
@@ -36,6 +36,16 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
   // Reset image error state when sitter changes
   useEffect(() => {
     setImageError(false);
+    if (sitter) {
+      console.log('🖼️ Popup - Sitter data received:', {
+        id: sitter.id,
+        name: sitter.name,
+        profileImage: sitter.profileImage,
+        imageSource: sitter.imageSource,
+        images: sitter.images,
+        allKeys: Object.keys(sitter)
+      });
+    }
   }, [sitter?.id]);
   
   if (!sitter) {
@@ -44,34 +54,44 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
 
   // Helper function to get proper image source (same as in FindSitterMapScreen)
   const getImageSource = (sitter: any) => {
-    const imageSource = sitter.imageSource || sitter.images?.[0] || sitter.profileImage;
+    const imageSource = sitter.profileImage || sitter.imageSource || sitter.images?.[0];
+    
+    console.log('🖼️ Popup - getImageSource called for sitter:', sitter.name);
+    console.log('🖼️ Popup - imageSource:', imageSource);
+    console.log('🖼️ Popup - sitter keys:', Object.keys(sitter));
     
     if (!imageSource) {
+      console.log('🖼️ Popup - No image source, using default avatar');
       return require('../assets/images/default-avatar.png');
     }
     
     // If it's a URL (starts with http), use it directly
     if (typeof imageSource === 'string' && (imageSource.startsWith('http') || imageSource.startsWith('https'))) {
+      console.log('🖼️ Popup - Using HTTP URL:', imageSource);
       return { uri: imageSource };
     }
     
     // If it's a relative URL (starts with /storage/), convert to full URL
     if (typeof imageSource === 'string' && imageSource.startsWith('/storage/')) {
       const fullUrl = `http://192.168.100.184:8000${imageSource}`;
+      console.log('🖼️ Popup - Converting storage URL to full URL:', fullUrl);
       return { uri: fullUrl };
     }
     
     // If it's already a require() object, use it directly
     if (typeof imageSource === 'object' && imageSource.uri !== undefined) {
+      console.log('🖼️ Popup - Using object with URI:', imageSource);
       return imageSource;
     }
     
     // For any other string (local paths), treat as URI
     if (typeof imageSource === 'string') {
+      console.log('🖼️ Popup - Using string as URI:', imageSource);
       return { uri: imageSource };
     }
     
     // If it's already a require() object, use it directly
+    console.log('🖼️ Popup - Using require object:', imageSource);
     return imageSource;
   };
 
@@ -104,12 +124,15 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
             <View style={styles.userInfoSection}>
               <View style={styles.avatarContainer}>
                 <Image
-                  source={getImageSource(sitter)}
+                  source={imageError ? require('../assets/images/default-avatar.png') : getImageSource(sitter)}
                   style={styles.avatar}
-                  onError={() => {
+                  onError={(error) => {
+                    console.log('❌ Popup - Image failed to load:', error.nativeEvent.error);
+                    console.log('❌ Popup - Image source was:', getImageSource(sitter));
                     setImageError(true);
                   }}
                   onLoad={() => {
+                    console.log('✅ Popup - Image loaded successfully');
                     setImageError(false);
                   }}
                   defaultSource={require('../assets/images/default-avatar.png')}
@@ -290,7 +313,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: '#fff',
     shadowColor: '#000',

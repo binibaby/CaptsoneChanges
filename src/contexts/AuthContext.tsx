@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import authService, { User } from '../services/authService';
 import locationService, { LocationConfig } from '../services/locationService';
+import realtimeLocationService from '../services/realtimeLocationService';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +16,13 @@ interface AuthContextType {
     userRole: 'Pet Owner' | 'Pet Sitter';
     selectedPetTypes?: ('dogs' | 'cats')[];
     selectedBreeds?: string[];
+    phone?: string;
+    address?: string;
+    gender?: string;
+    age?: number;
+    experience?: string;
+    specialties?: string[];
+    aboutMe?: string;
   }) => Promise<User>;
   updateUserProfile: (profileData: Partial<User>) => Promise<void>;
   storeUserFromBackend: (backendUser: any) => Promise<void>;
@@ -64,7 +72,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (currentUser) {
           console.log('Found existing user:', currentUser.email);
           console.log('User profile image:', currentUser.profileImage);
-          setUser(currentUser);
+          console.log('User hourly rate:', currentUser.hourlyRate);
+          
+          // Restore profile data if available
+          const userWithProfileData = await authService.restoreProfileData(currentUser);
+          setUser(userWithProfileData);
+          
+          console.log('AuthContext: User restored with profile data');
+          console.log('AuthContext: Restored hourly rate:', userWithProfileData.hourlyRate);
+          console.log('AuthContext: Restored profile image:', userWithProfileData.profileImage);
         } else {
           console.log('No existing user found');
           setUser(null);
@@ -113,6 +129,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     userRole: 'Pet Owner' | 'Pet Sitter';
     selectedPetTypes?: ('dogs' | 'cats')[];
     selectedBreeds?: string[];
+    phone?: string;
+    address?: string;
+    gender?: string;
+    age?: number;
+    experience?: string;
+    specialties?: string[];
+    aboutMe?: string;
   }) => {
     setIsLoading(true);
     try {
@@ -146,6 +169,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(updatedUser);
         console.log('AuthContext: User state updated successfully');
         console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
+        
+        // If this is a pet sitter and hourly rate was updated, refresh location data
+        if (user.role === 'pet_sitter' && profileData.hourlyRate !== undefined) {
+          console.log('AuthContext: Pet sitter hourly rate updated, refreshing location data');
+          try {
+            // Update the sitter's location data with the new hourly rate
+            await realtimeLocationService.updateSitterLocation({
+              id: user.id,
+              userId: user.id,
+              name: user.name,
+              email: user.email,
+              location: {
+                latitude: currentLocation?.coords.latitude || 0,
+                longitude: currentLocation?.coords.longitude || 0,
+                address: userAddress || '',
+              },
+              specialties: user.specialties || ['General Pet Care'],
+              experience: user.experience || '1 year',
+              petTypes: user.selectedPetTypes || ['dogs', 'cats'],
+              selectedBreeds: user.selectedBreeds || ['All breeds welcome'],
+              hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : profileData.hourlyRate,
+              rating: 4.5,
+              reviews: 0,
+              bio: user.aboutMe || 'Professional pet sitter ready to help!',
+              isOnline: true,
+              lastSeen: new Date(),
+              profileImage: user.profileImage,
+              followers: 0,
+              following: 0,
+            });
+          } catch (error) {
+            console.error('AuthContext: Error updating sitter location data:', error);
+          }
+        }
       } else {
         console.warn('AuthContext: No current user to update');
       }
@@ -158,11 +215,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const storeUserFromBackend = async (backendUser: any) => {
     try {
       console.log('AuthContext: Storing user from backend:', backendUser);
-      await authService.storeUserFromBackend(backendUser);
-      const user = await authService.getCurrentUser();
+      const user = await authService.storeUserFromBackend(backendUser);
       if (user) {
         console.log('AuthContext: User stored successfully, setting user state:', user);
         setUser(user);
+        
+        // If this is a pet sitter, update their location data with latest profile info
+        if (user.role === 'pet_sitter') {
+          console.log('AuthContext: Pet sitter logged in, updating location data with latest profile');
+          try {
+            await realtimeLocationService.updateSitterLocation({
+              id: user.id,
+              userId: user.id,
+              name: user.name,
+              email: user.email,
+              location: {
+                latitude: currentLocation?.coords.latitude || 0,
+                longitude: currentLocation?.coords.longitude || 0,
+                address: userAddress || user.address || '',
+              },
+              specialties: user.specialties || ['General Pet Care'],
+              experience: user.experience || '1 year',
+              petTypes: user.selectedPetTypes || ['dogs', 'cats'],
+              selectedBreeds: user.selectedBreeds || ['All breeds welcome'],
+              hourlyRate: typeof user.hourlyRate === 'string' ? parseFloat(user.hourlyRate) : (user.hourlyRate || 25),
+              rating: 4.5,
+              reviews: 0,
+              bio: user.aboutMe || 'Professional pet sitter ready to help!',
+              isOnline: true,
+              lastSeen: new Date(),
+              profileImage: user.profileImage,
+              followers: 0,
+              following: 0,
+            });
+            console.log('AuthContext: Pet sitter location data updated successfully');
+          } catch (error) {
+            console.error('AuthContext: Error updating pet sitter location data on login:', error);
+          }
+        }
       } else {
         console.error('AuthContext: Failed to retrieve user after storing');
       }
@@ -174,8 +264,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refresh = async () => {
     try {
-      // Clear all data and return to onboarding
-      await authService.clearAllData();
+      // Clear all data including profile data and return to onboarding
+      await authService.clearAllDataIncludingProfile();
       setUser(null);
     } catch (error) {
       console.error('Error refreshing:', error);

@@ -150,10 +150,39 @@ class LocationController extends Controller
             );
 
             if ($distance <= $radiusKm) {
-                // Get user profile image from database
+                // Get latest user data from database to ensure we have the most up-to-date profile
                 $user = User::find($sitterData['user_id']);
-                $profileImage = $user ? $user->profile_image : null;
                 
+                if ($user) {
+                    // Use latest data from database, fallback to cached data if not available
+                    $nearbySitters[] = [
+                        'id' => $sitterData['user_id'],
+                        'userId' => $sitterData['user_id'],
+                        'name' => $user->name ?: $sitterData['name'],
+                        'email' => $user->email ?: $sitterData['email'],
+                        'location' => [
+                            'latitude' => $sitterData['latitude'],
+                            'longitude' => $sitterData['longitude'],
+                            'address' => $sitterData['address'],
+                        ],
+                        'specialties' => $user->specialties ?: $sitterData['specialties'],
+                        'experience' => $user->experience ?: $sitterData['experience'],
+                        'petTypes' => $user->selected_pet_types ?: $sitterData['pet_types'],
+                        'selectedBreeds' => $user->pet_breeds ?: $sitterData['selected_breeds'],
+                        'hourlyRate' => $user->hourly_rate ?: $sitterData['hourly_rate'],
+                        'rating' => $sitterData['rating'],
+                        'reviews' => $sitterData['reviews'],
+                        'bio' => $user->bio ?: $sitterData['bio'],
+                        'isOnline' => $sitterData['is_online'],
+                        'lastSeen' => $sitterData['last_seen'],
+                        'distance' => round($distance, 1) . ' km',
+                        'profile_image' => $user->profile_image,
+                        'images' => $user->profile_image ? [$user->profile_image] : null,
+                        'followers' => $user->followers ?? 0,
+                        'following' => $user->following ?? 0
+                    ];
+                } else {
+                    // Fallback to cached data if user not found in database
                 $nearbySitters[] = [
                     'id' => $sitterData['user_id'],
                     'userId' => $sitterData['user_id'],
@@ -175,11 +204,12 @@ class LocationController extends Controller
                     'isOnline' => $sitterData['is_online'],
                     'lastSeen' => $sitterData['last_seen'],
                     'distance' => round($distance, 1) . ' km',
-                    'profile_image' => $profileImage,
-                    'images' => $profileImage ? [$profileImage] : null,
-                    'followers' => $user ? ($user->followers ?? 0) : 0,
-                    'following' => $user ? ($user->following ?? 0) : 0
-                ];
+                        'profile_image' => null,
+                        'images' => null,
+                        'followers' => 0,
+                        'following' => 0
+                    ];
+                }
             }
         }
 

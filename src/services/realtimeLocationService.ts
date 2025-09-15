@@ -39,6 +39,9 @@ class RealtimeLocationService {
 
   constructor() {
     // Real-time sitters will be loaded from API
+    // Clear any existing cache on initialization
+    this.sitters.clear();
+    console.log('🧹 RealtimeLocationService initialized - cache cleared');
   }
 
 
@@ -157,6 +160,12 @@ class RealtimeLocationService {
     radiusKm: number = 2,
     forceRefresh: boolean = false
   ): Promise<RealtimeSitter[]> {
+    // Clear cache if force refresh is requested
+    if (forceRefresh) {
+      console.log('🔄 Force refresh requested - clearing cache');
+      this.sitters.clear();
+    }
+    
     // Debounce API calls to prevent infinite loops (unless force refresh is requested)
     const now = Date.now();
     if (!forceRefresh && now - this.lastApiCallTime < this.apiCallDebounceMs) {

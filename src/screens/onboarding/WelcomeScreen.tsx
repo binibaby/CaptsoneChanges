@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   termsText: {
     color: '#666',
     fontSize: 14,
-    textDecorationLine: 'underline',
+    textDecorationLine: 'underline' as any,
   },
 });
 
