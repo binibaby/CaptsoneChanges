@@ -166,10 +166,35 @@ const BookingScreen: React.FC = () => {
         sitterRate
       });
       
+      // Convert 12-hour time to 24-hour format for backend
+      const convertTo24Hour = (time12: string) => {
+        console.log('⏰ Converting time to 24-hour format:', time12);
+        
+        // If already in 24-hour format (no AM/PM), return as is
+        if (!time12.includes('AM') && !time12.includes('PM')) {
+          console.log('⏰ Time already in 24-hour format:', time12);
+          return time12;
+        }
+        
+        const [time, period] = time12.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour24 = parseInt(hours, 10);
+        
+        if (period === 'PM' && hour24 !== 12) {
+          hour24 += 12;
+        } else if (period === 'AM' && hour24 === 12) {
+          hour24 = 0;
+        }
+        
+        const formattedTime = `${hour24.toString().padStart(2, '0')}:${minutes}`;
+        console.log('⏰ Converted to 24-hour format:', formattedTime);
+        return formattedTime;
+      };
+
       const bookingData = {
         sitter_id: sitterId,
         date: selectedDate, // Use the actual selected date
-        time: selectedTimeRange.startTime,
+        time: convertTo24Hour(selectedTimeRange.startTime), // Convert to 24-hour format
         pet_name: 'My Pet', // Default pet name
         pet_type: 'Dog', // Default pet type
         service_type: 'Pet Sitting',
