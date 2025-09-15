@@ -129,11 +129,11 @@ class AuthService {
       console.error('Error during login:', error);
       
       // Handle specific error types
-      if (error.name === 'AbortError') {
+      if ((error as any).name === 'AbortError') {
         throw new Error('Login request timed out. Please check your internet connection.');
-      } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+      } else if ((error as any).message?.includes('NetworkError') || (error as any).message?.includes('fetch')) {
         throw new Error('Network error. Please check your internet connection.');
-      } else if (error.message.includes('JSON Parse error')) {
+      } else if ((error as any).message?.includes('JSON Parse error')) {
         throw new Error('Server error. Please try again later.');
       }
       
@@ -240,11 +240,11 @@ class AuthService {
       console.error('Error during registration:', error);
       
       // Handle specific error types
-      if (error.name === 'AbortError') {
+      if ((error as any).name === 'AbortError') {
         throw new Error('Registration request timed out. Please check your internet connection.');
-      } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+      } else if ((error as any).message?.includes('NetworkError') || (error as any).message?.includes('fetch')) {
         throw new Error('Network error. Please check your internet connection.');
-      } else if (error.message.includes('JSON Parse error')) {
+      } else if ((error as any).message?.includes('JSON Parse error')) {
         throw new Error('Server error. Please try again later.');
       }
       
@@ -314,14 +314,6 @@ class AuthService {
     return null;
   }
 
-  private async saveUserToStorage(user: User): Promise<void> {
-    try {
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      console.log('User saved to storage successfully');
-    } catch (error) {
-      console.error('Error saving user to storage:', error);
-    }
-  }
 
   async updateUserProfile(profileData: Partial<User>): Promise<User> {
     console.log('AuthService: updateUserProfile called with:', profileData);

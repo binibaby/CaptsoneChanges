@@ -29,7 +29,7 @@ class BookingService {
   private cachedBookings: Booking[] | null = null;
   private cacheExpiry: number = 0;
   private cacheDurationMs: number = 30000; // 30 second cache
-  private pendingApiCall: Promise<Booking[]> | null = null;
+  private pendingApiCall: Promise<Response> | null = null;
 
   private constructor() {}
 
@@ -110,7 +110,9 @@ class BookingService {
       // If there's already a pending API call, wait for it
       if (this.pendingApiCall) {
         console.log('🔄 Waiting for pending API call');
-        return await this.pendingApiCall;
+        const response = await this.pendingApiCall;
+        // Process the response and return bookings
+        return await this.processApiResponse(response);
       }
 
       // Debounce API calls
@@ -150,33 +152,8 @@ class BookingService {
       // Clear the pending call
       this.pendingApiCall = null;
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📅 API bookings response:', data);
-        
-        if (data.success && data.bookings) {
-          // Convert API format to local format
-          const bookings: Booking[] = data.bookings.map((apiBooking: any) => ({
-            id: apiBooking.id.toString(),
-            sitterId: apiBooking.pet_sitter.id.toString(),
-            sitterName: apiBooking.pet_sitter.name,
-            petOwnerId: apiBooking.pet_owner.id.toString(),
-            petOwnerName: apiBooking.pet_owner.name,
-            date: apiBooking.date,
-            startTime: apiBooking.time.split(' - ')[0] || '09:00',
-            endTime: apiBooking.time.split(' - ')[1] || '17:00',
-            hourlyRate: 25, // Default rate since API doesn't include it
-            status: apiBooking.status,
-            createdAt: apiBooking.created_at,
-            updatedAt: apiBooking.created_at,
-          }));
-          
-          console.log('✅ Converted API bookings:', bookings.length);
-          return bookings;
-        }
-      } else {
-        console.log('⚠️ API call failed:', response.status, response.statusText);
-      }
+      // Process the response
+      return await this.processApiResponse(response);
     } catch (error) {
       console.error('Error fetching bookings from API:', error);
       // Clear the pending call on error
@@ -196,6 +173,39 @@ class BookingService {
         'Accept': 'application/json',
       },
     });
+  }
+
+  // Process API response and convert to Booking[]
+  private async processApiResponse(response: Response): Promise<Booking[]> {
+    if (response && response.ok) {
+      const data = await response.json();
+      console.log('📅 API bookings response:', data);
+      
+      if (data.success && data.bookings) {
+        // Convert API format to local format
+        const bookings: Booking[] = data.bookings.map((apiBooking: any) => ({
+          id: apiBooking.id.toString(),
+          sitterId: apiBooking.pet_sitter.id.toString(),
+          sitterName: apiBooking.pet_sitter.name,
+          petOwnerId: apiBooking.pet_owner.id.toString(),
+          petOwnerName: apiBooking.pet_owner.name,
+          date: apiBooking.date,
+          startTime: apiBooking.time.split(' - ')[0] || '09:00',
+          endTime: apiBooking.time.split(' - ')[1] || '17:00',
+          hourlyRate: 25, // Default rate since API doesn't include it
+          status: apiBooking.status,
+          createdAt: apiBooking.created_at,
+          updatedAt: apiBooking.created_at,
+        }));
+        
+        console.log('✅ Converted API bookings:', bookings.length);
+        return bookings;
+      }
+    } else {
+      console.log('⚠️ API call failed:', response?.status, response?.statusText);
+    }
+    
+    return [];
   }
 
   // Get current user (import from auth service)

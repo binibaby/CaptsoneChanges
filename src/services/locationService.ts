@@ -54,13 +54,13 @@ class LocationService {
 
       console.log('Location permissions granted successfully');
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error requesting location permissions:', error);
       
       // Provide more specific error information
-      if (error.message?.includes('NSLocation')) {
+      if (error?.message?.includes('NSLocation')) {
         console.error('iOS location permission keys missing. Please rebuild the app after updating app.json');
-      } else if (error.message?.includes('ACCESS_FINE_LOCATION')) {
+      } else if (error?.message?.includes('ACCESS_FINE_LOCATION')) {
         console.error('Android location permission missing. Please rebuild the app after updating app.json');
       }
       
@@ -104,7 +104,6 @@ class LocationService {
           accuracy: Location.Accuracy.Balanced,
           timeInterval: config.updateInterval,
           distanceInterval: 10, // Update every 10 meters of movement
-          showsBackgroundLocationIndicator: true,
         },
         (location) => {
           this.handleLocationUpdate(location, config);

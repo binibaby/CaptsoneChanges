@@ -86,7 +86,7 @@ class NotificationService {
         return notifications;
       }
 
-      const isPetSitter = user.userType === 'pet_sitter' || user.role === 'pet_sitter';
+      const isPetSitter = user.role === 'pet_sitter';
       console.log('🔍 Filtering notifications for user:', user.id, 'isPetSitter:', isPetSitter);
       console.log('🔍 Total notifications to filter:', notifications.length);
       
@@ -374,7 +374,7 @@ class NotificationService {
     const allNotifications = stored ? JSON.parse(stored) : [];
     
     // Update the specific notification
-    const updated = allNotifications.map(n => 
+    const updated = allNotifications.map((n: Notification) => 
       n.id === notificationId ? { ...n, isRead: true } : n
     );
     
@@ -400,7 +400,7 @@ class NotificationService {
     const allNotifications = stored ? JSON.parse(stored) : [];
     
     // Update all notifications
-    const updated = allNotifications.map(n => ({ ...n, isRead: true }));
+    const updated = allNotifications.map((n: Notification) => ({ ...n, isRead: true }));
     
     // Save back to storage
     await AsyncStorage.setItem('notifications', JSON.stringify(updated));
@@ -417,7 +417,7 @@ class NotificationService {
     const allNotifications = stored ? JSON.parse(stored) : [];
     
     // Remove the specific notification
-    const updated = allNotifications.filter(n => n.id !== notificationId);
+    const updated = allNotifications.filter((n: Notification) => n.id !== notificationId);
     
     // Save back to storage
     await AsyncStorage.setItem('notifications', JSON.stringify(updated));
@@ -590,7 +590,7 @@ class NotificationService {
     
     // Get current user to determine user type
     const user = await this.getCurrentUser();
-    const isPetSitter = user?.userType === 'pet_sitter' || user?.role === 'pet_sitter';
+    const isPetSitter = user?.role === 'pet_sitter';
     
     let sampleNotifications: Notification[] = [];
     

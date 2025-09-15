@@ -58,7 +58,7 @@ class RealtimeLocationService {
       return null;
     }
   }
-  private updateInterval: NodeJS.Timeout | null = null;
+  private updateInterval: ReturnType<typeof setInterval> | null = null;
 
   static getInstance(): RealtimeLocationService {
     if (!RealtimeLocationService.instance) {
@@ -111,7 +111,7 @@ class RealtimeLocationService {
 
       const response = await makeApiCall('/api/location/update', {
         method: 'POST',
-        headers: getAuthHeaders(token),
+        headers: getAuthHeaders(token || undefined),
         body: JSON.stringify({
           latitude: sitter.location.latitude,
           longitude: sitter.location.longitude,
@@ -174,7 +174,7 @@ class RealtimeLocationService {
       const token = await this.getAuthToken();
       const response = await makeApiCall('/api/location/nearby-sitters', {
         method: 'POST',
-        headers: getAuthHeaders(token),
+        headers: getAuthHeaders(token || undefined),
         body: JSON.stringify({
           latitude,
           longitude,
@@ -311,7 +311,7 @@ class RealtimeLocationService {
 
       const response = await makeApiCall('/api/location/status', {
         method: 'POST',
-        headers: getAuthHeaders(token),
+        headers: getAuthHeaders(token || undefined),
         body: JSON.stringify({
           is_online: isOnline,
         }),

@@ -58,14 +58,6 @@ export interface VerificationStatus {
   document_image?: string;
 }
 
-export interface Badge {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  color: string;
-  earned_at: string;
-}
 
 class VerificationService {
   private static instance: VerificationService;
@@ -349,7 +341,7 @@ class VerificationService {
   }
 
   // API method to get verification status from backend
-  async getVerificationStatus(): Promise<{
+  async getVerificationStatusFromAPI(): Promise<{
     success: boolean;
     verification?: VerificationStatus;
     badges: Badge[];
@@ -376,7 +368,7 @@ class VerificationService {
       // Return mock data for development
       return {
         success: true,
-        verification: null,
+        verification: undefined,
         badges: [],
         message: 'No verification submitted yet.'
       };

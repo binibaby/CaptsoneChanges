@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { bookingService, Booking } from '../../services/bookingService';
-import { notificationService } from '../../services/notificationService';
 import authService from '../../services/authService';
+import { Booking, bookingService } from '../../services/bookingService';
+import { notificationService } from '../../services/notificationService';
 
 const PetSitterRequestsScreen = () => {
   const router = useRouter();
@@ -77,7 +77,9 @@ const PetSitterRequestsScreen = () => {
                 await notificationService.createBookingConfirmationNotification({
                   sitterId: updatedBooking.sitterId,
                   sitterName: updatedBooking.sitterName,
+                  petOwnerId: updatedBooking.petOwnerId,
                   petOwnerName: updatedBooking.petOwnerName,
+                  bookingId: updatedBooking.id,
                   date: updatedBooking.date,
                   startTime: updatedBooking.startTime,
                   endTime: updatedBooking.endTime,
@@ -113,7 +115,9 @@ const PetSitterRequestsScreen = () => {
                 await notificationService.createBookingConfirmationNotification({
                   sitterId: updatedBooking.sitterId,
                   sitterName: updatedBooking.sitterName,
+                  petOwnerId: updatedBooking.petOwnerId,
                   petOwnerName: updatedBooking.petOwnerName,
+                  bookingId: updatedBooking.id,
                   date: updatedBooking.date,
                   startTime: updatedBooking.startTime,
                   endTime: updatedBooking.endTime,
@@ -260,7 +264,9 @@ const PetSitterRequestsScreen = () => {
                 onPress={() => handleViewDetails(request)}
               >
                 <View style={styles.requestHeader}>
-                  <Image source={request.avatar} style={styles.ownerAvatar} />
+                  <View style={styles.ownerAvatar}>
+                    <Ionicons name="person" size={24} color="#666" />
+                  </View>
                   <View style={styles.requestInfo}>
                     <Text style={styles.ownerName}>{request.petOwnerName}</Text>
                     <Text style={styles.requestDate}>{request.date}</Text>
@@ -271,25 +277,33 @@ const PetSitterRequestsScreen = () => {
                 </View>
 
                 <View style={styles.petInfo}>
-                  <Image source={request.petImage} style={styles.petImage} />
+                  {request.petImage ? (
+                    <Image source={{ uri: request.petImage }} style={styles.petImage} />
+                  ) : (
+                    <View style={styles.petImagePlaceholder}>
+                      <Ionicons name="paw" size={24} color="#666" />
+                    </View>
+                  )}
                   <View style={styles.petDetails}>
-                    <Text style={styles.petName}>{request.petName}</Text>
-                    <Text style={styles.petBreed}>{request.petBreed}</Text>
+                    <Text style={styles.petName}>{request.petName || 'Pet'}</Text>
+                    <Text style={styles.petBreed}>Pet Details</Text>
                   </View>
                 </View>
 
                 <View style={styles.bookingDetails}>
                   <View style={styles.detailItem}>
                     <Ionicons name="time-outline" size={16} color="#666" />
-                    <Text style={styles.detailText}>{request.time}</Text>
+                    <Text style={styles.detailText}>{request.startTime} - {request.endTime}</Text>
                   </View>
                   <View style={styles.detailItem}>
                     <Ionicons name="cash-outline" size={16} color="#666" />
-                    <Text style={styles.detailText}>{request.rate}</Text>
+                    <Text style={styles.detailText}>${request.hourlyRate}/hour</Text>
                   </View>
                 </View>
 
-                <Text style={styles.messageText} numberOfLines={2}>{request.message}</Text>
+                {request.specialInstructions && (
+                  <Text style={styles.messageText} numberOfLines={2}>{request.specialInstructions}</Text>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -401,6 +415,15 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 12,
+  },
+  petImagePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   petDetails: {
     flex: 1,

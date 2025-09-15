@@ -1,27 +1,18 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { getApiUrl, getAuthHeaders } from '../../constants/config';
+import { getAuthHeaders } from '../../constants/config';
 import { networkService } from '../../services/networkService';
-import { RootStackParamList } from '../../navigation/types';
-
-type PhoneVerificationScreenNavigationProp = StackNavigationProp<RootStackParamList, 'PhoneVerification'>;
-type PhoneVerificationScreenRouteProp = {
-  params?: {
-    userData: any;
-  };
-};
 
 interface PhoneVerificationScreenProps {
   userData?: any;
@@ -29,14 +20,12 @@ interface PhoneVerificationScreenProps {
 }
 
 const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userData: propUserData, onPhoneVerified }) => {
-  const navigation = useNavigation<PhoneVerificationScreenNavigationProp>();
-  const route = useRoute<PhoneVerificationScreenRouteProp>();
+  const router = useRouter();
   
-  // Get userData from either props or route params
-  const userData = propUserData || route.params?.userData;
+  // Get userData from props (since we're using Expo Router)
+  const userData = propUserData;
   
   console.log('PhoneVerificationScreen - propUserData:', propUserData);
-  console.log('PhoneVerificationScreen - route.params:', route.params);
   console.log('PhoneVerificationScreen - final userData:', userData);
   console.log('PhoneVerificationScreen - onPhoneVerified callback:', !!onPhoneVerified);
 
@@ -54,7 +43,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     }
 
     setIsLoading(true);
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let controller: AbortController | null = null;
     
     try {
@@ -192,7 +181,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     }
 
     setIsLoading(true);
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let controller: AbortController | null = null;
     
     try {
@@ -247,12 +236,9 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
           console.log('Using callback for navigation');
           onPhoneVerified(true);
         } else {
-          console.log('Using navigation prop');
-          // Navigate to front ID screen with all collected data
-          navigation.navigate('FrontID', {
-            userData: userData,
-            phoneVerified: true,
-          });
+          console.log('No callback available, staying on current screen');
+          // If no callback is provided, we stay on the current screen
+          // The parent component should handle navigation
         }
       } else {
         Alert.alert('Error', data.message || 'Invalid verification code');
