@@ -16,19 +16,23 @@ import SitterProfilePopup from '../../components/SitterProfilePopup';
 import { useAuth } from '../../contexts/AuthContext';
 import realtimeLocationService from '../../services/realtimeLocationService';
 
-// Conditional imports for react-native-maps (only on native platforms)
-let MapView: any = null;
-let Marker: any = null;
-
-if (Platform.OS !== 'web') {
+// Lazy import for react-native-maps to avoid duplicate registration
+const getMapComponents = () => {
+  if (Platform.OS === 'web') {
+    return { MapView: null, Marker: null };
+  }
+  
   try {
     const Maps = require('react-native-maps');
-    MapView = Maps.default;
-    Marker = Maps.Marker;
+    return {
+      MapView: Maps.default || Maps.MapView,
+      Marker: Maps.Marker
+    };
   } catch (error) {
     console.warn('react-native-maps not available:', error);
+    return { MapView: null, Marker: null };
   }
-}
+};
 
 // Type definitions for react-native-maps
 interface Region {
@@ -371,53 +375,60 @@ const FindSitterMapScreen = () => {
             showsPointsOfInterest={false}
             ref={mapRef}
           />
-        ) : MapView ? (
-          <MapView
-            style={StyleSheet.absoluteFill}
-            initialRegion={initialRegion}
-            showsUserLocation
-            showsPointsOfInterest={false}
-            ref={mapRef}
-          >
-            {filteredSitters.map((sitter) => (
-              <Marker
-                key={sitter.id}
-                coordinate={sitter.location}
-                title={sitter.name}
-                description={`₱${sitter.hourlyRate}/hr • ${sitter.rating}⭐ • ${sitter.isOnline ? 'Available' : 'Offline'}`}
-                onPress={() => handleSitterPress(sitter.id)}
+        ) : (() => {
+          const { MapView: NativeMapView, Marker: NativeMarker } = getMapComponents();
+          if (NativeMapView) {
+            return (
+              <NativeMapView
+                style={StyleSheet.absoluteFill}
+                initialRegion={initialRegion}
+                showsUserLocation
+                showsPointsOfInterest={false}
+                ref={mapRef}
               >
-                <View style={styles.markerContainer}>
-                  <View style={[
-                    styles.markerProfileImage,
-                    { borderColor: sitter.isOnline ? '#10B981' : '#6B7280' }
-                  ]}>
-                    <Image 
-                      source={getImageSource(sitter)} 
-                      style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                      }}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  {sitter.isOnline && (
-                    <View style={styles.onlinePulse} />
-                  )}
-                </View>
-              </Marker>
-            ))}
-          </MapView>
-        ) : (
-          <PlatformMap
-            style={StyleSheet.absoluteFill}
-            initialRegion={initialRegion}
-            showsUserLocation
-            showsPointsOfInterest={false}
-            ref={mapRef}
-          />
-        )}
+                {filteredSitters.map((sitter) => (
+                  <NativeMarker
+                    key={sitter.id}
+                    coordinate={sitter.location}
+                    title={sitter.name}
+                    description={`₱${sitter.hourlyRate}/hr • ${sitter.rating}⭐ • ${sitter.isOnline ? 'Available' : 'Offline'}`}
+                    onPress={() => handleSitterPress(sitter.id)}
+                  >
+                    <View style={styles.markerContainer}>
+                      <View style={[
+                        styles.markerProfileImage,
+                        { borderColor: sitter.isOnline ? '#10B981' : '#6B7280' }
+                      ]}>
+                        <Image 
+                          source={getImageSource(sitter)} 
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 21,
+                          }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                      {sitter.isOnline && (
+                        <View style={styles.onlinePulse} />
+                      )}
+                    </View>
+                  </NativeMarker>
+                ))}
+              </NativeMapView>
+            );
+          } else {
+            return (
+              <PlatformMap
+                style={StyleSheet.absoluteFill}
+                initialRegion={initialRegion}
+                showsUserLocation
+                showsPointsOfInterest={false}
+                ref={mapRef}
+              />
+            );
+          }
+        })()}
       </View>
 
       {/* Recenter button */}
@@ -804,4 +815,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FindSitterMapScreen; 
+export default FindSitterMapScreen;
