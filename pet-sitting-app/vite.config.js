@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
     plugins: [
@@ -12,7 +12,7 @@ export default defineConfig({
         host: '0.0.0.0',
         port: 5173,
         hmr: {
-            host: '172.20.10.2',
+            host: '192.168.100.184',
             port: 5173,
         },
         cors: true,

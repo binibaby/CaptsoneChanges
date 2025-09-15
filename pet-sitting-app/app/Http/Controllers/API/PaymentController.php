@@ -9,8 +9,6 @@ use App\Models\User;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Stripe\Stripe;
-use Stripe\PaymentIntent;
 
 class PaymentController extends Controller
 {
@@ -21,7 +19,7 @@ class PaymentController extends Controller
         $request->validate([
             'booking_id' => 'required|exists:bookings,id',
             'amount' => 'required|numeric|min:0',
-            'payment_method' => 'required|in:stripe,gcash,maya',
+            'payment_method' => 'required|in:gcash,maya',
             'payment_details' => 'required|array'
         ]);
 
@@ -113,71 +111,6 @@ class PaymentController extends Controller
         }
     }
 
-    public function processStripePayment(Request $request)
-    {
-        $request->validate([
-            'booking_id' => 'required|exists:bookings,id',
-            'amount' => 'required|numeric|min:0',
-            'payment_method_id' => 'required|string'
-        ]);
-
-        $booking = Booking::find($request->booking_id);
-        $totalAmount = $request->amount;
-        $platformFee = ($totalAmount * $this->platformFeePercentage) / 100;
-        $sitterShare = $totalAmount - $platformFee;
-
-        try {
-            // Set Stripe API key
-            Stripe::setApiKey(config('services.stripe.secret'));
-
-            // Create payment intent
-            $paymentIntent = PaymentIntent::create([
-                'amount' => $totalAmount * 100, // Convert to cents
-                'currency' => 'php',
-                'payment_method' => $request->payment_method_id,
-                'confirmation_method' => 'manual',
-                'confirm' => true,
-                'return_url' => config('app.url') . '/payment/return'
-            ]);
-
-            // Create payment record
-            $payment = Payment::create([
-                'booking_id' => $booking->id,
-                'amount' => $totalAmount,
-                'method' => 'stripe',
-                'app_share' => $platformFee,
-                'sitter_share' => $sitterShare,
-                'status' => 'paid',
-                'transaction_id' => $paymentIntent->id,
-                'processed_at' => now()
-            ]);
-
-            // Update booking
-            $booking->update(['status' => 'confirmed']);
-
-            // Notify all parties
-            $this->notifyPaymentSuccess($payment, $booking);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Stripe payment processed successfully!',
-                'payment' => [
-                    'id' => $payment->id,
-                    'amount' => $payment->amount,
-                    'platform_fee' => $payment->app_share,
-                    'sitter_amount' => $payment->sitter_share,
-                    'status' => $payment->status,
-                    'stripe_payment_intent' => $paymentIntent->id
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Stripe payment failed: ' . $e->getMessage()
-            ], 500);
-        }
-    }
 
     public function processGcashPayment(Request $request)
     {

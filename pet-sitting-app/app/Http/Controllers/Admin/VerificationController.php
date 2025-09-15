@@ -11,10 +11,33 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
+/**
+ * @method int|null id() Get the ID of the currently authenticated user
+ * @method \App\Models\User|null user() Get the currently authenticated user
+ */
 class VerificationController extends Controller
 {
+    /**
+     * Get the authenticated user ID
+     * @return int|null
+     */
+    private function getAuthId(): ?int
+    {
+        return $this->getAuthId();
+    }
+
+    /**
+     * Get the authenticated user
+     * @return \App\Models\User|null
+     */
+    private function getAuthUser(): ?User
+    {
+        return Auth::user();
+    }
+
     /**
      * Display verification management page
      */
@@ -168,7 +191,7 @@ class VerificationController extends Controller
             $verification->update([
                 'status' => 'approved',
                 'verified_at' => now(),
-                'verified_by' => auth()->id(),
+                'verified_by' => $this->getAuthId(),
                 'admin_notes' => $request->admin_notes,
                 'confidence_level' => $request->confidence_level,
                 'verification_method' => $request->verification_method
@@ -178,13 +201,13 @@ class VerificationController extends Controller
             $verification->user->update([
                 'status' => 'active',
                 'approved_at' => now(),
-                'approved_by' => auth()->id()
+                'approved_by' => $this->getAuthId()
             ]);
 
             // Create audit log
             VerificationAuditLog::create([
                 'verification_id' => $verification->id,
-                'admin_id' => auth()->id(),
+                'admin_id' => $this->getAuthId(),
                 'action' => 'approved',
                 'reason' => $request->admin_notes ?? 'ID verification approved',
                 'ip_address' => $request->ip(),
@@ -200,12 +223,12 @@ class VerificationController extends Controller
             ]);
 
             // Notify all admins
-            $admins = User::where('is_admin', true)->where('id', '!=', auth()->id())->get();
+            $admins = User::where('is_admin', true)->where('id', '!=', $this->getAuthId())->get();
             foreach ($admins as $admin) {
                 Notification::create([
                     'user_id' => $admin->id,
                     'type' => 'admin',
-                    'message' => "ID verification approved by " . auth()->user()->name . " for user: {$verification->user->name} ({$verification->user->email})"
+                    'message' => "ID verification approved by " . $this->getAuthUser()->name . " for user: {$verification->user->name} ({$verification->user->email})"
                 ]);
             }
 
@@ -213,7 +236,7 @@ class VerificationController extends Controller
             Log::info('ID Verification Approved', [
                 'verification_id' => $verification->id,
                 'user_id' => $verification->user_id,
-                'admin_id' => auth()->id(),
+                'admin_id' => $this->getAuthId(),
                 'confidence_level' => $request->confidence_level,
                 'ip_address' => $request->ip()
             ]);
@@ -227,7 +250,7 @@ class VerificationController extends Controller
                     'id' => $verification->id,
                     'status' => $verification->status,
                     'verified_at' => $verification->verified_at->format('Y-m-d H:i:s'),
-                    'verified_by' => auth()->user()->name
+                    'verified_by' => $this->getAuthUser()->name
                 ]
             ]);
 
@@ -235,7 +258,7 @@ class VerificationController extends Controller
             DB::rollBack();
             Log::error('ID Verification Approval Failed', [
                 'verification_id' => $id,
-                'admin_id' => auth()->id(),
+                'admin_id' => $this->getAuthId(),
                 'error' => $e->getMessage()
             ]);
 
@@ -280,7 +303,7 @@ class VerificationController extends Controller
             $verification->update([
                 'status' => 'rejected',
                 'verified_at' => now(),
-                'verified_by' => auth()->id(),
+                'verified_by' => $this->getAuthId(),
                 'rejection_reason' => $request->reason,
                 'rejection_category' => $request->rejection_category,
                 'allow_resubmission' => $request->allow_resubmission
@@ -291,14 +314,14 @@ class VerificationController extends Controller
             $verification->user->update([
                 'status' => $userStatus,
                 'denied_at' => now(),
-                'denied_by' => auth()->id(),
+                'denied_by' => $this->getAuthId(),
                 'denial_reason' => $request->reason
             ]);
 
             // Create audit log
             VerificationAuditLog::create([
                 'verification_id' => $verification->id,
-                'admin_id' => auth()->id(),
+                'admin_id' => $this->getAuthId(),
                 'action' => 'rejected',
                 'reason' => $request->reason,
                 'ip_address' => $request->ip(),
@@ -319,12 +342,12 @@ class VerificationController extends Controller
             ]);
 
             // Notify all admins
-            $admins = User::where('is_admin', true)->where('id', '!=', auth()->id())->get();
+            $admins = User::where('is_admin', true)->where('id', '!=', $this->getAuthId())->get();
             foreach ($admins as $admin) {
                 Notification::create([
                     'user_id' => $admin->id,
                     'type' => 'admin',
-                    'message' => "ID verification rejected by " . auth()->user()->name . " for user: {$verification->user->name}. Reason: {$request->rejection_category}"
+                    'message' => "ID verification rejected by " . $this->getAuthUser()->name . " for user: {$verification->user->name}. Reason: {$request->rejection_category}"
                 ]);
             }
 
@@ -332,7 +355,7 @@ class VerificationController extends Controller
             Log::warning('ID Verification Rejected', [
                 'verification_id' => $verification->id,
                 'user_id' => $verification->user_id,
-                'admin_id' => auth()->id(),
+                'admin_id' => $this->getAuthId(),
                 'rejection_category' => $request->rejection_category,
                 'allow_resubmission' => $request->allow_resubmission,
                 'ip_address' => $request->ip()
@@ -347,7 +370,7 @@ class VerificationController extends Controller
                     'id' => $verification->id,
                     'status' => $verification->status,
                     'verified_at' => $verification->verified_at->format('Y-m-d H:i:s'),
-                    'verified_by' => auth()->user()->name,
+                    'verified_by' => $this->getAuthUser()->name,
                     'rejection_reason' => $verification->rejection_reason
                 ]
             ]);
@@ -356,7 +379,7 @@ class VerificationController extends Controller
             DB::rollBack();
             Log::error('ID Verification Rejection Failed', [
                 'verification_id' => $id,
-                'admin_id' => auth()->id(),
+                'admin_id' => $this->getAuthId(),
                 'error' => $e->getMessage()
             ]);
 

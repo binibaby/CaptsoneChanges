@@ -75,7 +75,7 @@ const MyPetsScreen = () => {
             console.log('Loading pets from backend for user:', user.id);
             console.log('Using token:', user.token ? 'Present' : 'Missing');
             
-            const response = await fetch('http://172.20.10.2:8000/api/pets', {
+            const response = await fetch('http://192.168.100.184:8000/api/pets', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${user.token}`,
@@ -181,7 +181,7 @@ const MyPetsScreen = () => {
             console.log('Saving pet with token:', user.token ? 'Present' : 'Missing');
             console.log('Pet data:', petData);
 
-            const response = await fetch('http://172.20.10.2:8000/api/pets', {
+            const response = await fetch('http://192.168.100.184:8000/api/pets', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${user.token}`,

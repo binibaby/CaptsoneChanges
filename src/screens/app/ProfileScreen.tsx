@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -29,7 +29,8 @@ const ProfileScreen = () => {
     address: user?.address
   });
   
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
+  const [imageError, setImageError] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newSpecialty, setNewSpecialty] = useState('');
   const [profileData, setProfileData] = useState<{
@@ -59,6 +60,52 @@ const ProfileScreen = () => {
 
   console.log('ProfileScreen: Current profileData:', profileData);
 
+  // Helper function to validate image URI
+  const isValidImageUri = (uri: string | null): boolean => {
+    if (!uri || uri.trim() === '') return false;
+    // Check if it's a valid URL or local file path
+    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+  };
+
+  // Helper function to get full image URL
+  const getFullImageUrl = (uri: string | null): string | null => {
+    if (!uri) return null;
+    if (uri.startsWith('http')) return uri;
+    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    return uri;
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle image load success
+  const handleImageLoad = () => {
+    setImageError(false);
+  };
+
+  // Sync profile image with user data - always sync when user data changes
+  useEffect(() => {
+    console.log('🔍 ProfileScreen: useEffect triggered, user profileImage:', user?.profileImage);
+    console.log('🔍 ProfileScreen: Current local profileImage state:', profileImage);
+    console.log('🔍 ProfileScreen: User object:', user);
+    
+    // Always sync with user data when it changes
+    // This ensures the profile image updates when user data is refreshed
+    if (user?.profileImage && user.profileImage !== profileImage) {
+      console.log('✅ ProfileScreen: Updating profile image from user data:', user.profileImage);
+      setProfileImage(user.profileImage);
+      setImageError(false);
+    } else if (!user?.profileImage && profileImage) {
+      console.log('❌ ProfileScreen: User has no profile image, clearing local state');
+      setProfileImage(null);
+      setImageError(false);
+    } else {
+      console.log('🔄 ProfileScreen: Profile image already in sync');
+    }
+  }, [user?.profileImage]);
+
   // Show loading state while auth context is loading
   if (isLoading) {
     return (
@@ -70,20 +117,14 @@ const ProfileScreen = () => {
 
   // Update profileData when user changes
   React.useEffect(() => {
-    console.log('ProfileScreen: useEffect triggered with user:', user);
-    console.log('ProfileScreen: Current profileImage state:', profileImage);
+    console.log('🚀 ProfileScreen: Main useEffect triggered with user:', user);
+    console.log('🚀 ProfileScreen: Current profileImage state:', profileImage);
     if (user) {
-      console.log('Profile screen: Loading user data from auth context:', user);
-      console.log('Profile screen: User profileImage field:', user.profileImage);
+      console.log('📱 Profile screen: Loading user data from auth context:', user);
+      console.log('📱 Profile screen: User profileImage field:', user.profileImage);
       
-      // Set profile image from user data
-      if (user.profileImage) {
-        console.log('ProfileScreen: Setting profile image from user data:', user.profileImage);
-        setProfileImage(user.profileImage);
-      } else {
-        console.log('ProfileScreen: No profile image in user data');
-        setProfileImage(null);
-      }
+      // Profile image is handled by the separate useEffect above
+      console.log('📱 ProfileScreen: Profile image will be handled by sync useEffect');
       
       // Safely extract name parts with proper fallbacks
       const userName = user.name || '';
@@ -210,6 +251,7 @@ const ProfileScreen = () => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
         setProfileImage(imageUri);
+        setImageError(false);
         
         // Upload image to backend
         await uploadProfileImage(imageUri);
@@ -228,10 +270,10 @@ const ProfileScreen = () => {
         name: 'profile_image.jpg',
       } as any);
 
-      console.log('Uploading profile image to:', 'http://172.20.10.2:8000/api/profile/upload-image');
+      console.log('Uploading profile image to:', 'http://192.168.100.184:8000/api/profile/upload-image');
       console.log('User token:', user?.token ? 'Present' : 'Missing');
 
-      const response = await fetch('http://172.20.10.2:8000/api/profile/upload-image', {
+      const response = await fetch('http://192.168.100.184:8000/api/profile/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user?.token || ''}`,
@@ -257,11 +299,17 @@ const ProfileScreen = () => {
         console.log('Profile image uploaded successfully:', result.profile_image);
         // Update the local state immediately to show the new image
         setProfileImage(result.profile_image);
+        setImageError(false);
+        console.log('ProfileScreen: Local profileImage state updated to:', result.profile_image);
+        
         // Update the user context with the new profile image
         await updateUserProfile({ profileImage: result.profile_image });
+        console.log('ProfileScreen: User context updated with profile image');
+        
         Alert.alert('Success', 'Profile image updated successfully!');
       } else {
         console.error('Failed to upload profile image:', result.message);
+        setImageError(true);
         Alert.alert('Error', result.message || 'Failed to upload profile image');
       }
     } catch (error) {
@@ -365,9 +413,31 @@ const ProfileScreen = () => {
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <TouchableOpacity onPress={pickProfileImage}>
+          {console.log('🖼️ ProfileScreen: Rendering image with:', {
+            profileImage,
+            isValidUri: isValidImageUri(profileImage),
+            imageError,
+            willShowDefault: !(profileImage && isValidImageUri(profileImage) && !imageError)
+          })}
           <Image
-              source={profileImage ? { uri: profileImage } : require('../../assets/images/default-avatar.png')}
+            source={
+              profileImage && isValidImageUri(profileImage) && !imageError 
+                ? { uri: getFullImageUrl(profileImage) } 
+                : require('../../assets/images/default-avatar.png')
+            }
             style={styles.profileImage}
+            onError={(error) => {
+              console.log('❌ ProfileScreen: Image load error:', error);
+              console.log('❌ ProfileScreen: Failed to load image URI:', profileImage);
+              console.log('❌ ProfileScreen: isValidImageUri result:', isValidImageUri(profileImage));
+              console.log('❌ ProfileScreen: imageError state:', imageError);
+              handleImageError();
+            }}
+            onLoad={() => {
+              console.log('✅ ProfileScreen: Image loaded successfully:', profileImage);
+              handleImageLoad();
+            }}
+            defaultSource={require('../../assets/images/default-avatar.png')}
           />
             <View style={styles.cameraIconOverlay}>
               <Ionicons name="camera" size={20} color="#fff" />

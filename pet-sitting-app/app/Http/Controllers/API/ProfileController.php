@@ -53,7 +53,7 @@ class ProfileController extends Controller
                 $file = $request->file('profile_image');
                 $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
                 $path = $file->storeAs('profile_images', $filename, 'public');
-                $profileImageUrl = Storage::disk('public')->url($path);
+                $profileImageUrl = '/storage/' . $path;
                 
                 // Delete old profile image if exists
                 if ($user->profile_image) {
@@ -157,7 +157,7 @@ class ProfileController extends Controller
             $file = $request->file('profile_image');
             $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs('profile_images', $filename, 'public');
-            $profileImageUrl = Storage::disk('public')->url($path);
+            $profileImageUrl = '/storage/' . $path;
             
             // Delete old profile image if exists
             if ($user->profile_image) {

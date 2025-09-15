@@ -42,13 +42,19 @@ class LocationController extends Controller
             ], 403);
         }
 
+        // Generate address from coordinates if not provided
+        $address = $request->address;
+        if (!$address) {
+            $address = $this->generateAddressFromCoordinates($request->latitude, $request->longitude);
+        }
+
         $locationData = [
             'user_id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
             'latitude' => $request->latitude,
             'longitude' => $request->longitude,
-            'address' => $request->address ?: 'Location not available',
+            'address' => $address,
             'specialties' => $user->specialties ?: ['General Pet Care'],
             'experience' => $user->experience ?: '1 year',
             'pet_types' => $user->selected_pet_types ?: ['dogs', 'cats'],
@@ -69,10 +75,18 @@ class LocationController extends Controller
         $cacheKey = "sitter_location_{$user->id}";
         Cache::put($cacheKey, $locationData, 300); // 5 minutes
 
-        // Also store in a global sitters list
+        // Also store in a global sitters list (only if online)
         $sittersKey = 'active_sitters';
         $activeSitters = Cache::get($sittersKey, []);
-        $activeSitters[$user->id] = $locationData;
+        
+        if ($locationData['is_online']) {
+            // Only add to active sitters if online
+            $activeSitters[$user->id] = $locationData;
+        } else {
+            // Remove from active sitters if offline
+            unset($activeSitters[$user->id]);
+        }
+        
         Cache::put($sittersKey, $activeSitters, 300);
 
         Log::info('📍 Pet sitter location updated', [
@@ -240,10 +254,16 @@ class LocationController extends Controller
             // Update in global sitters list
             $sittersKey = 'active_sitters';
             $activeSitters = Cache::get($sittersKey, []);
-            if (isset($activeSitters[$user->id])) {
+            
+            if ($isOnline) {
+                // If going online, add/update in active sitters list
                 $activeSitters[$user->id] = $locationData;
-                Cache::put($sittersKey, $activeSitters, 300);
+            } else {
+                // If going offline, remove from active sitters list entirely
+                unset($activeSitters[$user->id]);
             }
+            
+            Cache::put($sittersKey, $activeSitters, 300);
         }
 
         Log::info('👤 Pet sitter status updated', [
@@ -388,6 +408,21 @@ class LocationController extends Controller
                 'success' => false,
                 'message' => 'Failed to save availability'
             ], 500);
+        }
+    }
+
+    /**
+     * Generate address from coordinates
+     */
+    private function generateAddressFromCoordinates($latitude, $longitude)
+    {
+        try {
+            // Use a simple reverse geocoding approach
+            // For now, return coordinates as a readable format
+            return number_format($latitude, 4) . ', ' . number_format($longitude, 4);
+        } catch (\Exception $e) {
+            Log::error('Failed to generate address from coordinates: ' . $e->getMessage());
+            return number_format($latitude, 4) . ', ' . number_format($longitude, 4);
         }
     }
 

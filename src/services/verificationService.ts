@@ -349,7 +349,7 @@ class VerificationService {
   }> {
     try {
       // In a real implementation, this would call your backend API
-      const response = await fetch('http://172.20.10.2:8000/api/verification/status', {
+      const response = await fetch('http://192.168.100.184:8000/api/verification/status', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -389,7 +389,7 @@ class VerificationService {
   }> {
     try {
       // Send as JSON instead of FormData
-      const response = await fetch('http://172.20.10.2:8000/api/verification/submit', {
+      const response = await fetch('http://192.168.100.184:8000/api/verification/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -424,7 +424,7 @@ class VerificationService {
     message?: string;
   }> {
     try {
-      const response = await fetch('http://172.20.10.2:8000/api/verification/session-status', {
+      const response = await fetch('http://192.168.100.184:8000/api/verification/session-status', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -457,7 +457,7 @@ class VerificationService {
     }>;
   }> {
     try {
-      const response = await fetch('http://172.20.10.2:8000/api/verification/philippine-ids', {
+      const response = await fetch('http://192.168.100.184:8000/api/verification/philippine-ids', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

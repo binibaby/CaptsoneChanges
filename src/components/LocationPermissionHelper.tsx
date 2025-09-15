@@ -22,69 +22,30 @@ const LocationPermissionHelper: React.FC<LocationPermissionHelperProps> = ({
   const [isRequesting, setIsRequesting] = useState(false);
 
   const requestLocationPermission = async () => {
+    console.log('🔍 Location permission button clicked');
     setIsRequesting(true);
     
     try {
-      console.log('🔍 Requesting location permissions...');
+      // Request foreground permissions directly
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('Permission request result:', status);
       
-      // Check current permission status
-      const { status: currentStatus } = await Location.getForegroundPermissionsAsync();
-      console.log('Current permission status:', currentStatus);
-      
-      if (currentStatus === 'granted') {
-        console.log('✅ Location permission already granted');
+      if (status === 'granted') {
+        console.log('✅ Location permission granted');
         onPermissionGranted?.();
-        setIsRequesting(false);
-        return;
-      }
-
-      // Request foreground permissions
-      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-      console.log('Foreground permission result:', foregroundStatus);
-      
-      if (foregroundStatus !== 'granted') {
-        console.log('❌ Foreground location permission denied');
+      } else {
+        console.log('❌ Location permission denied');
         Alert.alert(
           'Location Permission Required',
-          'This app needs location access to show nearby pet sitters and provide location-based services. Please enable location permissions in your device settings.',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => onPermissionDenied?.() },
-            { text: 'Open Settings', onPress: () => {
-              // In a real app, you would use Linking.openSettings()
-              console.log('Would open device settings');
-              onPermissionDenied?.();
-            }}
-          ]
+          'Please enable location access in your device settings to use this feature.',
+          [{ text: 'OK' }]
         );
-        setIsRequesting(false);
-        return;
+        onPermissionDenied?.();
       }
-
-      // Request background permissions for iOS
-      if (Platform.OS === 'ios') {
-        try {
-          const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-          console.log('Background permission result:', backgroundStatus);
-          
-          if (backgroundStatus !== 'granted') {
-            console.log('⚠️ Background location permission denied, using foreground only');
-          }
-        } catch (backgroundError) {
-          console.log('Background permission request failed:', backgroundError);
-          // Continue with foreground only
-        }
-      }
-
-      console.log('✅ Location permissions granted successfully');
-      onPermissionGranted?.();
-      
     } catch (error) {
       console.error('❌ Error requesting location permissions:', error);
-      Alert.alert(
-        'Permission Error',
-        'Failed to request location permissions. Please check your device settings and try again.',
-        [{ text: 'OK', onPress: () => onPermissionDenied?.() }]
-      );
+      Alert.alert('Error', 'Failed to request location permissions');
+      onPermissionDenied?.();
     } finally {
       setIsRequesting(false);
     }
@@ -93,32 +54,29 @@ const LocationPermissionHelper: React.FC<LocationPermissionHelperProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Ionicons name="location" size={32} color="#F59E0B" />
+        <Ionicons name="location" size={20} color="#F59E0B" />
       </View>
       
-      <Text style={styles.title}>Location Access Required</Text>
+      <Text style={styles.title}>Enable Location</Text>
       <Text style={styles.description}>
-        To find nearby pet sitters and share your location, we need access to your device's location services.
+        Allow location access to find nearby pet sitters.
       </Text>
       
       <TouchableOpacity
         style={[styles.button, isRequesting && styles.buttonDisabled]}
         onPress={requestLocationPermission}
         disabled={isRequesting}
+        activeOpacity={0.7}
       >
         <Ionicons 
           name={isRequesting ? "hourglass" : "location"} 
-          size={20} 
+          size={16} 
           color="#fff" 
         />
         <Text style={styles.buttonText}>
-          {isRequesting ? 'Requesting...' : 'Enable Location Access'}
+          {isRequesting ? 'Requesting...' : 'Enable Location'}
         </Text>
       </TouchableOpacity>
-      
-      <Text style={styles.note}>
-        Your location data is only used to provide pet sitting services and is not shared with third parties.
-      </Text>
     </View>
   );
 };

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -18,7 +18,9 @@ const PetOwnerProfileScreen = () => {
   const router = useRouter();
   const { user, logout, updateUserProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
+  const [imageError, setImageError] = useState(false);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -32,7 +34,7 @@ const PetOwnerProfileScreen = () => {
   // Update profile data when user changes
   useEffect(() => {
     if (user) {
-      console.log('PetOwnerProfileScreen: Loading user data from auth context:', user);
+      console.log('📱 PetOwnerProfileScreen: Updating profile data from user:', user);
       setProfile({
         name: user.name || '',
         email: user.email || '',
@@ -42,7 +44,6 @@ const PetOwnerProfileScreen = () => {
         emergencyContact: '', // New users start with no emergency contact
         emergencyPhone: '',
       });
-      setProfileImage(user.profileImage || null);
     }
   }, [user]);
 
@@ -75,6 +76,66 @@ const PetOwnerProfileScreen = () => {
     );
   };
 
+  // Helper function to validate image URI
+  const isValidImageUri = (uri: string | null): boolean => {
+    if (!uri || uri.trim() === '') return false;
+    // Check if it's a valid URL or local file path
+    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+  };
+
+  // Helper function to get full image URL
+  const getFullImageUrl = (uri: string | null): string | null => {
+    if (!uri) return null;
+    if (uri.startsWith('http')) return uri;
+    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    return uri;
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle image load success
+  const handleImageLoad = () => {
+    setImageError(false);
+  };
+
+  // Profile image persistence - sync when user data changes
+  useEffect(() => {
+    console.log('🔄 PetOwnerProfileScreen: useEffect triggered for profile image sync');
+    console.log('🔄 PetOwnerProfileScreen: user.profileImage:', user?.profileImage);
+    console.log('🔄 PetOwnerProfileScreen: current profileImage state:', profileImage);
+    
+    if (user && user.profileImage && user.profileImage !== profileImage) {
+      console.log('✅ PetOwnerProfileScreen: Updating profile image from user data:', user.profileImage);
+      setProfileImage(user.profileImage);
+      setImageError(false);
+    } else if (!user?.profileImage && profileImage) {
+      console.log('❌ PetOwnerProfileScreen: User has no profile image, clearing local state');
+      setProfileImage(null);
+      setImageError(false);
+    } else {
+      console.log('🔄 PetOwnerProfileScreen: Profile image already in sync');
+    }
+  }, [user?.profileImage]);
+
+  // Also sync when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🎯 PetOwnerProfileScreen: useFocusEffect triggered');
+      if (user && user.profileImage) {
+        console.log('✅ PetOwnerProfileScreen: Focus sync - updating profile image:', user.profileImage);
+        setProfileImage(user.profileImage);
+        setImageError(false);
+      } else if (user && !user.profileImage) {
+        console.log('❌ PetOwnerProfileScreen: Focus sync - no profile image in user data');
+        setProfileImage(null);
+        setImageError(false);
+      }
+    }, [user?.profileImage])
+  );
+
 
   const pickProfileImage = async () => {
     try {
@@ -92,7 +153,10 @@ const PetOwnerProfileScreen = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await uploadProfileImage(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        setProfileImage(imageUri);
+        setImageError(false);
+        await uploadProfileImage(imageUri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -115,7 +179,10 @@ const PetOwnerProfileScreen = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        await uploadProfileImage(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        setProfileImage(imageUri);
+        setImageError(false);
+        await uploadProfileImage(imageUri);
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -132,10 +199,7 @@ const PetOwnerProfileScreen = () => {
         name: 'profile_image.jpg',
       } as any);
 
-      console.log('Uploading profile image to:', 'http://172.20.10.2:8000/api/profile/upload-image');
-      console.log('User token:', user?.token ? 'Present' : 'Missing');
-
-      const response = await fetch('http://172.20.10.2:8000/api/profile/upload-image', {
+      const response = await fetch('http://192.168.100.184:8000/api/profile/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user?.token || ''}`,
@@ -144,27 +208,20 @@ const PetOwnerProfileScreen = () => {
         body: formData,
       });
 
-      console.log('Response status:', response.status);
-
-      // Check if response is ok
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Response error:', errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('Upload result:', result);
       
       if (result.success) {
-        console.log('Profile image uploaded successfully:', result.profile_image);
-        // Update the local state immediately to show the new image
         setProfileImage(result.profile_image);
-        // Update the user context with the new profile image
+        setImageError(false);
         await updateUserProfile({ profileImage: result.profile_image });
         Alert.alert('Success', 'Profile image updated successfully!');
       } else {
-        console.error('Failed to upload profile image:', result.message);
+        setImageError(true);
         Alert.alert('Error', result.message || 'Failed to upload profile image');
       }
     } catch (error) {
@@ -202,11 +259,17 @@ const PetOwnerProfileScreen = () => {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickImage} style={styles.profileImageContainer}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} />
-            ) : (
-          <Image source={require('../../assets/images/default-avatar.png')} style={styles.profileImage} />
-            )}
+            <Image 
+              source={
+                profileImage && isValidImageUri(profileImage) && !imageError 
+                  ? { uri: getFullImageUrl(profileImage) } 
+                  : require('../../assets/images/default-avatar.png')
+              } 
+              style={styles.profileImage}
+              onError={handleImageError}
+              onLoad={handleImageLoad}
+              defaultSource={require('../../assets/images/default-avatar.png')}
+            />
             <View style={styles.profileImageOverlay}>
               <Ionicons name="camera" size={20} color="#FFF" />
             </View>

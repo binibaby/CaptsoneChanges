@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 interface PaymentScreenProps {
@@ -24,11 +24,8 @@ const PaymentScreen: React.FC = () => {
   const route = useRoute();
   const { bookingId, amount, petSitterName, bookingDetails } = route.params as PaymentScreenProps;
 
-  const [selectedMethod, setSelectedMethod] = useState<'card' | 'gcash' | 'maya'>('card');
+  const [selectedMethod, setSelectedMethod] = useState<'gcash' | 'maya'>('gcash');
   const [loading, setLoading] = useState(false);
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
   // Calculate fees
@@ -36,12 +33,6 @@ const PaymentScreen: React.FC = () => {
   const sitterAmount = amount - platformFee;
 
   const paymentMethods = [
-    {
-      id: 'card',
-      name: 'Credit/Debit Card',
-      icon: 'card-outline',
-      color: '#4F46E5'
-    },
     {
       id: 'gcash',
       name: 'GCash',
@@ -60,12 +51,7 @@ const PaymentScreen: React.FC = () => {
     if (loading) return;
 
     // Validation
-    if (selectedMethod === 'card') {
-      if (!cardNumber || !expiryDate || !cvv) {
-        Alert.alert('Error', 'Please fill in all card details');
-        return;
-      }
-    } else if (!phoneNumber) {
+    if (!phoneNumber) {
       Alert.alert('Error', 'Please enter your phone number');
       return;
     }
@@ -74,7 +60,7 @@ const PaymentScreen: React.FC = () => {
 
     try {
       const token = await getAuthToken(); // Get from AsyncStorage or context
-      const apiUrl = 'http://172.20.10.2:8000/api';
+      const apiUrl = 'http://192.168.100.184:8000/api';
 
       let endpoint = '';
       let body: any = {
@@ -82,10 +68,7 @@ const PaymentScreen: React.FC = () => {
         amount: amount
       };
 
-      if (selectedMethod === 'card') {
-        endpoint = '/payments/stripe';
-        body.payment_method_id = 'pm_card_visa'; // In real app, use Stripe SDK
-      } else if (selectedMethod === 'gcash') {
+      if (selectedMethod === 'gcash') {
         endpoint = '/payments/gcash';
         body.phone_number = phoneNumber;
       } else if (selectedMethod === 'maya') {
@@ -132,50 +115,6 @@ const PaymentScreen: React.FC = () => {
     return 'mock_token';
   };
 
-  const renderCardForm = () => (
-    <View style={styles.formContainer}>
-      <Text style={styles.formTitle}>Card Details</Text>
-      
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Card Number</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="1234 5678 9012 3456"
-          value={cardNumber}
-          onChangeText={setCardNumber}
-          keyboardType="numeric"
-          maxLength={19}
-        />
-      </View>
-
-      <View style={styles.row}>
-        <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-          <Text style={styles.inputLabel}>Expiry Date</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="MM/YY"
-            value={expiryDate}
-            onChangeText={setExpiryDate}
-            keyboardType="numeric"
-            maxLength={5}
-          />
-        </View>
-        
-        <View style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}>
-          <Text style={styles.inputLabel}>CVV</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="123"
-            value={cvv}
-            onChangeText={setCvv}
-            keyboardType="numeric"
-            maxLength={4}
-            secureTextEntry
-          />
-        </View>
-      </View>
-    </View>
-  );
 
   const renderMobileForm = () => (
     <View style={styles.formContainer}>
@@ -265,7 +204,7 @@ const PaymentScreen: React.FC = () => {
       </View>
 
       {/* Payment Form */}
-      {selectedMethod === 'card' ? renderCardForm() : renderMobileForm()}
+      {renderMobileForm()}
 
       {/* Pay Button */}
       <TouchableOpacity

@@ -1,16 +1,14 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import locationService from '../services/locationService';
 import realtimeLocationService from '../services/realtimeLocationService';
-import LocationPermissionHelper from './LocationPermissionHelper';
 
 interface SitterLocationSharingProps {
   onLocationShared?: (isSharing: boolean) => void;
@@ -21,7 +19,7 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
 }) => {
   const { user, currentLocation, userAddress } = useAuth();
   const [isSharing, setIsSharing] = useState(false);
-  const [sharingStatus, setSharingStatus] = useState<string>('Not sharing location');
+  const [sharingStatus, setSharingStatus] = useState<string>('Not available');
 
   useEffect(() => {
     if (user && user.userRole === 'Pet Sitter' && currentLocation) {
@@ -36,22 +34,104 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
       return;
     }
 
+    // If no current location, try to get it first
     if (!currentLocation) {
-      Alert.alert(
-        'Location Required', 
-        'Location services are not available. Please:\n\n1. Enable location services in your device settings\n2. Grant location permissions to this app\n3. Make sure you\'re not in airplane mode',
-        [
-          { text: 'OK', style: 'default' },
-          { text: 'Open Settings', onPress: () => {
-            // This would open device settings in a real app
-            console.log('Would open device settings');
-          }}
-        ]
-      );
-      return;
+      try {
+        // Import Location from expo-location
+        const Location = require('expo-location');
+        
+        // Request location permission
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Location Permission Required',
+            'Please enable location access in your device settings to make yourself available to pet owners.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        // Get current location
+        const location = await Location.getCurrentPositionAsync({});
+        console.log('📍 Got current location:', location);
+        
+        // Get address from coordinates
+        let address = userAddress;
+        if (!address) {
+          try {
+            address = await locationService.getAddressFromCoordinates(
+              location.coords.latitude,
+              location.coords.longitude
+            );
+            console.log('📍 Got address from coordinates:', address);
+          } catch (error) {
+            console.error('Failed to get address from coordinates:', error);
+            address = `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`;
+          }
+        }
+        
+        const sitterData = {
+          id: user.id,
+          userId: user.id,
+          name: user.name,
+          email: user.email,
+          location: {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            address: address,
+          },
+          specialties: user.specialties || ['General Pet Care'],
+          experience: user.experience || '1 year',
+          petTypes: user.selectedPetTypes || ['dogs', 'cats'],
+          selectedBreeds: user.selectedBreeds || ['All breeds welcome'],
+          hourlyRate: parseFloat(user.hourlyRate || '25'),
+          rating: 4.5,
+          reviews: 0,
+          bio: user.aboutMe || 'Professional pet sitter ready to help!',
+          isOnline: true,
+          lastSeen: new Date(),
+        };
+
+        await realtimeLocationService.updateSitterLocation(sitterData);
+        await realtimeLocationService.setSitterOnline(user.id, true);
+        realtimeLocationService.startRealtimeUpdates();
+
+        setIsSharing(true);
+        setSharingStatus('Available - Pet owners can find you!');
+        onLocationShared?.(true);
+
+        console.log('✅ Pet sitter location sharing started with new location:', {
+          name: user.name,
+          location: sitterData.location,
+        });
+        return;
+      } catch (error) {
+        console.error('Failed to get location:', error);
+        Alert.alert(
+          'Location Error',
+          'Unable to get your current location. Please check your location settings and try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
     }
 
     try {
+      // Get address from coordinates if not available
+      let address = userAddress;
+      if (!address) {
+        try {
+          address = await locationService.getAddressFromCoordinates(
+            currentLocation.coords.latitude,
+            currentLocation.coords.longitude
+          );
+          console.log('📍 Got address from coordinates:', address);
+        } catch (error) {
+          console.error('Failed to get address from coordinates:', error);
+          address = `${currentLocation.coords.latitude.toFixed(4)}, ${currentLocation.coords.longitude.toFixed(4)}`;
+        }
+      }
+
       const sitterData = {
         id: user.id,
         userId: user.id,
@@ -60,7 +140,7 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
         location: {
           latitude: currentLocation.coords.latitude,
           longitude: currentLocation.coords.longitude,
-          address: userAddress || 'Location not available',
+          address: address,
         },
         specialties: user.specialties || ['General Pet Care'],
         experience: user.experience || '1 year',
@@ -79,7 +159,7 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
       realtimeLocationService.startRealtimeUpdates();
 
       setIsSharing(true);
-      setSharingStatus('Sharing location - Pet owners can find you!');
+      setSharingStatus('Available - Pet owners can find you!');
       onLocationShared?.(true);
 
       console.log('✅ Pet sitter location sharing started:', {
@@ -99,7 +179,7 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
     realtimeLocationService.removeSitter(user.id);
 
     setIsSharing(false);
-    setSharingStatus('Location sharing stopped');
+    setSharingStatus('Not available');
     onLocationShared?.(false);
 
     console.log('⏹️ Pet sitter location sharing stopped');
@@ -117,36 +197,23 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
     return null;
   }
 
-  // Show permission helper if location is not available
-  if (!currentLocation) {
-    return (
-      <LocationPermissionHelper
-        onPermissionGranted={() => {
-          console.log('Location permission granted, retrying location sharing...');
-          // The useEffect will automatically retry when currentLocation becomes available
-        }}
-        onPermissionDenied={() => {
-          console.log('Location permission denied');
-        }}
-      />
-    );
-  }
+  // Show simple toggle even if location is not available
+  // The toggle will handle location permission requests internally
 
   return (
     <View style={styles.container}>
-      <View style={styles.statusContainer}>
-        <View style={[styles.statusIndicator, { backgroundColor: isSharing ? '#10B981' : '#EF4444' }]} />
-        <Text style={styles.statusText}>{isSharing ? 'Sharing Location' : 'Not Sharing'}</Text>
+      <Text style={styles.title}>Availability</Text>
+      <View style={styles.toggleContainer}>
+        <Text style={styles.toggleLabel}>Status</Text>
         <TouchableOpacity
-          style={[styles.toggleButton, { backgroundColor: isSharing ? '#EF4444' : '#10B981' }]}
+          style={[styles.toggle, isSharing ? styles.toggleOn : styles.toggleOff]}
           onPress={toggleLocationSharing}
         >
-          <Ionicons 
-            name={isSharing ? 'stop' : 'location'} 
-            size={16} 
-            color="#fff" 
-          />
+          <View style={[styles.toggleButton, isSharing ? styles.toggleButtonOn : styles.toggleButtonOff]} />
         </TouchableOpacity>
+        <Text style={[styles.toggleText, isSharing ? styles.toggleTextOn : styles.toggleTextOff]}>
+          {isSharing ? 'ON' : 'OFF'}
+        </Text>
       </View>
     </View>
   );
@@ -156,37 +223,73 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     padding: 12,
-    borderRadius: 12,
-    margin: 16,
+    borderRadius: 8,
+    margin: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  statusContainer: {
+  title: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  toggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 12,
   },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusText: {
+  toggleLabel: {
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
-    flex: 1,
+  },
+  toggle: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    padding: 2,
+  },
+  toggleOn: {
+    backgroundColor: '#10B981',
+  },
+  toggleOff: {
+    backgroundColor: '#D1D5DB',
   },
   toggleButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleButtonOn: {
+    alignSelf: 'flex-end',
+  },
+  toggleButtonOff: {
+    alignSelf: 'flex-start',
+  },
+  toggleText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  toggleTextOn: {
+    color: '#10B981',
+  },
+  toggleTextOff: {
+    color: '#6B7280',
   },
 });
 

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\PaymentController;
@@ -27,6 +28,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::delete('/{user}', [UserController::class, 'delete'])->name('delete');
         Route::post('/bulk-action', [UserController::class, 'bulkAction'])->name('bulk-action');
         Route::get('/export', [UserController::class, 'export'])->name('export');
+        
+        // Profile Image Management
+        Route::post('/{user}/profile-image', [UserController::class, 'updateProfileImage'])->name('update-profile-image');
+        Route::delete('/{user}/profile-image', [UserController::class, 'deleteProfileImage'])->name('delete-profile-image');
     });
 
     // Payment Management

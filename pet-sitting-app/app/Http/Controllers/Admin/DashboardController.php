@@ -76,10 +76,10 @@ class DashboardController extends Controller
             $date = Carbon::now()->subDays($i);
             $last7Days->push([
                 'date' => $date->format('M d'),
-                'users' => User::whereDate('created_at', $date)->count(),
-                'bookings' => Booking::whereDate('created_at', $date)->count(),
+                'users' => User::whereRaw('DATE(created_at) = ?', [$date->toDateString()])->count(),
+                'bookings' => Booking::whereRaw('DATE(created_at) = ?', [$date->toDateString()])->count(),
                 'revenue' => Payment::where('status', 'completed')
-                    ->whereDate('created_at', $date)
+                    ->whereRaw('DATE(created_at) = ?', [$date->toDateString()])
                     ->sum('amount'),
             ]);
         }

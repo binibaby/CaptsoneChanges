@@ -49,8 +49,8 @@ class AuthService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      // Use mobile data IP for mobile device access
-      const response = await fetch('http://172.20.10.2:8000/api/login', {
+      // Use current WiFi IP for mobile device access
+      const response = await fetch('http://192.168.100.184:8000/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,8 +156,8 @@ class AuthService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      // Use mobile data IP for faster registration (bypass network service)
-      const response = await fetch('http://172.20.10.2:8000/api/register', {
+      // Use current WiFi IP for faster registration (bypass network service)
+      const response = await fetch('http://192.168.100.184:8000/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -318,6 +318,7 @@ class AuthService {
   async updateUserProfile(profileData: Partial<User>): Promise<User> {
     console.log('AuthService: updateUserProfile called with:', profileData);
     console.log('AuthService: Current user:', this.currentUser);
+    console.log('AuthService: Profile image in update data:', profileData.profileImage);
     
     // Validate profileData
     if (!profileData) {
@@ -381,6 +382,7 @@ class AuthService {
     
     // Update the current user with new profile data
     const updatedUser = { ...this.currentUser, ...profileData };
+    console.log('AuthService: Updated user profileImage:', updatedUser.profileImage);
     
     // Update the name field if firstName or lastName changed
     if (profileData.firstName || profileData.lastName) {
@@ -392,6 +394,7 @@ class AuthService {
     this.currentUser = updatedUser;
     await this.saveUserToStorage(updatedUser);
     console.log('Updated user profile:', updatedUser);
+    console.log('AuthService: Final user profileImage after save:', updatedUser.profileImage);
     return updatedUser;
   }
 

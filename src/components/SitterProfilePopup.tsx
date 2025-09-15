@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Image,
     Modal,
@@ -31,53 +31,47 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
   onViewCertificates,
 }) => {
   const router = useRouter();
-  if (!sitter) return null;
-
-  // Debug sitter data
-  console.log('🔍 Popup - Sitter data:', {
-    name: sitter.name,
-    location: sitter.location,
-    address: sitter.location?.address,
-    hasLocation: !!sitter.location,
-    allKeys: Object.keys(sitter)
-  });
+  const [imageError, setImageError] = useState(false);
+  
+  // Reset image error state when sitter changes
+  useEffect(() => {
+    setImageError(false);
+  }, [sitter?.id]);
+  
+  if (!sitter) {
+    return null;
+  }
 
   // Helper function to get proper image source (same as in FindSitterMapScreen)
   const getImageSource = (sitter: any) => {
     const imageSource = sitter.imageSource || sitter.images?.[0] || sitter.profileImage;
     
-    console.log(`🖼️ Popup - Getting image source for ${sitter.name}:`, {
-      imageSource,
-      type: typeof imageSource,
-      isString: typeof imageSource === 'string',
-      isUrl: typeof imageSource === 'string' && (imageSource.startsWith('http') || imageSource.startsWith('https'))
-    });
-    
     if (!imageSource) {
-      console.log('📷 Popup - No image source found, using default avatar');
       return require('../assets/images/default-avatar.png');
     }
     
     // If it's a URL (starts with http), use it directly
     if (typeof imageSource === 'string' && (imageSource.startsWith('http') || imageSource.startsWith('https'))) {
-      console.log('🌐 Popup - Using URL image:', imageSource);
       return { uri: imageSource };
+    }
+    
+    // If it's a relative URL (starts with /storage/), convert to full URL
+    if (typeof imageSource === 'string' && imageSource.startsWith('/storage/')) {
+      const fullUrl = `http://192.168.100.184:8000${imageSource}`;
+      return { uri: fullUrl };
     }
     
     // If it's already a require() object, use it directly
     if (typeof imageSource === 'object' && imageSource.uri !== undefined) {
-      console.log('✅ Popup - Using existing URI object');
       return imageSource;
     }
     
     // For any other string (local paths), treat as URI
     if (typeof imageSource === 'string') {
-      console.log('📁 Popup - Using string as URI:', imageSource);
       return { uri: imageSource };
     }
     
     // If it's already a require() object, use it directly
-    console.log('✅ Popup - Using existing image object');
     return imageSource;
   };
 
@@ -112,12 +106,20 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                 <Image
                   source={getImageSource(sitter)}
                   style={styles.avatar}
+                  onError={() => {
+                    setImageError(true);
+                  }}
+                  onLoad={() => {
+                    setImageError(false);
+                  }}
+                  defaultSource={require('../assets/images/default-avatar.png')}
+                  resizeMode="cover"
                 />
               </View>
               <View style={styles.userDetails}>
                 <Text style={styles.userName}>{sitter.name}</Text>
                 <Text style={styles.userLocation}>
-                  📍 {sitter.location?.address || 'Location not available'}
+                  📍 {sitter.location?.address || `${sitter.location?.latitude?.toFixed(4)}, ${sitter.location?.longitude?.toFixed(4)}`}
                 </Text>
                 <View style={styles.ratingContainer}>
                   <Text style={styles.reviewsText}>{sitter.reviews} reviews</Text>
@@ -282,12 +284,20 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: 15,
+    position: 'relative',
   },
   avatar: {
     width: 60,
     height: 60,
     borderRadius: 30,
     backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   userDetails: {
     flex: 1,

@@ -1,19 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  Modal,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Image,
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -36,7 +36,8 @@ const PetSitterProfileScreen = () => {
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
   const [selectedIDType, setSelectedIDType] = useState('');
   const [idImage, setIdImage] = useState<string | null>(null);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
+  const [imageError, setImageError] = useState(false);
   const [verifiedIDs, setVerifiedIDs] = useState([
     { type: 'umid', label: 'UMID (Unified Multi-Purpose ID)', icon: 'card', color: '#4CAF50', verified: false },
     { type: 'sss', label: 'SSS ID', icon: 'card', color: '#2196F3', verified: false },
@@ -48,20 +49,10 @@ const PetSitterProfileScreen = () => {
 
   // Update profile data when user changes
   useEffect(() => {
-    console.log('PetSitterProfileScreen: useEffect triggered with user:', user);
-    console.log('PetSitterProfileScreen: Current profileImage state:', profileImage);
     if (user) {
-      console.log('PetSitterProfileScreen: Loading user data from auth context:', user);
-      console.log('PetSitterProfileScreen: User profileImage field:', user.profileImage);
-      
-      // Set profile image from user data
-      if (user.profileImage) {
-        console.log('PetSitterProfileScreen: Setting profile image from user data:', user.profileImage);
-        setProfileImage(user.profileImage);
-      } else {
-        console.log('PetSitterProfileScreen: No profile image in user data');
-        setProfileImage(null);
-      }
+      console.log('📱 PetSitterProfileScreen: Updating profile data from user:', user);
+      console.log('📱 PetSitterProfileScreen: user.hourlyRate:', user.hourlyRate);
+      console.log('📱 PetSitterProfileScreen: user.experience:', user.experience);
       
       setProfile({
         name: user.name || '',
@@ -72,8 +63,8 @@ const PetSitterProfileScreen = () => {
         location: user.address || '',
         specialties: user.specialties || [],
         experience: user.experience || '',
-        rating: 0, // New user starts with 0 rating
-        reviews: 0, // New user starts with 0 reviews
+        rating: 0,
+        reviews: 0,
       });
     }
   }, [user]);
@@ -131,6 +122,7 @@ const PetSitterProfileScreen = () => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
         setProfileImage(imageUri);
+        setImageError(false);
         
         // Upload image to backend
         await uploadProfileImage(imageUri);
@@ -150,10 +142,7 @@ const PetSitterProfileScreen = () => {
         name: 'profile_image.jpg',
       } as any);
 
-      console.log('Uploading profile image to:', 'http://172.20.10.2:8000/api/profile/upload-image');
-      console.log('User token:', user?.token ? 'Present' : 'Missing');
-
-      const response = await fetch('http://172.20.10.2:8000/api/profile/upload-image', {
+      const response = await fetch('http://192.168.100.184:8000/api/profile/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user?.token || ''}`,
@@ -162,27 +151,20 @@ const PetSitterProfileScreen = () => {
         body: formData,
       });
 
-      console.log('Response status:', response.status);
-
-      // Check if response is ok
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Response error:', errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('Upload result:', result);
       
       if (result.success) {
-        console.log('Profile image uploaded successfully:', result.profile_image);
-        // Update the local state immediately to show the new image
         setProfileImage(result.profile_image);
-        // Update the user context with the new profile image
+        setImageError(false);
         await updateUserProfile({ profileImage: result.profile_image });
         Alert.alert('Success', 'Profile image updated successfully!');
       } else {
-        console.error('Failed to upload profile image:', result.message);
+        setImageError(true);
         Alert.alert('Error', result.message || 'Failed to upload profile image');
       }
     } catch (error) {
@@ -234,6 +216,66 @@ const PetSitterProfileScreen = () => {
     closeVerifyModal();
   };
 
+  // Helper function to validate image URI
+  const isValidImageUri = (uri: string | null): boolean => {
+    if (!uri || uri.trim() === '') return false;
+    // Check if it's a valid URL or local file path
+    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+  };
+
+  // Helper function to get full image URL
+  const getFullImageUrl = (uri: string | null): string | null => {
+    if (!uri) return null;
+    if (uri.startsWith('http')) return uri;
+    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    return uri;
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle image load success
+  const handleImageLoad = () => {
+    setImageError(false);
+  };
+
+  // Profile image persistence - sync when user data changes
+  useEffect(() => {
+    console.log('🔄 PetSitterProfileScreen: useEffect triggered for profile image sync');
+    console.log('🔄 PetSitterProfileScreen: user.profileImage:', user?.profileImage);
+    console.log('🔄 PetSitterProfileScreen: current profileImage state:', profileImage);
+    
+    if (user && user.profileImage && user.profileImage !== profileImage) {
+      console.log('✅ PetSitterProfileScreen: Updating profile image from user data:', user.profileImage);
+      setProfileImage(user.profileImage);
+      setImageError(false);
+    } else if (!user?.profileImage && profileImage) {
+      console.log('❌ PetSitterProfileScreen: User has no profile image, clearing local state');
+      setProfileImage(null);
+      setImageError(false);
+    } else {
+      console.log('🔄 PetSitterProfileScreen: Profile image already in sync');
+    }
+  }, [user?.profileImage]);
+
+  // Also sync when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🎯 PetSitterProfileScreen: useFocusEffect triggered');
+      if (user && user.profileImage) {
+        console.log('✅ PetSitterProfileScreen: Focus sync - updating profile image:', user.profileImage);
+        setProfileImage(user.profileImage);
+        setImageError(false);
+      } else if (user && !user.profileImage) {
+        console.log('❌ PetSitterProfileScreen: Focus sync - no profile image in user data');
+        setProfileImage(null);
+        setImageError(false);
+      }
+    }, [user?.profileImage])
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -252,8 +294,15 @@ const PetSitterProfileScreen = () => {
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickProfileImage} style={styles.profileImageContainer}>
             <Image 
-              source={profileImage ? { uri: profileImage } : require('../../assets/images/default-avatar.png')} 
-              style={styles.profileImage} 
+              source={
+                profileImage && isValidImageUri(profileImage) && !imageError 
+                  ? { uri: getFullImageUrl(profileImage) } 
+                  : require('../../assets/images/default-avatar.png')
+              } 
+              style={styles.profileImage}
+              onError={handleImageError}
+              onLoad={handleImageLoad}
+              defaultSource={require('../../assets/images/default-avatar.png')}
             />
             <View style={styles.imageEditOverlay}>
               <Ionicons name="camera" size={16} color="#fff" />

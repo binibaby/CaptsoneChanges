@@ -49,15 +49,15 @@ export class NetworkService {
   public async detectWorkingIP(): Promise<string> {
     console.log('🔍 Detecting working IP address...');
 
-    // Fast path: Try mobile data IP first (current network)
-    const mobileIP = '172.20.10.2';
-    console.log(`🌐 Testing mobile data IP: ${mobileIP}`);
+    // Fast path: Try current WiFi IP first
+    const wifiIP = '192.168.100.184';
+    console.log(`🌐 Testing current WiFi IP: ${wifiIP}`);
     
-    const isMobileWorking = await this.testIPConnection(mobileIP);
-    if (isMobileWorking) {
-      this.currentBaseUrl = `http://${mobileIP}:8000`;
+    const isWifiWorking = await this.testIPConnection(wifiIP);
+    if (isWifiWorking) {
+      this.currentBaseUrl = `http://${wifiIP}:8000`;
       this.isConnected = true;
-      console.log(`✅ Connected to mobile data: ${this.currentBaseUrl}`);
+      console.log(`✅ Connected to WiFi: ${this.currentBaseUrl}`);
       return this.currentBaseUrl;
     }
 
@@ -73,17 +73,6 @@ export class NetworkService {
       return this.currentBaseUrl;
     }
 
-    // Try the configured network IP
-    const networkIP = '192.168.100.179';
-    console.log(`🌐 Testing network IP: ${networkIP}`);
-    
-    const isNetworkWorking = await this.testIPConnection(networkIP);
-    if (isNetworkWorking) {
-      this.currentBaseUrl = `http://${networkIP}:8000`;
-      this.isConnected = true;
-      console.log(`✅ Connected to network: ${this.currentBaseUrl}`);
-      return this.currentBaseUrl;
-    }
 
     // If both fail, use the primary IP as default (don't test all fallbacks)
     const primaryIP = NETWORK_FALLBACK.PRIMARY_IPS[0];

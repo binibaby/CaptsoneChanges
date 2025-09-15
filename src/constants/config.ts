@@ -11,12 +11,13 @@ const getNetworkIP = () => {
 export const NETWORK_FALLBACK = {
   // Primary IPs to try in order
   PRIMARY_IPS: [
-    '172.20.10.2',      // Mobile data IP (current)
-    '192.168.100.179',  // WiFi IP (fallback)
+    '192.168.100.184',  // Current WiFi IP
+    '172.20.10.2',      // Mobile data IP (fallback)
   ],
   
   // Fallback IPs for different network scenarios
   FALLBACK_IPS: [
+    '192.168.100.184',  // Current WiFi IP
     '172.20.10.1',      // Common mobile hotspot
     '192.168.100.179',  // Previous WiFi IP
     '192.168.1.100',    // Common home WiFi

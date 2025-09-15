@@ -165,7 +165,7 @@ class BookingService {
 
   // Make the actual API call
   private async makeApiCall(userId: string, token: string): Promise<Response> {
-    return await fetch('http://172.20.10.2:8000/api/bookings/', {
+    return await fetch('http://192.168.100.184:8000/api/bookings/', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

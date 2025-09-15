@@ -35,7 +35,7 @@ class RealtimeLocationService {
   private sitters: Map<string, RealtimeSitter> = new Map();
   private listeners: Set<(sitters: RealtimeSitter[]) => void> = new Set();
   private lastApiCallTime: number = 0;
-  private apiCallDebounceMs: number = 10000; // 10 second debounce for API calls
+  private apiCallDebounceMs: number = 3000; // 3 second debounce for API calls
 
   constructor() {
     // Real-time sitters will be loaded from API
@@ -154,11 +154,12 @@ class RealtimeLocationService {
   async getSittersNearby(
     latitude: number, 
     longitude: number, 
-    radiusKm: number = 2
+    radiusKm: number = 2,
+    forceRefresh: boolean = false
   ): Promise<RealtimeSitter[]> {
-    // Debounce API calls to prevent infinite loops
+    // Debounce API calls to prevent infinite loops (unless force refresh is requested)
     const now = Date.now();
-    if (now - this.lastApiCallTime < this.apiCallDebounceMs) {
+    if (!forceRefresh && now - this.lastApiCallTime < this.apiCallDebounceMs) {
       console.log('🚫 Skipping API call due to debounce, using cached data');
       return Array.from(this.sitters.values());
     }
@@ -298,13 +299,17 @@ class RealtimeLocationService {
       if (!token) {
         console.warn('⚠️ No auth token available, updating local cache only');
         // Update local cache without API call
-        const sitter = this.sitters.get(sitterId);
-        if (sitter) {
-          sitter.isOnline = isOnline;
-          sitter.lastSeen = new Date();
-          this.sitters.set(sitterId, sitter);
-          this.notifyListeners();
-          console.log(`👤 Sitter ${sitter.name} is now ${isOnline ? 'online' : 'offline'} (local only)`);
+        if (isOnline) {
+          const sitter = this.sitters.get(sitterId);
+          if (sitter) {
+            sitter.isOnline = isOnline;
+            sitter.lastSeen = new Date();
+            this.sitters.set(sitterId, sitter);
+            this.notifyListeners();
+            console.log(`👤 Sitter ${sitter.name} is now ${isOnline ? 'online' : 'offline'} (local only)`);
+          }
+        } else {
+          this.removeSitter(sitterId);
         }
         return;
       }
@@ -322,35 +327,49 @@ class RealtimeLocationService {
       if (data.success) {
         console.log(`✅ Sitter ${sitterId} status updated successfully via API`);
         // Update local cache
-        const sitter = this.sitters.get(sitterId);
-        if (sitter) {
-          sitter.isOnline = isOnline;
-          sitter.lastSeen = new Date();
-          this.sitters.set(sitterId, sitter);
-          this.notifyListeners();
+        if (isOnline) {
+          // If going online, keep in cache
+          const sitter = this.sitters.get(sitterId);
+          if (sitter) {
+            sitter.isOnline = isOnline;
+            sitter.lastSeen = new Date();
+            this.sitters.set(sitterId, sitter);
+            this.notifyListeners();
+          }
+        } else {
+          // If going offline, remove from cache entirely
+          this.removeSitter(sitterId);
         }
       } else {
         console.error('❌ Failed to update sitter status:', data.message);
         // Fallback to local update
-        const sitter = this.sitters.get(sitterId);
-        if (sitter) {
-          sitter.isOnline = isOnline;
-          sitter.lastSeen = new Date();
-          this.sitters.set(sitterId, sitter);
-          this.notifyListeners();
-          console.log(`👤 Sitter ${sitter.name} is now ${isOnline ? 'online' : 'offline'} (local fallback)`);
+        if (isOnline) {
+          const sitter = this.sitters.get(sitterId);
+          if (sitter) {
+            sitter.isOnline = isOnline;
+            sitter.lastSeen = new Date();
+            this.sitters.set(sitterId, sitter);
+            this.notifyListeners();
+            console.log(`👤 Sitter ${sitter.name} is now ${isOnline ? 'online' : 'offline'} (local fallback)`);
+          }
+        } else {
+          this.removeSitter(sitterId);
         }
       }
     } catch (error) {
       console.error('❌ Error updating sitter status via API:', error);
       // Fallback to local update
-      const sitter = this.sitters.get(sitterId);
-      if (sitter) {
-        sitter.isOnline = isOnline;
-        sitter.lastSeen = new Date();
-        this.sitters.set(sitterId, sitter);
-        this.notifyListeners();
-        console.log(`👤 Sitter ${sitter.name} is now ${isOnline ? 'online' : 'offline'} (local)`);
+      if (isOnline) {
+        const sitter = this.sitters.get(sitterId);
+        if (sitter) {
+          sitter.isOnline = isOnline;
+          sitter.lastSeen = new Date();
+          this.sitters.set(sitterId, sitter);
+          this.notifyListeners();
+          console.log(`👤 Sitter ${sitter.name} is now ${isOnline ? 'online' : 'offline'} (local)`);
+        }
+      } else {
+        this.removeSitter(sitterId);
       }
     }
   }

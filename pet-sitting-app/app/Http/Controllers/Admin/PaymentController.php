@@ -38,11 +38,11 @@ class PaymentController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $query->where('created_at', '>=', $request->date_from);
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $query->where('created_at', '<=', $request->date_to);
         }
 
         if ($request->filled('search')) {
@@ -74,7 +74,7 @@ class PaymentController extends Controller
         $request->validate([
             'booking_id' => 'required|exists:bookings,id',
             'amount' => 'required|numeric|min:0',
-            'payment_method' => 'required|in:stripe,gcash,maya',
+            'payment_method' => 'required|in:gcash,maya',
             'currency' => 'required|in:PHP,USD',
         ]);
 
@@ -101,9 +101,6 @@ class PaymentController extends Controller
 
             // Process payment based on method
             switch ($request->payment_method) {
-                case 'stripe':
-                    $result = $this->processStripePayment($payment, $request);
-                    break;
                 case 'gcash':
                     $result = $this->processGCashPayment($payment, $request);
                     break;
@@ -258,11 +255,11 @@ class PaymentController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $query->where('created_at', '>=', $request->date_from);
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $query->where('created_at', '<=', $request->date_to);
         }
 
         $payments = $query->get();
@@ -306,29 +303,30 @@ class PaymentController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    private function processStripePayment(Payment $payment, Request $request)
+    /**
+     * Create success response
+     * @param string $paymentIntentId
+     * @return array{success: bool, payment_intent_id: string}
+     */
+    private function createSuccessResponse(string $paymentIntentId): array
     {
-        try {
-            // Create payment intent with Stripe
-            $paymentIntent = \Stripe\PaymentIntent::create([
-                'amount' => $payment->amount * 100, // Convert to cents
-                'currency' => strtolower($payment->currency),
-                'metadata' => [
-                    'payment_id' => $payment->id,
-                    'booking_id' => $payment->booking_id,
-                ],
-            ]);
+        return [
+            'success' => true,
+            'payment_intent_id' => $paymentIntentId,
+        ];
+    }
 
-            return [
-                'success' => true,
-                'payment_intent_id' => $paymentIntent->id,
-            ];
-        } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-            ];
-        }
+    /**
+     * Create error response
+     * @param string $error
+     * @return array{success: bool, error: string}
+     */
+    private function createErrorResponse(string $error): array
+    {
+        return [
+            'success' => false,
+            'error' => $error,
+        ];
     }
 
     private function processGCashPayment(Payment $payment, Request $request)
@@ -446,7 +444,7 @@ class PaymentController extends Controller
 
     private function sendRefundNotifications(Payment $refund)
     {
-        $amount = abs($refund->amount);
+        $amount = abs((float)$refund->amount);
         
         Notification::create([
             'user_id' => $refund->user_id,

@@ -53,6 +53,8 @@ const PetSitterDashboard = () => {
   const [notificationCount, setNotificationCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
+  const [imageError, setImageError] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     loadUserData();
@@ -93,9 +95,35 @@ const PetSitterDashboard = () => {
     try {
       const user = await authService.getCurrentUser();
       setCurrentUserId(user?.id || null);
+      setCurrentUser(user);
     } catch (error) {
       console.error('Error loading user data:', error);
     }
+  };
+
+  // Helper function to validate image URI
+  const isValidImageUri = (uri: string | null): boolean => {
+    if (!uri || uri.trim() === '') return false;
+    // Check if it's a valid URL or local file path
+    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+  };
+
+  // Helper function to get full image URL
+  const getFullImageUrl = (uri: string | null): string | null => {
+    if (!uri) return null;
+    if (uri.startsWith('http')) return uri;
+    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    return uri;
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle image load success
+  const handleImageLoad = () => {
+    setImageError(false);
   };
 
   const loadDashboardData = async () => {
@@ -229,8 +257,18 @@ const PetSitterDashboard = () => {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/pet-sitter-profile')}>
-              <Ionicons name="person-circle" size={28} color="#222" />
+            <TouchableOpacity onPress={() => router.push('/pet-sitter-profile')} style={styles.profileButton}>
+              <Image
+                source={
+                  currentUser?.profileImage && isValidImageUri(currentUser.profileImage) && !imageError 
+                    ? { uri: getFullImageUrl(currentUser.profileImage) } 
+                    : require('../../assets/images/default-avatar.png')
+                }
+                style={styles.profileImage}
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                defaultSource={require('../../assets/images/default-avatar.png')}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -758,6 +796,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  profileButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
 });
 

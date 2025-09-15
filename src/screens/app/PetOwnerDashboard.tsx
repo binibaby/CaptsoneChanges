@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import authService from '../../services/authService';
 // @ts-ignore
 import FindIcon from '../../assets/icons/find.png';
 // @ts-ignore
@@ -47,6 +49,46 @@ const reflectionColors = {
 
 const PetOwnerDashboard = () => {
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [imageError, setImageError] = useState<boolean>(false);
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  // Helper function to validate image URI
+  const isValidImageUri = (uri: string | null): boolean => {
+    if (!uri || uri.trim() === '') return false;
+    // Check if it's a valid URL or local file path
+    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+  };
+
+  // Helper function to get full image URL
+  const getFullImageUrl = (uri: string | null): string | null => {
+    if (!uri) return null;
+    if (uri.startsWith('http')) return uri;
+    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    return uri;
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle image load success
+  const handleImageLoad = () => {
+    setImageError(false);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -61,8 +103,18 @@ const PetOwnerDashboard = () => {
             <TouchableOpacity onPress={() => router.push('/pet-owner-notifications')} style={{ marginRight: 16 }}>
               <Ionicons name="notifications-outline" size={24} color="#222" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/pet-owner-profile')}>
-              <Ionicons name="person-circle" size={28} color="#222" />
+            <TouchableOpacity onPress={() => router.push('/pet-owner-profile')} style={styles.profileButton}>
+              <Image
+                source={
+                  currentUser?.profileImage && isValidImageUri(currentUser.profileImage) && !imageError 
+                    ? { uri: getFullImageUrl(currentUser.profileImage) } 
+                    : require('../../assets/images/default-avatar.png')
+                }
+                style={styles.profileImage}
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                defaultSource={require('../../assets/images/default-avatar.png')}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -359,6 +411,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 0,
     marginBottom: 16,
+  },
+  profileButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
 });
 

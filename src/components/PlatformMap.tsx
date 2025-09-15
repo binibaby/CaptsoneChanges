@@ -1,5 +1,4 @@
-import React from 'react';
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 // Web fallback component
 const WebMapFallback = () => (

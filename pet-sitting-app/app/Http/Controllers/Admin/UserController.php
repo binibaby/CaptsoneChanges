@@ -10,11 +10,36 @@ use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
+/**
+ * @method int|null id() Get the ID of the currently authenticated user
+ * @method \App\Models\User|null user() Get the currently authenticated user
+ */
 class UserController extends Controller
 {
+    /**
+     * Get the authenticated user ID
+     * @return int|null
+     */
+    private function getAuthId(): ?int
+    {
+        return $this->getAuthId();
+    }
+
+    /**
+     * Get the authenticated user
+     * @return \App\Models\User|null
+     */
+    private function getAuthUser(): ?User
+    {
+        return Auth::user();
+    }
+
     public function index(Request $request)
     {
         $query = User::query();
@@ -44,11 +69,11 @@ class UserController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $query->where('created_at', '>=', $request->date_from);
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $query->where('created_at', '<=', $request->date_to);
         }
 
         $users = $query->withCount(['bookings', 'verifications'])
@@ -132,7 +157,7 @@ class UserController extends Controller
             'completed_bookings' => $user->bookings()->where('bookings.status', 'completed')->count(),
             'total_spent' => $user->payments()->where('payments.status', 'completed')->sum('amount'),
             'average_rating' => $user->bookings()->avg('rating') ?? 0,
-            'verification_status' => $user->verifications()->latest()->first(),
+            'latest_verification' => $user->verifications()->latest()->first(),
             'id_verified' => $user->id_verified,
             'id_verified_at' => $user->id_verified_at,
             'verification_status' => $user->verification_status,
@@ -155,7 +180,7 @@ class UserController extends Controller
         $user->update([
             'status' => 'active',
             'approved_at' => now(),
-            'approved_by' => auth()->id(),
+            'approved_by' => $this->getAuthId(),
         ]);
 
         // Send approval notification
@@ -173,7 +198,7 @@ class UserController extends Controller
         $user->update([
             'status' => 'denied',
             'denied_at' => now(),
-            'denied_by' => auth()->id(),
+            'denied_by' => $this->getAuthId(),
             'denial_reason' => $request->reason,
         ]);
 
@@ -195,7 +220,7 @@ class UserController extends Controller
         $user->update([
             'status' => 'suspended',
             'suspended_at' => now(),
-            'suspended_by' => auth()->id(),
+            'suspended_by' => $this->getAuthId(),
             'suspension_reason' => $request->reason,
             'suspension_ends_at' => $suspensionEnd,
         ]);
@@ -215,7 +240,7 @@ class UserController extends Controller
         $user->update([
             'status' => 'banned',
             'banned_at' => now(),
-            'banned_by' => auth()->id(),
+            'banned_by' => $this->getAuthId(),
             'ban_reason' => $request->reason,
         ]);
 
@@ -274,7 +299,7 @@ class UserController extends Controller
                 $users->update([
                     'status' => 'active',
                     'approved_at' => now(),
-                    'approved_by' => auth()->id(),
+                    'approved_by' => $this->getAuthId(),
                 ]);
                 break;
 
@@ -283,7 +308,7 @@ class UserController extends Controller
                 $users->update([
                     'status' => 'suspended',
                     'suspended_at' => now(),
-                    'suspended_by' => auth()->id(),
+                    'suspended_by' => $this->getAuthId(),
                     'suspension_reason' => $request->reason,
                     'suspension_ends_at' => $suspensionEnd,
                 ]);
@@ -293,7 +318,7 @@ class UserController extends Controller
                 $users->update([
                     'status' => 'banned',
                     'banned_at' => now(),
-                    'banned_by' => auth()->id(),
+                    'banned_by' => $this->getAuthId(),
                     'ban_reason' => $request->reason,
                 ]);
                 break;
@@ -320,11 +345,11 @@ class UserController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $query->where('created_at', '>=', $request->date_from);
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $query->where('created_at', '<=', $request->date_to);
         }
 
         $users = $query->withCount(['bookings'])->get();
@@ -471,5 +496,81 @@ class UserController extends Controller
             $message->to($user->email)
                     ->subject('Account Reactivated - PetSitConnect');
         });
+    }
+
+    /**
+     * Update user profile image (Admin only)
+     */
+    public function updateProfileImage(Request $request, User $user)
+    {
+        try {
+            $request->validate([
+                'profile_image' => 'required|image|mimes:jpeg,png,jpg|max:5120',
+            ]);
+
+            $file = $request->file('profile_image');
+            $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('profile_images', $filename, 'public');
+            $profileImageUrl = '/storage/' . $path;
+            
+            // Delete old profile image if exists
+            if ($user->profile_image) {
+                $oldPath = str_replace('/storage/', '', $user->profile_image);
+                Storage::disk('public')->delete($oldPath);
+            }
+            
+            $user->profile_image = $profileImageUrl;
+            $user->save();
+
+            Log::info('📸 Admin updated profile image for user ' . $user->id . ': ' . $filename);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile image updated successfully',
+                'profile_image' => $profileImageUrl
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Admin profile image update error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update profile image: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete user profile image (Admin only)
+     */
+    public function deleteProfileImage(User $user)
+    {
+        try {
+            if ($user->profile_image) {
+                $oldPath = str_replace('/storage/', '', $user->profile_image);
+                Storage::disk('public')->delete($oldPath);
+                
+                $user->profile_image = null;
+                $user->save();
+
+                Log::info('🗑️ Admin deleted profile image for user ' . $user->id);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Profile image deleted successfully'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No profile image to delete'
+                ], 404);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Admin profile image deletion error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete profile image: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

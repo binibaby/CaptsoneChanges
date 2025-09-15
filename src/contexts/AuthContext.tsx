@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import authService, { User } from '../services/authService';
@@ -8,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (userData: {
     email: string;
     password: string;
@@ -16,7 +15,7 @@ interface AuthContextType {
     userRole: 'Pet Owner' | 'Pet Sitter';
     selectedPetTypes?: ('dogs' | 'cats')[];
     selectedBreeds?: string[];
-  }) => Promise<void>;
+  }) => Promise<User>;
   updateUserProfile: (profileData: Partial<User>) => Promise<void>;
   storeUserFromBackend: (backendUser: any) => Promise<void>;
   refresh: () => Promise<void>;
@@ -54,62 +53,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLocationTracking, setIsLocationTracking] = useState(false);
 
   useEffect(() => {
-    // Force fresh start - no auto-login
-    const forceFreshStart = async () => {
+    // Check for existing user data and restore if available
+    const checkAuthState = async () => {
       try {
-        console.log('App started - FORCING FRESH START (no auto-login)');
+        console.log('App started - checking for existing user data');
         
-        // Clear any existing user data to ensure fresh start
-        await AsyncStorage.removeItem('user');
-        await AsyncStorage.removeItem('user_logged_out');
-        authService.clearCurrentUser();
-        setUser(null);
-        setIsLoading(false);
+        // Check if there's a current user stored
+        const currentUser = await authService.getCurrentUser();
         
-        console.log('AuthContext: Fresh start completed - no auto-login');
+        if (currentUser) {
+          console.log('Found existing user:', currentUser.email);
+          console.log('User profile image:', currentUser.profileImage);
+          setUser(currentUser);
+        } else {
+          console.log('No existing user found');
+          setUser(null);
+        }
       } catch (error) {
-        console.error('Error in fresh start:', error);
+        console.error('Error checking auth state:', error);
         setUser(null);
+      } finally {
         setIsLoading(false);
       }
     };
     
-    forceFreshStart();
+    checkAuthState();
   }, []);
 
-  // Auto-start location tracking when user logs in
+  // Auto-start location tracking when user logs in (disabled to prevent crashes)
   useEffect(() => {
     if (user && !isLocationTracking) {
-      console.log('User logged in, starting location tracking automatically');
-      startLocationTracking(1000); // Start with 1km radius
+      console.log('User logged in, location tracking available but not auto-started');
+      // startLocationTracking(1000); // Disabled to prevent crashes
+    } else if (!user && isLocationTracking) {
+      console.log('User logged out, stopping location tracking...');
+      stopLocationTracking();
     }
-  }, [user, isLocationTracking, startLocationTracking]);
+  }, [user, isLocationTracking]);
 
-  const checkAuthState = async () => {
-    try {
-      // Check if there's a current user stored
-      const currentUser = await authService.getCurrentUser();
-      
-      if (currentUser) {
-        console.log('Found existing user:', currentUser.email);
-        console.log('User details:', {
-          id: currentUser.id,
-          name: currentUser.name,
-          email: currentUser.email,
-          role: currentUser.userRole
-        });
-        setUser(currentUser);
-      } else {
-        console.log('No existing user found, starting fresh');
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Error checking auth state:', error);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -150,6 +131,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('AuthContext: updateUserProfile called with:', profileData);
       console.log('AuthContext: Current user state:', user);
+      console.log('AuthContext: Profile image in update data:', profileData.profileImage);
       
       // Validate profileData before processing
       if (!profileData) {
@@ -163,6 +145,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const updatedUser = { ...user, ...profileData };
         setUser(updatedUser);
         console.log('AuthContext: User state updated successfully');
+        console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
       } else {
         console.warn('AuthContext: No current user to update');
       }
