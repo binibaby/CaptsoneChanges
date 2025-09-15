@@ -406,11 +406,16 @@ class AuthService {
           hourlyRate: user.hourlyRate || profileData.hourlyRate || '',
           experience: user.experience || profileData.experience || '',
           specialties: user.specialties || profileData.specialties || [],
+          // CRITICAL: Always preserve profileImage from backend (source of truth)
+          profileImage: user.profileImage || profileData.profileImage || undefined,
         };
         
         console.log('AuthService: Original user hourlyRate:', user.hourlyRate);
         console.log('AuthService: Stored profileData hourlyRate:', profileData.hourlyRate);
         console.log('AuthService: Restored user hourlyRate:', restoredUser.hourlyRate);
+        console.log('AuthService: Original user profileImage:', user.profileImage);
+        console.log('AuthService: Stored profileData profileImage:', profileData.profileImage);
+        console.log('AuthService: Restored user profileImage:', restoredUser.profileImage);
         
         this.currentUser = restoredUser;
         await this.saveUserToStorage(restoredUser);
