@@ -11,7 +11,18 @@ import PetsHeartIcon from '../../assets/icons/petsheart.png';
 // @ts-ignore
 import MessageIcon from '../../assets/icons/message.png';
 
-const upcomingBookings = [
+interface Booking {
+  id: string;
+  petImage: any;
+  petName: string;
+  sitterName: string;
+  status: string;
+  cost: string;
+  date: string;
+  time: string;
+}
+
+const upcomingBookings: Booking[] = [
   // New users start with no bookings
 ];
 

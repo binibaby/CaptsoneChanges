@@ -91,29 +91,7 @@ class AuthController extends Controller
                 'message' => $request->role === 'pet_sitter' 
                     ? 'Registration successful! Please verify your phone number, then complete ID verification to start accepting bookings.'
                     : 'Registration successful! Please verify your phone number to complete your account setup.',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                    'status' => $user->status,
-                    'phone' => $user->phone,
-                    'address' => $user->address,
-                    'gender' => $user->gender,
-                    'age' => $user->age,
-                    'experience' => $user->experience,
-                    'hourly_rate' => $user->hourly_rate,
-                    'pet_breeds' => $user->pet_breeds,
-                    'specialties' => $user->specialties,
-                    'selected_pet_types' => $user->selected_pet_types,
-                    'bio' => $user->bio,
-                    'profile_image' => $user->profile_image,
-                    'email_verified' => $user->email_verified_at !== null,
-                    'phone_verified' => $user->phone_verified_at !== null,
-                    'requires_id_verification' => $request->role === 'pet_sitter',
-                ],
+                'user' => $this->buildUserProfile($user),
                 'token' => $token,
                 'verification_required' => [
                     'email' => false, // Email is auto-verified
@@ -370,31 +348,47 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login successful!',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'status' => $user->status,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'gender' => $user->gender,
-                'age' => $user->age,
-                'experience' => $user->experience,
-                'hourly_rate' => $user->hourly_rate,
-                'pet_breeds' => $user->pet_breeds,
-                'specialties' => $user->specialties,
-                'selected_pet_types' => $user->selected_pet_types,
-                'bio' => $user->bio,
-                'profile_image' => $user->profile_image,
-                'email_verified' => $user->email_verified_at !== null,
-                'phone_verified' => $user->phone_verified_at !== null,
-            ],
+            'user' => $this->buildUserProfile($user),
             'token' => $token,
             'verification_status' => $verificationStatus,
         ]);
+    }
+
+    private function buildUserProfile(User $user)
+    {
+        // Base profile fields for all users
+        $profile = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'status' => $user->status,
+            'phone' => $user->phone,
+            'address' => $user->address,
+            'gender' => $user->gender,
+            'age' => $user->age,
+            'bio' => $user->bio,
+            'profile_image' => $user->profile_image,
+            'email_verified' => $user->email_verified_at !== null,
+            'phone_verified' => $user->phone_verified_at !== null,
+        ];
+
+        // Add role-specific fields
+        if ($user->role === 'pet_sitter') {
+            // Pet sitter specific fields
+            $profile['experience'] = $user->experience;
+            $profile['hourly_rate'] = $user->hourly_rate;
+            $profile['specialties'] = $user->specialties;
+            $profile['selected_pet_types'] = $user->selected_pet_types;
+            $profile['pet_breeds'] = $user->pet_breeds;
+        } else {
+            // Pet owner specific fields (no sitter-specific fields)
+            $profile['pet_breeds'] = $user->pet_breeds; // Pet owners can have pet breeds they own
+        }
+
+        return $profile;
     }
 
     private function getVerificationStatus(User $user)
@@ -451,27 +445,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'status' => $user->status,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'gender' => $user->gender,
-                'age' => $user->age,
-                'experience' => $user->experience,
-                'hourly_rate' => $user->hourly_rate,
-                'pet_breeds' => $user->pet_breeds,
-                'specialties' => $user->specialties,
-                'selected_pet_types' => $user->selected_pet_types,
-                'bio' => $user->bio,
-                'email_verified' => $user->email_verified_at !== null,
-                'phone_verified' => $user->phone_verified_at !== null,
-            ],
+            'user' => $this->buildUserProfile($user),
             'verification_status' => $verificationStatus,
         ]);
     }

@@ -428,16 +428,19 @@ class AuthService {
       age: backendUser.age,
       gender: backendUser.gender || '',
       address: backendUser.address || '',
-      experience: backendUser.experience || '',
-      hourlyRate: backendUser.hourly_rate || '',
       aboutMe: backendUser.bio || '',
-      specialties: backendUser.specialties || [],
       email_verified: backendUser.email_verified || false,
       phone_verified: backendUser.phone_verified || false,
       selectedPetTypes: backendUser.selected_pet_types || [],
       selectedBreeds: backendUser.pet_breeds || [],
       profileImage: backendUser.profile_image || undefined,
       token: backendUser.token || undefined,
+      // Only include sitter-specific fields for pet sitters
+      ...(backendUser.role === 'pet_sitter' && {
+        experience: backendUser.experience || '',
+        hourlyRate: backendUser.hourly_rate || '',
+        specialties: backendUser.specialties || [],
+      }),
     };
 
     this.currentUser = user;

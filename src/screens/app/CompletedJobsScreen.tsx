@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    FlatList,
-    Image,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import authService from '../../services/authService';
 import { Booking, bookingService } from '../../services/bookingService';
@@ -411,5 +411,6 @@ const styles = StyleSheet.create({
 });
 
 export default CompletedJobsScreen;
+
 
 

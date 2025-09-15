@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    FlatList,
-    Image,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Request {
@@ -37,7 +37,7 @@ const RequestsScreen = () => {
     { id: 'completed', label: 'Completed' },
   ];
 
-  const filteredRequests = []; // No mock data, so no filtering
+  const filteredRequests: Request[] = []; // No mock data, so no filtering
 
   const getStatusColor = (status: string) => {
     switch (status) {

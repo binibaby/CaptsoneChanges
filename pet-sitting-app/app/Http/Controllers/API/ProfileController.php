@@ -23,7 +23,8 @@ class ProfileController extends Controller
                 ], 401);
             }
 
-            $request->validate([
+            // Base validation rules for all users
+            $validationRules = [
                 'name' => 'sometimes|string|max:255',
                 'first_name' => 'sometimes|string|max:255',
                 'last_name' => 'sometimes|string|max:255',
@@ -31,11 +32,21 @@ class ProfileController extends Controller
                 'address' => 'sometimes|string|max:500',
                 'gender' => 'sometimes|in:male,female,other',
                 'age' => 'sometimes|integer|min:1|max:120',
-                'experience' => 'sometimes|string|max:500',
-                'hourly_rate' => 'sometimes|numeric|min:0|max:999999.99',
                 'bio' => 'sometimes|string|max:1000',
                 'profile_image' => 'sometimes|image|mimes:jpeg,png,jpg|max:5120',
-            ]);
+            ];
+
+            // Add pet sitter specific validation rules
+            if ($user->role === 'pet_sitter') {
+                $validationRules['experience'] = 'sometimes|string|max:500';
+                $validationRules['hourly_rate'] = 'sometimes|numeric|min:0|max:999999.99';
+                $validationRules['specialties'] = 'sometimes|array';
+                $validationRules['selected_pet_types'] = 'sometimes|array';
+            }
+
+            $validationRules['pet_breeds'] = 'sometimes|array'; // Both roles can have pet breeds
+
+            $request->validate($validationRules);
 
             // Handle profile image upload
             if ($request->hasFile('profile_image')) {
@@ -55,11 +66,17 @@ class ProfileController extends Controller
                 Log::info('📸 Profile image uploaded for user ' . $user->id . ': ' . $filename);
             }
 
-            // Update other profile fields
-            $updateData = $request->only([
-                'name', 'first_name', 'last_name', 'phone', 'address', 
-                'gender', 'age', 'experience', 'hourly_rate', 'bio'
-            ]);
+            // Update other profile fields based on user role
+            $baseFields = ['name', 'first_name', 'last_name', 'phone', 'address', 'gender', 'age', 'bio'];
+            $sitterFields = ['experience', 'hourly_rate', 'specialties', 'selected_pet_types'];
+            $commonFields = ['pet_breeds'];
+
+            $allowedFields = array_merge($baseFields, $commonFields);
+            if ($user->role === 'pet_sitter') {
+                $allowedFields = array_merge($allowedFields, $sitterFields);
+            }
+
+            $updateData = $request->only($allowedFields);
 
             foreach ($updateData as $key => $value) {
                 if ($value !== null) {
@@ -72,22 +89,7 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'address' => $user->address,
-                    'gender' => $user->gender,
-                    'age' => $user->age,
-                    'experience' => $user->experience,
-                    'hourly_rate' => $user->hourly_rate,
-                    'bio' => $user->bio,
-                    'profile_image' => $user->profile_image,
-                    'role' => $user->role,
-                ]
+                'user' => $this->buildUserProfile($user)
             ]);
 
         } catch (\Exception $e) {
@@ -97,6 +99,43 @@ class ProfileController extends Controller
                 'message' => 'Failed to update profile: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    private function buildUserProfile(User $user)
+    {
+        // Base profile fields for all users
+        $profile = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'status' => $user->status,
+            'phone' => $user->phone,
+            'address' => $user->address,
+            'gender' => $user->gender,
+            'age' => $user->age,
+            'bio' => $user->bio,
+            'profile_image' => $user->profile_image,
+            'email_verified' => $user->email_verified_at !== null,
+            'phone_verified' => $user->phone_verified_at !== null,
+        ];
+
+        // Add role-specific fields
+        if ($user->role === 'pet_sitter') {
+            // Pet sitter specific fields
+            $profile['experience'] = $user->experience;
+            $profile['hourly_rate'] = $user->hourly_rate;
+            $profile['specialties'] = $user->specialties;
+            $profile['selected_pet_types'] = $user->selected_pet_types;
+            $profile['pet_breeds'] = $user->pet_breeds;
+        } else {
+            // Pet owner specific fields (no sitter-specific fields)
+            $profile['pet_breeds'] = $user->pet_breeds; // Pet owners can have pet breeds they own
+        }
+
+        return $profile;
     }
 
     public function uploadProfileImage(Request $request)

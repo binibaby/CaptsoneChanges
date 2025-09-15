@@ -40,10 +40,10 @@ const ProfileScreen = () => {
     age: string;
     gender: string;
     address: string;
-    experience: string;
-    hourlyRate: string;
+    experience?: string;
+    hourlyRate?: string;
     aboutMe: string;
-    specialties: string[];
+    specialties?: string[];
     petBreeds: string[];
   }>({
     firstName: '',
@@ -53,10 +53,7 @@ const ProfileScreen = () => {
     age: '',
     gender: '',
     address: '',
-    experience: '',
-    hourlyRate: '',
     aboutMe: '',
-    specialties: [],
     petBreeds: [],
   });
 
@@ -104,11 +101,14 @@ const ProfileScreen = () => {
         age: user.age ? user.age.toString() : '',
         gender: user.gender || '',
         address: user.address || '',
-        experience: user.experience || '',
-        hourlyRate: user.hourlyRate || '',
         aboutMe: user.aboutMe || '',
-        specialties: user.specialties || [],
         petBreeds: user.selectedBreeds || [],
+        // Only include sitter-specific fields for pet sitters
+        ...(user.role === 'pet_sitter' && {
+          experience: user.experience || '',
+          hourlyRate: user.hourlyRate || '',
+          specialties: user.specialties || [],
+        }),
       };
       
       console.log('Profile screen: Setting new profile data:', newProfileData);
@@ -400,17 +400,21 @@ const ProfileScreen = () => {
             <Text style={styles.debugText}>Debug: Profile Data - Email: {profileData.email || 'None'}</Text>
             <Text style={styles.debugText}>Debug: Profile Data - Phone: {profileData.phone || 'None'}</Text>
             <Text style={styles.debugText}>Debug: Profile Data - Address: {profileData.address || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Experience: {profileData.experience || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Hourly Rate: {profileData.hourlyRate || 'None'}</Text>
+            {user?.role === 'pet_sitter' && (
+              <>
+                <Text style={styles.debugText}>Debug: Profile Data - Experience: {profileData.experience || 'None'}</Text>
+                <Text style={styles.debugText}>Debug: Profile Data - Hourly Rate: {profileData.hourlyRate || 'None'}</Text>
+                <Text style={styles.debugText}>Debug: Profile Data - Specialties: {profileData.specialties && profileData.specialties.length > 0 ? profileData.specialties.join(', ') : 'None'}</Text>
+              </>
+            )}
             <Text style={styles.debugText}>Debug: Profile Data - About Me: {profileData.aboutMe || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Specialties: {profileData.specialties.length > 0 ? profileData.specialties.join(', ') : 'None'}</Text>
             <Text style={styles.debugText}>Debug: Profile Data - Pet Breeds: {profileData.petBreeds.length > 0 ? profileData.petBreeds.join(', ') : 'None'}</Text>
           </View>
         )}
 
         {/* Professional Metrics Section */}
         <View style={styles.statsSection}>
-          {user?.userRole === 'Pet Sitter' ? (
+          {user?.role === 'pet_sitter' ? (
             <>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>{profileData.experience || '0'}</Text>
@@ -421,7 +425,7 @@ const ProfileScreen = () => {
                 <Text style={styles.statLabel}>Per Hour</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{profileData.specialties.length > 0 ? profileData.specialties.length.toString() : '0'}</Text>
+                <Text style={styles.statNumber}>{profileData.specialties && profileData.specialties.length > 0 ? profileData.specialties.length.toString() : '0'}</Text>
                 <Text style={styles.statLabel}>Specialties</Text>
               </View>
             </>
@@ -510,7 +514,7 @@ const ProfileScreen = () => {
             />
           </View>
 
-          {user?.userRole === 'Pet Sitter' && (
+          {user?.role === 'pet_sitter' && (
             <>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Years of Experience</Text>
@@ -555,14 +559,14 @@ const ProfileScreen = () => {
                 {isEditing ? (
                   <>
                     <View style={styles.specialtiesContainer}>
-                      {profileData.specialties.map((specialty, index) => (
+                      {profileData.specialties?.map((specialty, index) => (
                         <View key={index} style={styles.specialtyTag}>
                           <Text style={styles.specialtyText}>{specialty}</Text>
                           <TouchableOpacity
                             style={styles.removeSpecialtyButton}
                             onPress={() => setProfileData({
                               ...profileData, 
-                              specialties: profileData.specialties.filter((_, i) => i !== index)
+                              specialties: profileData.specialties?.filter((_, i) => i !== index) || []
                             })}
                           >
                             <Ionicons name="close" size={16} color="#666" />
@@ -581,7 +585,7 @@ const ProfileScreen = () => {
                           if (newSpecialty.trim()) {
                             setProfileData({
                               ...profileData, 
-                              specialties: [...profileData.specialties, newSpecialty.trim()]
+                              specialties: [...(profileData.specialties || []), newSpecialty.trim()]
                             });
                             setNewSpecialty('');
                           }
@@ -593,7 +597,7 @@ const ProfileScreen = () => {
                           if (newSpecialty.trim()) {
                             setProfileData({
                               ...profileData, 
-                              specialties: [...profileData.specialties, newSpecialty.trim()]
+                              specialties: [...(profileData.specialties || []), newSpecialty.trim()]
                             });
                             setNewSpecialty('');
                           }
@@ -606,9 +610,9 @@ const ProfileScreen = () => {
                   </>
                 ) : (
                   <>
-                    {profileData.specialties.length > 0 ? (
+                    {profileData.specialties && profileData.specialties.length > 0 ? (
                       <View style={styles.specialtiesContainer}>
-                        {profileData.specialties.map((specialty, index) => (
+                        {profileData.specialties?.map((specialty, index) => (
                           <View key={index} style={styles.specialtyTag}>
                             <Text style={styles.specialtyText}>{specialty}</Text>
                           </View>
@@ -623,7 +627,7 @@ const ProfileScreen = () => {
             </>
           )}
 
-          {user?.userRole === 'Pet Owner' && (
+          {user?.role === 'pet_owner' && (
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Preferred Pet Breeds</Text>
               {profileData.petBreeds.length > 0 ? (

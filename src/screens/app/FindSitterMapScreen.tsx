@@ -2,19 +2,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Image,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Image,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
 import LocationPermissionHelper from '../../components/LocationPermissionHelper';
+import PlatformMap from '../../components/PlatformMap';
 import SitterProfilePopup from '../../components/SitterProfilePopup';
 import { useAuth } from '../../contexts/AuthContext';
 import realtimeLocationService from '../../services/realtimeLocationService';
+
+// Conditional imports for react-native-maps (only on native platforms)
+let MapView: any = null;
+let Marker: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    const Maps = require('react-native-maps');
+    MapView = Maps.default;
+    Marker = Maps.Marker;
+  } catch (error) {
+    console.warn('react-native-maps not available:', error);
+  }
+}
+
+// Type definitions for react-native-maps
+interface Region {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+}
 
 // Web-only version - no react-native-maps imports
 const FindSitterMapScreen = () => {
@@ -136,7 +158,7 @@ const FindSitterMapScreen = () => {
 
   // Subscribe to real-time updates (only once, not dependent on currentLocation)
   useEffect(() => {
-    const unsubscribe = realtimeLocationService.subscribe((allSitters) => {
+    const unsubscribe: () => void = realtimeLocationService.subscribe((allSitters) => {
       // Only update if we have a current location and the sitters data has changed
       if (currentLocation && allSitters.length > 0) {
         // Filter sitters based on current location instead of making another API call
@@ -156,7 +178,7 @@ const FindSitterMapScreen = () => {
       }
     });
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []); // Remove currentLocation dependency to prevent infinite loop
 
   // Filter sitters based on selected filter
@@ -169,8 +191,8 @@ const FindSitterMapScreen = () => {
   const initialRegion: Region = useMemo(() => {
     if (currentLocation) {
       return {
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
         latitudeDelta: 0.02,
         longitudeDelta: 0.02,
       };
@@ -194,7 +216,7 @@ const FindSitterMapScreen = () => {
   }, [currentLocation, filteredSitters]);
 
   const [userRegion, setUserRegion] = useState<Region | null>(null);
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<any>(null);
 
   useEffect(() => {
     // Start location tracking with 2km radius for this screen
@@ -267,13 +289,7 @@ const FindSitterMapScreen = () => {
 
       {/* Map View */}
       <View style={styles.mapContainer}>
-        {Platform.OS === 'web' ? (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={{ fontSize: 18, color: '#666' }}>🗺️ Interactive Map</Text>
-            <Text style={{ fontSize: 14, color: '#999', marginTop: 8 }}>Available on mobile devices</Text>
-            <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>Tap on sitters below to view profiles</Text>
-          </View>
-        ) : !currentLocation ? (
+        {!currentLocation ? (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
             <LocationPermissionHelper
               onPermissionGranted={() => {
@@ -284,13 +300,21 @@ const FindSitterMapScreen = () => {
               }}
             />
           </View>
-        ) : (
+        ) : Platform.OS === 'web' ? (
+          <PlatformMap
+            style={StyleSheet.absoluteFill}
+            initialRegion={initialRegion}
+            showsUserLocation
+            showsPointsOfInterest={false}
+            ref={mapRef}
+          />
+        ) : MapView ? (
           <MapView
             style={StyleSheet.absoluteFill}
             initialRegion={initialRegion}
             showsUserLocation
             showsPointsOfInterest={false}
-            ref={(r) => (mapRef.current = r)}
+            ref={mapRef}
           >
             {filteredSitters.map((sitter) => (
               <Marker
@@ -314,6 +338,14 @@ const FindSitterMapScreen = () => {
               </Marker>
             ))}
           </MapView>
+        ) : (
+          <PlatformMap
+            style={StyleSheet.absoluteFill}
+            initialRegion={initialRegion}
+            showsUserLocation
+            showsPointsOfInterest={false}
+            ref={mapRef}
+          />
         )}
       </View>
 
@@ -322,7 +354,8 @@ const FindSitterMapScreen = () => {
         <TouchableOpacity
           onPress={() => {
             const target = userRegion ?? initialRegion;
-            mapRef.current?.animateToRegion(target, 600);
+            // @ts-ignore - PlatformMap handles the ref internally
+            mapRef.current?.animateToRegion?.(target, 600);
           }}
           style={{ position: 'absolute', right: 20, top: 160, backgroundColor: '#fff', borderRadius: 20, padding: 10, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8 }}
         >

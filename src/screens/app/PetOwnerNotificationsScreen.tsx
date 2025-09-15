@@ -93,7 +93,7 @@ const PetOwnerNotificationsScreen = () => {
       case 'message':
         router.push('/pet-owner-messages');
         break;
-      case 'reminder':
+      case 'system':
         router.push('/pet-owner-jobs');
         break;
       case 'review':
@@ -129,7 +129,7 @@ const PetOwnerNotificationsScreen = () => {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'booking':
-        return <Ionicons name="calendar-check" size={24} color="#4CAF50" />;
+        return <Ionicons name="calendar" size={24} color="#4CAF50" />;
       case 'message':
         return <Ionicons name="mail" size={24} color="#3B82F6" />;
       case 'reminder':

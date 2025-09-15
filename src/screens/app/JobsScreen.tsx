@@ -41,7 +41,7 @@ const JobsScreen = () => {
     { id: 'urgent', label: 'Urgent' },
   ];
 
-  const filteredJobs = []; // No mock data, so filteredJobs will be empty
+  const filteredJobs: Job[] = []; // No mock data, so filteredJobs will be empty
 
   const handleApply = (jobId: string) => {
     console.log('Applied for job:', jobId);

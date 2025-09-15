@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+    Alert,
     FlatList,
     Image,
     SafeAreaView,
@@ -303,8 +304,8 @@ const PetOwnerMessagesScreen = () => {
           data={supportMessages}
           renderItem={renderSupportMessage}
           keyExtractor={(item) => item.id}
-          style={styles.chatContainer}
-          contentContainerStyle={styles.chatContent}
+          style={styles.chatMessages}
+          contentContainerStyle={styles.chatMessages}
         />
 
         {/* Support Message Input */}

@@ -2,17 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingService } from '../../services/bookingService';
@@ -555,7 +555,7 @@ const PetSitterNotificationsScreen = () => {
 
           <View style={styles.modalActions}>
             <TouchableOpacity 
-              style={[styles.actionButton, styles.declineButton]}
+              style={[styles.modalActionButton, styles.declineButton]}
               onPress={() => handleBookingResponse('cancelled')}
             >
               <View style={styles.buttonContent}>
@@ -565,7 +565,7 @@ const PetSitterNotificationsScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.actionButton, styles.acceptButton]}
+              style={[styles.modalActionButton, styles.acceptButton]}
               onPress={() => handleBookingResponse('confirmed')}
             >
               <View style={styles.buttonContent}>
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 15,
   },
-  actionButton: {
+  modalActionButton: {
     flex: 1,
     paddingVertical: 18,
     borderRadius: 12,

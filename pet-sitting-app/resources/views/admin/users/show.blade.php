@@ -98,6 +98,7 @@
                             <dt class="text-sm font-medium text-gray-500">Address</dt>
                             <dd class="text-sm text-gray-900">{{ $user->address ?: 'Not provided' }}</dd>
                         </div>
+                        @if($user->role === 'pet_sitter')
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Experience</dt>
                             <dd class="text-sm text-gray-900">{{ $user->experience ?: 'Not specified' }}</dd>
@@ -116,6 +117,7 @@
                                 @endif
                             </dd>
                         </div>
+                        @endif
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Pet Breeds</dt>
                             <dd class="text-sm text-gray-900">
