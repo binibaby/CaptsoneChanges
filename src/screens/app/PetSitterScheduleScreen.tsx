@@ -25,12 +25,61 @@ interface ScheduleItem {
 
 const PetSitterScheduleScreen = () => {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState('Dec 16');
+  
+  // Generate current week dates
+  const generateCurrentWeekDates = () => {
+    const today = new Date();
+    const dates = [];
+    
+    // Start from Monday of current week
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1);
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const day = date.getDate();
+      dates.push(`${month} ${day}`);
+    }
+    
+    return dates;
+  };
+  
+  const currentWeekDates = generateCurrentWeekDates();
+  const today = new Date();
+  const todayFormatted = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  
+  const [selectedDate, setSelectedDate] = useState(todayFormatted);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([
-    // New users start with no schedule items
+    // Sample schedule data with current dates
+    {
+      id: '1',
+      petOwnerName: 'Sarah Johnson',
+      petName: 'Buddy',
+      petBreed: 'Golden Retriever',
+      date: todayFormatted,
+      time: '9:00 AM - 12:00 PM',
+      duration: '3 hours',
+      status: 'upcoming',
+      location: 'Downtown Area',
+      rate: '₱25/hour'
+    },
+    {
+      id: '2',
+      petOwnerName: 'Mike Chen',
+      petName: 'Luna',
+      petBreed: 'Siberian Husky',
+      date: todayFormatted,
+      time: '2:00 PM - 5:00 PM',
+      duration: '3 hours',
+      status: 'upcoming',
+      location: 'Suburb District',
+      rate: '₱30/hour'
+    }
   ]);
 
-  const dates = ['Dec 15', 'Dec 16', 'Dec 17', 'Dec 18', 'Dec 19', 'Dec 20', 'Dec 21'];
+  const dates = currentWeekDates;
 
   const handleBack = () => {
     router.back();
@@ -119,7 +168,7 @@ const PetSitterScheduleScreen = () => {
 
         {/* Schedule for Selected Date */}
         <View style={styles.scheduleContainer}>
-          <Text style={styles.dateTitle}>{selectedDate}, 2024</Text>
+          <Text style={styles.dateTitle}>{selectedDate}, {new Date().getFullYear()}</Text>
           
           {filteredSchedule.length > 0 ? (
             filteredSchedule.map((item) => (
