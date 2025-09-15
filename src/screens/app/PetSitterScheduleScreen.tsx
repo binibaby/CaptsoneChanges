@@ -52,31 +52,7 @@ const PetSitterScheduleScreen = () => {
   
   const [selectedDate, setSelectedDate] = useState(todayFormatted);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([
-    // Sample schedule data with current dates
-    {
-      id: '1',
-      petOwnerName: 'Sarah Johnson',
-      petName: 'Buddy',
-      petBreed: 'Golden Retriever',
-      date: todayFormatted,
-      time: '9:00 AM - 12:00 PM',
-      duration: '3 hours',
-      status: 'upcoming',
-      location: 'Downtown Area',
-      rate: '₱25/hour'
-    },
-    {
-      id: '2',
-      petOwnerName: 'Mike Chen',
-      petName: 'Luna',
-      petBreed: 'Siberian Husky',
-      date: todayFormatted,
-      time: '2:00 PM - 5:00 PM',
-      duration: '3 hours',
-      status: 'upcoming',
-      location: 'Suburb District',
-      rate: '₱30/hour'
-    }
+    // New users start with no schedule items
   ]);
 
   const dates = currentWeekDates;
