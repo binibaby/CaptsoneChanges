@@ -116,19 +116,19 @@ const BookingScreen: React.FC = () => {
   const getAuthToken = async (): Promise<string | null> => {
     try {
       const user = await authService.getCurrentUser();
-      let token = user?.token;
+      const token = user?.token;
       
-      // If no token, use hardcoded tokens for specific users
-      // In production, this should be handled by proper authentication
-      if (!token && user?.id === '5') {
-        token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
-        console.log('✅ Using hardcoded token for user 5 (Jasmine Paneda) in booking screen');
-      } else if (!token && user?.id === '21') {
-        token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
-        console.log('✅ Using hardcoded token for user 21 (Jassy Barnachea) in booking screen');
+      console.log('🔑 BookingScreen - Getting auth token for user:', user?.id);
+      console.log('🔑 BookingScreen - User token:', token ? 'Present' : 'Missing');
+      
+      if (!token) {
+        console.error('❌ BookingScreen - No authentication token available for user:', user?.id);
+        console.log('❌ User needs to be properly authenticated to make bookings');
+        return null;
       }
       
-      return token || null;
+      console.log('✅ BookingScreen - Using token for user:', user?.id);
+      return token;
     } catch (error) {
       console.error('Error getting auth token:', error);
       return null;
@@ -152,6 +152,20 @@ const BookingScreen: React.FC = () => {
 
     try {
       const token = await getAuthToken();
+      
+      if (!token) {
+        Alert.alert('Authentication Error', 'Please log in again to make a booking.');
+        return;
+      }
+      
+      console.log('📝 BookingScreen - Creating booking with data:', {
+        sitterId,
+        selectedDate,
+        startTime: selectedTimeRange.startTime,
+        endTime: selectedTimeRange.endTime,
+        sitterRate
+      });
+      
       const bookingData = {
         sitter_id: sitterId,
         date: selectedDate, // Use the actual selected date
@@ -164,17 +178,22 @@ const BookingScreen: React.FC = () => {
         description: 'Pet sitting service requested'
       };
 
+      console.log('📝 BookingScreen - Sending booking data:', bookingData);
+
       const response = await makeApiCall(
         '/api/bookings',
         {
           method: 'POST',
           headers: {
-            ...getAuthHeaders(token || undefined),
+            ...getAuthHeaders(token),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(bookingData),
         }
       );
+
+      console.log('📝 BookingScreen - Booking response status:', response.status);
+      console.log('📝 BookingScreen - Booking response ok:', response.ok);
 
       if (response.ok) {
         // Create booking in local storage
@@ -234,10 +253,22 @@ const BookingScreen: React.FC = () => {
           ]
         );
       } else {
-        Alert.alert('Error', 'Failed to send booking request. Please try again.');
+        console.error('❌ BookingScreen - Booking request failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('❌ BookingScreen - Error response:', errorText);
+        
+        // Try to parse error as JSON for better error handling
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error('❌ BookingScreen - Parsed error data:', errorData);
+          Alert.alert('Booking Error', errorData.message || 'Failed to send booking request. Please try again.');
+        } catch (parseError) {
+          console.error('❌ BookingScreen - Could not parse error response as JSON');
+          Alert.alert('Error', 'Failed to send booking request. Please try again.');
+        }
       }
     } catch (error) {
-      console.error('Error creating booking:', error);
+      console.error('❌ BookingScreen - Error creating booking:', error);
       Alert.alert('Error', 'Failed to send booking request. Please try again.');
     }
   };
@@ -292,11 +323,22 @@ const BookingScreen: React.FC = () => {
 
   // Helper function to format time to AM/PM
   const formatTime = (time24: string) => {
+    console.log('⏰ BookingScreen - Formatting time:', time24);
+    
+    // Check if time already has AM/PM (to avoid duplication)
+    if (time24.includes('AM') || time24.includes('PM')) {
+      console.log('⏰ BookingScreen - Time already has AM/PM, returning as is:', time24);
+      return time24;
+    }
+    
     const [hours, minutes] = time24.split(':');
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
+    const formattedTime = `${hour12}:${minutes} ${ampm}`;
+    
+    console.log('⏰ BookingScreen - Formatted time:', formattedTime);
+    return formattedTime;
   };
 
   if (loading) {
