@@ -124,7 +124,7 @@ export default function Auth() {
       } else {
         console.log('Saving user data to backend in onAuthSuccess');
         // Save the user data to the backend
-        const response = await fetch('http://192.168.100.184:8000/api/register', {
+        const response = await fetch('http://172.20.10.2:8000/api/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -240,7 +240,7 @@ export default function Auth() {
       console.log('🚀 hourly_rate type:', typeof requestBody.hourly_rate);
 
       // Save the complete user data to the backend
-      const response = await fetch('http://192.168.100.184:8000/api/register', {
+      const response = await fetch('http://172.20.10.2:8000/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

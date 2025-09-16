@@ -358,17 +358,15 @@ const PetOwnerProfileScreen = () => {
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Address</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.address}
-                onChangeText={(text) => setProfile({...profile, address: text})}
-                placeholder="Enter your address"
-                multiline
-              />
-            ) : (
-              <Text style={[styles.input, styles.disabledInput]}>{profile.address}</Text>
-            )}
+            <TextInput
+              style={[styles.input, styles.disabledInput]}
+              value={profile.address}
+              editable={false}
+              selectTextOnFocus={false}
+              pointerEvents="none"
+              placeholder="Address auto-detected"
+              multiline
+            />
           </View>
         </View>
         {/* Bio */}

@@ -26,30 +26,31 @@ class ProfileController extends Controller
             // Base validation rules for all users
             $validationRules = [
                 'name' => 'sometimes|string|max:255',
-                'first_name' => 'sometimes|string|max:255',
-                'last_name' => 'sometimes|string|max:255',
-                'phone' => 'sometimes|string|max:20',
-                'address' => 'sometimes|string|max:500',
-                'gender' => 'sometimes|in:male,female,other',
-                'age' => 'sometimes|integer|min:1|max:120',
-                'bio' => 'sometimes|string|max:1000',
-                'profile_image' => 'sometimes|image|mimes:jpeg,png,jpg|max:5120',
+                'first_name' => 'sometimes|nullable|string|max:255',
+                'last_name' => 'sometimes|nullable|string|max:255',
+                'phone' => 'sometimes|nullable|string|max:20',
+                'address' => 'sometimes|nullable|string|max:500',
+                'gender' => 'sometimes|nullable|in:male,female,other',
+                'age' => 'sometimes|nullable|integer|min:1|max:120',
+                'bio' => 'sometimes|nullable|string|max:1000',
+                'profile_image' => 'sometimes|nullable|string|max:500',
             ];
 
             // Add pet sitter specific validation rules
             if ($user->role === 'pet_sitter') {
-                $validationRules['experience'] = 'sometimes|string|max:500';
-                $validationRules['hourly_rate'] = 'sometimes|numeric|min:0|max:999999.99';
-                $validationRules['specialties'] = 'sometimes|array';
-                $validationRules['selected_pet_types'] = 'sometimes|array';
+                $validationRules['experience'] = 'sometimes|nullable|string|max:500';
+                $validationRules['hourly_rate'] = 'sometimes|nullable|numeric|min:0|max:999999.99';
+                $validationRules['specialties'] = 'sometimes|nullable|array';
+                $validationRules['selected_pet_types'] = 'sometimes|nullable|array';
             }
 
-            $validationRules['pet_breeds'] = 'sometimes|array'; // Both roles can have pet breeds
+            $validationRules['pet_breeds'] = 'sometimes|nullable|array'; // Both roles can have pet breeds
 
             $request->validate($validationRules);
 
-            // Handle profile image upload
+            // Handle profile image (can be file upload or URL string)
             if ($request->hasFile('profile_image')) {
+                // Handle file upload
                 $file = $request->file('profile_image');
                 $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
                 $path = $file->storeAs('profile_images', $filename, 'public');
@@ -64,6 +65,10 @@ class ProfileController extends Controller
                 $user->profile_image = $profileImageUrl;
                 
                 Log::info('📸 Profile image uploaded for user ' . $user->id . ': ' . $filename);
+            } elseif ($request->has('profile_image') && $request->profile_image !== null) {
+                // Handle profile image URL string
+                $user->profile_image = $request->profile_image;
+                Log::info('📸 Profile image URL updated for user ' . $user->id . ': ' . $request->profile_image);
             }
 
             // Update other profile fields based on user role

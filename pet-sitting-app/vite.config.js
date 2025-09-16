@@ -12,7 +12,7 @@ export default defineConfig({
         host: '0.0.0.0',
         port: 5173,
         hmr: {
-            host: '192.168.100.184',
+            host: '172.20.10.2',
             port: 5173,
         },
         cors: true,

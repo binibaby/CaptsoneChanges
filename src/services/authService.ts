@@ -41,93 +41,137 @@ class AuthService {
     return AuthService.instance;
   }
 
-  async login(email: string, password: string): Promise<User> {
+  // Test server connectivity
+  async testServerConnection(ip: string): Promise<boolean> {
     try {
-      console.log('Attempting to login with backend API');
-      
-      // Call the backend login API with timeout
+      console.log(`🔍 Testing server connection to ${ip}:8000`);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
       
-      // Use current WiFi IP for mobile device access
-      const response = await fetch('http://192.168.100.184:8000/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+      const response = await fetch(`http://${ip}:8000/api/health`, {
+        method: 'GET',
         signal: controller.signal,
       });
       
       clearTimeout(timeoutId);
+      console.log(`✅ ${ip}:8000 - Server is reachable (status: ${response.status})`);
+      return true;
+    } catch (error) {
+      console.log(`❌ ${ip}:8000 - Server not reachable:`, error);
+      return false;
+    }
+  }
 
-      // Check if response is ok
-      if (!response.ok) {
-        console.error('Login API error response:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('Error response body:', errorText);
-        throw new Error(`Login failed: ${response.status} ${response.statusText}`);
-      }
-
-      // Check content type
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error('Invalid content type:', contentType);
-        const responseText = await response.text();
-        console.error('Non-JSON response:', responseText);
-        throw new Error('Server returned non-JSON response');
-      }
-
-      const result = await response.json();
-      console.log('Login API response:', result);
+  async login(email: string, password: string): Promise<User> {
+    try {
+      console.log('Attempting to login with backend API');
       
-      if (result.success) {
-        console.log('Login successful, user data from backend:', result.user);
-        
-        // Check if user data exists and has required fields
-        if (!result.user || !result.user.id) {
-          console.error('Invalid user data received from backend:', result);
-          throw new Error('Invalid user data received from server');
-        }
-        
-        // Create user object from backend response
-        const user: User = {
-          id: result.user.id.toString(),
-          email: result.user.email || '',
-          name: result.user.name || '',
-          firstName: result.user.first_name || '',
-          lastName: result.user.last_name || '',
-          userRole: result.user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter',
-          role: result.user.role || 'pet_owner',
-          phone: result.user.phone || '',
-          age: result.user.age,
-          gender: result.user.gender || '',
-          address: result.user.address || '',
-          experience: result.user.experience || '',
-          hourlyRate: result.user.hourly_rate !== null && result.user.hourly_rate !== undefined ? String(result.user.hourly_rate) : '',
-          aboutMe: result.user.bio || '',
-          specialties: result.user.specialties || [],
-          email_verified: result.user.email_verified || false,
-          phone_verified: result.user.phone_verified || false,
-          selectedPetTypes: result.user.selected_pet_types || [],
-          selectedBreeds: result.user.pet_breeds || [],
-          profileImage: result.user.profile_image || undefined,
-          token: result.token || undefined,
-        };
+      // Try multiple IPs in order
+      const ipsToTry = [
+        '192.168.100.184',  // Current WiFi IP
+        '192.168.100.179',  // Previous WiFi IP
+        'localhost',         // Localhost fallback
+        '127.0.0.1',        // Localhost IP
+      ];
+      
+      let lastError: Error | null = null;
+      
+      for (const ip of ipsToTry) {
+        try {
+          console.log(`🌐 Trying to connect to: ${ip}:8000`);
+          
+          // Call the backend login API with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout per IP
+          
+          const response = await fetch(`http://${ip}:8000/api/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email,
+              password,
+            }),
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
 
-        this.currentUser = user;
-        await this.saveUserToStorage(user);
-        
-        // Restore profile data if available
-        const userWithProfileData = await this.restoreProfileData(user);
-        return userWithProfileData;
-      } else {
-        console.error('Login failed:', result.message);
-        throw new Error(result.message || 'Login failed');
+          // Check if response is ok
+          if (!response.ok) {
+            console.error(`❌ ${ip}:8000 - Login API error response:`, response.status, response.statusText);
+            const errorText = await response.text();
+            console.error('Error response body:', errorText);
+            throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+          }
+
+          // Check content type
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            console.error(`❌ ${ip}:8000 - Invalid content type:`, contentType);
+            const responseText = await response.text();
+            console.error('Non-JSON response:', responseText);
+            throw new Error('Server returned non-JSON response');
+          }
+
+          const result = await response.json();
+          console.log(`✅ ${ip}:8000 - Login API response:`, result);
+          
+          if (result.success) {
+            console.log(`✅ ${ip}:8000 - Login successful, user data from backend:`, result.user);
+            
+            // Check if user data exists and has required fields
+            if (!result.user || !result.user.id) {
+              console.error('Invalid user data received from backend:', result);
+              throw new Error('Invalid user data received from server');
+            }
+            
+            // Create user object from backend response
+            const user: User = {
+              id: result.user.id.toString(),
+              email: result.user.email || '',
+              name: result.user.name || '',
+              firstName: result.user.first_name || '',
+              lastName: result.user.last_name || '',
+              userRole: result.user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter',
+              role: result.user.role || 'pet_owner',
+              phone: result.user.phone || '',
+              age: result.user.age,
+              gender: result.user.gender || '',
+              address: result.user.address || '',
+              experience: result.user.experience || '',
+              hourlyRate: result.user.hourly_rate !== null && result.user.hourly_rate !== undefined ? String(result.user.hourly_rate) : '',
+              aboutMe: result.user.bio || '',
+              specialties: result.user.specialties || [],
+              email_verified: result.user.email_verified || false,
+              phone_verified: result.user.phone_verified || false,
+              selectedPetTypes: result.user.selected_pet_types || [],
+              selectedBreeds: result.user.pet_breeds || [],
+              profileImage: result.user.profile_image || undefined,
+              token: result.token || undefined,
+            };
+
+            this.currentUser = user;
+            await this.saveUserToStorage(user);
+            
+            // Restore profile data if available
+            const userWithProfileData = await this.restoreProfileData(user);
+            return userWithProfileData;
+          } else {
+            console.error(`❌ ${ip}:8000 - Login failed:`, result.message);
+            throw new Error(result.message || 'Login failed');
+          }
+        } catch (error) {
+          console.error(`❌ ${ip}:8000 - Connection failed:`, error);
+          lastError = error as Error;
+          continue; // Try next IP
+        }
       }
+      
+      // If we get here, all IPs failed
+      console.error('❌ All IP addresses failed. Last error:', lastError);
+      throw new Error(`Cannot connect to server. Tried: ${ipsToTry.join(', ')}. Last error: ${lastError?.message || 'Unknown error'}`);
     } catch (error) {
       console.error('Error during login:', error);
       
@@ -144,7 +188,7 @@ class AuthService {
     }
   }
 
-  async register(userData: {
+  async register(  userData: {
     email: string;
     password: string;
     name: string;
@@ -156,6 +200,7 @@ class AuthService {
     gender?: string;
     age?: number;
     experience?: string;
+    hourlyRate?: string;
     specialties?: string[];
     aboutMe?: string;
   }): Promise<User> {
@@ -390,7 +435,7 @@ class AuthService {
         const profileData = JSON.parse(storedProfileData);
         console.log('AuthService: Restoring profile data:', profileData);
         
-        // Merge profile data with user data, prioritizing backend data for critical fields
+        // Merge profile data with user data, prioritizing stored profile data for user-editable fields
         const restoredUser = {
           ...user,
           ...profileData,
@@ -402,10 +447,19 @@ class AuthService {
           token: user.token,
           email_verified: user.email_verified,
           phone_verified: user.phone_verified,
-          // Prioritize backend data for critical fields if they exist
-          hourlyRate: user.hourlyRate || profileData.hourlyRate || '',
-          experience: user.experience || profileData.experience || '',
-          specialties: user.specialties || profileData.specialties || [],
+          // Prioritize stored profile data for user-editable fields (preserve user changes)
+          hourlyRate: profileData.hourlyRate || user.hourlyRate || '',
+          experience: profileData.experience || user.experience || '',
+          specialties: profileData.specialties || user.specialties || [],
+          aboutMe: profileData.aboutMe || user.aboutMe || '',
+          address: profileData.address || user.address || '',
+          phone: profileData.phone || user.phone || '',
+          age: profileData.age || user.age,
+          gender: profileData.gender || user.gender || '',
+          firstName: profileData.firstName || user.firstName || '',
+          lastName: profileData.lastName || user.lastName || '',
+          selectedPetTypes: profileData.selectedPetTypes || user.selectedPetTypes || [],
+          selectedBreeds: profileData.selectedBreeds || user.selectedBreeds || [],
           // CRITICAL: Always preserve profileImage from backend (source of truth)
           profileImage: user.profileImage || profileData.profileImage || undefined,
         };
@@ -478,6 +532,12 @@ class AuthService {
 
       this.currentUser = newUser;
       await this.saveUserToStorage(newUser);
+      
+      // Clear availability for new pet sitters
+      if (newUser.userRole === 'Pet Sitter') {
+        await this.clearAvailabilityForNewSitter();
+      }
+      
       console.log('Created new user in updateUserProfile:', newUser);
       return newUser;
     }
@@ -511,6 +571,24 @@ class AuthService {
     this.currentUser = updatedUser;
     await this.saveUserToStorage(updatedUser);
     
+    // Update profile on backend
+    try {
+      await this.updateProfileOnBackend(updatedUser);
+      console.log('AuthService: Profile updated on backend successfully');
+      
+      // Clear sitter cache to force refresh in find sitter map
+      try {
+        const { default: realtimeLocationService } = await import('./realtimeLocationService');
+        realtimeLocationService.clearSitterCache();
+        console.log('AuthService: Cleared sitter cache for profile update');
+      } catch (cacheError) {
+        console.error('AuthService: Error clearing sitter cache:', cacheError);
+      }
+    } catch (error) {
+      console.error('AuthService: Failed to update profile on backend:', error);
+      // Don't throw error here - local update was successful
+    }
+    
     // Also save profile data persistently
     try {
       const profileData = {
@@ -540,6 +618,64 @@ class AuthService {
     return updatedUser;
   }
 
+  // Update profile on backend
+  async updateProfileOnBackend(user: User): Promise<void> {
+    try {
+      console.log('AuthService: Updating profile on backend for user:', user.id);
+      console.log('AuthService: Using endpoint: http://192.168.100.184:8000/api/profile/update');
+      
+      const response = await fetch('http://192.168.100.184:8000/api/profile/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({
+          id: user.id,
+          name: user.name,
+          first_name: user.firstName || user.name.split(' ')[0] || null,
+          last_name: user.lastName || user.name.split(' ').slice(1).join(' ') || null,
+          email: user.email,
+          phone: user.phone || null,
+          age: user.age || null,
+          gender: user.gender || null,
+          address: user.address || null,
+          experience: user.experience || null,
+          hourly_rate: user.hourlyRate || null,
+          bio: user.aboutMe || null,
+          specialties: user.specialties || null,
+          pet_breeds: user.selectedBreeds || null,
+          selected_pet_types: user.selectedPetTypes || null,
+          profile_image: user.profileImage || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Backend profile update failed:', response.status, errorText);
+        console.error('Response URL:', response.url);
+        console.error('Response headers:', response.headers);
+        throw new Error(`Backend update failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Backend profile update successful:', result);
+    } catch (error) {
+      console.error('Error updating profile on backend:', error);
+      throw error;
+    }
+  }
+
+  // Clear availability for new pet sitters
+  async clearAvailabilityForNewSitter(): Promise<void> {
+    try {
+      console.log('AuthService: Clearing availability for new pet sitter');
+      await AsyncStorage.removeItem('petSitterAvailabilities');
+      console.log('AuthService: Availability cleared for new sitter');
+    } catch (error) {
+      console.error('AuthService: Error clearing availability for new sitter:', error);
+    }
+  }
 
   // New method to store complete user data from backend registration
   async storeUserFromBackend(backendUser: any): Promise<User> {

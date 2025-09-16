@@ -49,7 +49,7 @@ const FindSitterMapScreen = () => {
   const [selectedSitter, setSelectedSitter] = useState<any>(null);
   const [showProfilePopup, setShowProfilePopup] = useState<boolean>(false);
   const router = useRouter();
-  const { currentLocation, userAddress, isLocationTracking, startLocationTracking } = useAuth();
+  const { currentLocation, userAddress, isLocationTracking, startLocationTracking, profileUpdateTrigger } = useAuth();
 
   // Initialize with empty array - will be populated by real-time data
   useEffect(() => {
@@ -200,6 +200,14 @@ const FindSitterMapScreen = () => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
   }, [currentLocation]);
+
+  // Refresh when profile is updated (triggered by profileUpdateTrigger)
+  useEffect(() => {
+    if (profileUpdateTrigger && profileUpdateTrigger > 0) {
+      console.log('🗺️ FindSitterMapScreen: Profile updated, refreshing sitter data');
+      loadSittersFromAPI(true); // Force refresh to get latest data
+    }
+  }, [profileUpdateTrigger]);
 
   // Periodic refresh to ensure we get the latest sitter status
   useEffect(() => {

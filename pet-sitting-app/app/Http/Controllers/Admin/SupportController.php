@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class SupportController extends Controller
@@ -65,7 +66,7 @@ class SupportController extends Controller
         $ticket->load(['user', 'assignedTo', 'messages.user']);
         
         // Mark as read if assigned to current admin
-        if ($ticket->assigned_to === auth()->id()) {
+        if ($ticket->assigned_to === Auth::id()) {
             $ticket->update(['read_at' => now()]);
         }
 
@@ -130,7 +131,7 @@ class SupportController extends Controller
 
         $message = SupportMessage::create([
             'ticket_id' => $ticket->id,
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
             'message' => $request->message,
             'is_internal' => $request->is_internal ?? false,
         ]);
@@ -180,7 +181,7 @@ class SupportController extends Controller
         $ticket->load(['user', 'assignedTo', 'messages.user']);
         
         // Mark messages as read by admin
-        $ticket->messages()->where('user_id', '!=', auth()->id())
+        $ticket->messages()->where('user_id', '!=', Auth::id())
             ->where('is_read', false)
             ->update(['is_read' => true]);
         
@@ -199,7 +200,7 @@ class SupportController extends Controller
 
         $message = SupportMessage::create([
             'ticket_id' => $ticket->id,
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
             'message' => $request->message,
             'is_internal' => false,
             'is_read' => false,
@@ -209,7 +210,7 @@ class SupportController extends Controller
         $ticket->update([
             'last_reply_at' => now(),
             'status' => 'in_progress',
-            'assigned_to' => auth()->id(),
+            'assigned_to' => Auth::id(),
             'assigned_at' => $ticket->assigned_at ?? now(),
         ]);
 
@@ -264,7 +265,7 @@ class SupportController extends Controller
             });
 
         // Mark messages as read by admin
-        $ticket->messages()->where('user_id', '!=', auth()->id())
+        $ticket->messages()->where('user_id', '!=', Auth::id())
             ->where('is_read', false)
             ->update(['is_read' => true]);
 
@@ -282,7 +283,7 @@ class SupportController extends Controller
             ],
             'messages' => $messages,
             'last_message_id' => $messages->last() ? $messages->last()['id'] : null,
-            'unread_count' => $ticket->messages()->where('user_id', '!=', auth()->id())->where('is_read', false)->count()
+            'unread_count' => $ticket->messages()->where('user_id', '!=', Auth::id())->where('is_read', false)->count()
         ]);
     }
 
@@ -316,7 +317,7 @@ class SupportController extends Controller
         if ($newMessages->isNotEmpty()) {
             $ticket->messages()
                 ->where('id', '>', $lastMessageId)
-                ->where('user_id', '!=', auth()->id())
+                ->where('user_id', '!=', Auth::id())
                 ->where('is_read', false)
                 ->update(['is_read' => true]);
         }
@@ -336,7 +337,7 @@ class SupportController extends Controller
         $messageId = $request->get('message_id');
         
         $message = $ticket->messages()->find($messageId);
-        if ($message && $message->user_id !== auth()->id()) {
+        if ($message && $message->user_id !== Auth::id()) {
             $message->update(['is_read' => true]);
         }
 

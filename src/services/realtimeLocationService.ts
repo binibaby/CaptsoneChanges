@@ -90,6 +90,13 @@ class RealtimeLocationService {
     }
   }
 
+  // Clear sitter cache to force refresh
+  clearSitterCache() {
+    console.log('🧹 Clearing sitter cache to force refresh');
+    this.sitters.clear();
+    this.lastApiCallTime = 0; // Reset debounce timer
+  }
+
   // Add or update a sitter's location via backend API
   async updateSitterLocation(sitter: RealtimeSitter) {
     console.log('📍 Updating sitter location via API:', {
@@ -100,6 +107,13 @@ class RealtimeLocationService {
     });
 
     try {
+      // Check if current user is a pet sitter before updating location
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser && currentUser.role !== 'pet_sitter') {
+        console.warn('⚠️ Only pet sitters can share their location. Current user role:', currentUser.role);
+        return;
+      }
+
       const token = await this.getAuthToken();
       if (!token) {
         console.warn('⚠️ No auth token available, updating local cache only');
@@ -304,6 +318,13 @@ class RealtimeLocationService {
     console.log(`👤 Setting sitter ${sitterId} ${isOnline ? 'online' : 'offline'} via API`);
 
     try {
+      // Check if current user is a pet sitter before setting online status
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser && currentUser.role !== 'pet_sitter') {
+        console.warn('⚠️ Only pet sitters can set online status. Current user role:', currentUser.role);
+        return;
+      }
+
       const token = await this.getAuthToken();
       if (!token) {
         console.warn('⚠️ No auth token available, updating local cache only');

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 
 class SupportController extends Controller
 {
@@ -30,7 +31,7 @@ class SupportController extends Controller
 
         // Create support ticket
         $ticket = SupportTicket::create([
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
             'ticket_number' => $ticketNumber,
             'subject' => $request->subject,
             'category' => $request->category,
@@ -42,7 +43,7 @@ class SupportController extends Controller
         // Create initial message
         SupportMessage::create([
             'ticket_id' => $ticket->id,
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
             'message' => $request->message,
             'is_admin_message' => false,
         ]);
@@ -53,12 +54,12 @@ class SupportController extends Controller
             Notification::create([
                 'user_id' => $admin->id,
                 'title' => 'New Support Ticket',
-                'message' => "New support ticket #{$ticketNumber} created by " . auth()->user()->name,
+                'message' => "New support ticket #{$ticketNumber} created by " . Auth::user()->name,
                 'type' => 'support',
                 'data' => json_encode([
                     'ticket_id' => $ticket->id,
                     'ticket_number' => $ticketNumber,
-                    'user_name' => auth()->user()->name,
+                    'user_name' => Auth::user()->name,
                     'subject' => $request->subject,
                     'priority' => $request->priority
                 ])
@@ -70,7 +71,7 @@ class SupportController extends Controller
 
     public function myTickets()
     {
-        $tickets = SupportTicket::where('user_id', auth()->id())
+        $tickets = SupportTicket::where('user_id', Auth::id())
             ->with(['messages', 'assignedTo'])
             ->orderBy('created_at', 'desc')
             ->paginate(10);
@@ -81,7 +82,7 @@ class SupportController extends Controller
     public function show(SupportTicket $ticket)
     {
         // Ensure user can only view their own tickets
-        if ($ticket->user_id !== auth()->id() && !auth()->user()->is_admin) {
+        if ($ticket->user_id !== Auth::id() && !Auth::user()->is_admin) {
             abort(403);
         }
 
@@ -97,30 +98,30 @@ class SupportController extends Controller
         ]);
 
         // Ensure user can only reply to their own tickets
-        if ($ticket->user_id !== auth()->id() && !auth()->user()->is_admin) {
+        if ($ticket->user_id !== Auth::id() && !Auth::user()->is_admin) {
             abort(403);
         }
 
         // Create message
         SupportMessage::create([
             'ticket_id' => $ticket->id,
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
             'message' => $request->message,
-            'is_admin_message' => auth()->user()->is_admin,
+            'is_admin_message' => Auth::user()->is_admin,
         ]);
 
         // Update ticket status if admin replied
-        if (auth()->user()->is_admin) {
+        if (Auth::user()->is_admin) {
             $ticket->update(['status' => 'in_progress']);
         }
 
         // Notify the other party
-        $recipientId = auth()->user()->is_admin ? $ticket->user_id : $ticket->assigned_to;
+        $recipientId = Auth::user()->is_admin ? $ticket->user_id : $ticket->assigned_to;
         if ($recipientId) {
             Notification::create([
                 'user_id' => $recipientId,
                 'title' => 'New Message on Ticket #' . $ticket->ticket_number,
-                'message' => auth()->user()->name . ' replied to your support ticket',
+                'message' => Auth::user()->name . ' replied to your support ticket',
                 'type' => 'support',
                 'data' => json_encode([
                     'ticket_id' => $ticket->id,

@@ -429,7 +429,7 @@ const PetSitterDashboard = () => {
                 const hours = diffMs / (1000 * 60 * 60);
                 
                 // Use the user's actual hourly rate from profile
-                const hourlyRate = user?.hourlyRate || 25;
+                const hourlyRate = currentUser?.hourlyRate || 25;
                 totalEarnings = Math.ceil(hours * hourlyRate);
                 
                 console.log('💰 Dashboard earnings calculated:', { 

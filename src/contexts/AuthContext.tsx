@@ -1,7 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import authService, { User } from '../services/authService';
-import locationService, { LocationConfig } from '../services/locationService';
+import locationService from '../services/locationService';
 import realtimeLocationService from '../services/realtimeLocationService';
 
 interface AuthContextType {
@@ -34,6 +35,8 @@ interface AuthContextType {
   isLocationTracking: boolean;
   startLocationTracking: (radius?: number) => Promise<void>;
   stopLocationTracking: () => void;
+  // Profile update trigger for global refresh
+  profileUpdateTrigger: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,6 +62,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
+  const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
+  // Profile update trigger for global refresh
+  const [profileUpdateTrigger, setProfileUpdateTrigger] = useState(0);
 
   useEffect(() => {
     // Check for existing user data and restore if available
@@ -96,16 +102,119 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuthState();
   }, []);
 
-  // Auto-start location tracking when user logs in (disabled to prevent crashes)
+  // Load persisted location data (only for initial load, then use real-time)
+  const loadPersistedLocation = React.useCallback(async () => {
+    try {
+      // Don't load old location data - force fresh location detection
+      console.log('📍 Skipping old location data, will use fresh real-time location');
+      setCurrentLocation(null);
+      setUserAddress(null);
+    } catch (error) {
+      console.error('Error loading persisted location:', error);
+    }
+  }, []);
+
+  // Location tracking functions
+  const startLocationTracking = React.useCallback(async (radius: number = 1000) => {
+    if (!user) {
+      console.log('Cannot start location tracking: no user logged in');
+      return;
+    }
+
+    if (isLocationTracking) {
+      console.log('Location tracking already active');
+      return;
+    }
+
+    try {
+      console.log('📍 Starting location tracking with radius:', radius);
+      setIsLocationTracking(true);
+      
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Location permission denied');
+        setIsLocationTracking(false);
+        return;
+      }
+
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000, // Update every 5 seconds
+          distanceInterval: radius, // Update when moved radius meters
+        },
+        async (location) => {
+          setCurrentLocation(location);
+          console.log('Location updated:', {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            accuracy: location.coords.accuracy,
+            timestamp: new Date(location.timestamp).toLocaleString()
+          });
+
+          // Get address from coordinates
+          try {
+            const address = await locationService.getAddressFromCoordinates(
+              location.coords.latitude,
+              location.coords.longitude
+            );
+            setUserAddress(address);
+            console.log('📍 Real-time address detected:', address);
+
+            // Clear old stored location data and save new real-time location
+            await AsyncStorage.removeItem('user_location');
+            await AsyncStorage.removeItem('user_address');
+            await saveLocationData(location, address);
+
+            // Update user profile with new real-time location
+            if (user) {
+              try {
+                await updateUserProfile({ address: address });
+                console.log('📍 Updated user profile with real-time location');
+              } catch (error) {
+                console.error('Failed to update user profile with location:', error);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to get address:', error);
+            // Still save location even if address fails
+            await saveLocationData(location, null);
+          }
+        }
+      );
+
+      setLocationSubscription(subscription);
+      console.log('📍 Location tracking started successfully');
+    } catch (error) {
+      console.error('Error starting location tracking:', error);
+      setIsLocationTracking(false);
+    }
+  }, [user, isLocationTracking]);
+
+  const stopLocationTracking = React.useCallback(() => {
+    if (locationSubscription) {
+      locationSubscription.remove();
+      setLocationSubscription(null);
+    }
+    setIsLocationTracking(false);
+    console.log('📍 Location tracking stopped');
+  }, [locationSubscription]);
+
+  // Load persisted location on mount
+  useEffect(() => {
+    loadPersistedLocation();
+  }, [loadPersistedLocation]);
+
+  // Auto-start location tracking when user logs in
   useEffect(() => {
     if (user && !isLocationTracking) {
-      console.log('User logged in, location tracking available but not auto-started');
-      // startLocationTracking(1000); // Disabled to prevent crashes
+      console.log('User logged in, starting location tracking immediately');
+      startLocationTracking(1000); // Enable real-time location tracking
     } else if (!user && isLocationTracking) {
       console.log('User logged out, stopping location tracking...');
       stopLocationTracking();
     }
-  }, [user, isLocationTracking]);
+  }, [user, isLocationTracking, startLocationTracking]);
 
 
   const login = async (email: string, password: string) => {
@@ -170,15 +279,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('AuthContext: User state updated successfully');
         console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
         
-        // If this is a pet sitter and hourly rate was updated, refresh location data
-        if (user.role === 'pet_sitter' && profileData.hourlyRate !== undefined) {
-          console.log('AuthContext: Pet sitter hourly rate updated, refreshing location data');
+        // Trigger global refresh for all components
+        setProfileUpdateTrigger(prev => prev + 1);
+        console.log('AuthContext: Triggered global profile update refresh');
+        
+        // If this is a pet sitter and profile was updated, refresh location data
+        console.log('AuthContext: Checking user role for profile update:', user.role, 'is pet_sitter:', user.role === 'pet_sitter');
+        if (user.role === 'pet_sitter' && (profileData.hourlyRate !== undefined || profileData.name !== undefined)) {
+          console.log('AuthContext: Pet sitter profile updated, refreshing location data');
           try {
-            // Update the sitter's location data with the new hourly rate
+            // Clear sitter cache to force refresh in find sitter map
+            realtimeLocationService.clearSitterCache();
+            console.log('AuthContext: Cleared sitter cache for profile update');
+            
+            // Update the sitter's location data with the new profile info
             await realtimeLocationService.updateSitterLocation({
               id: user.id,
               userId: user.id,
-              name: user.name,
+              name: updatedUser.name,
               email: user.email,
               location: {
                 latitude: currentLocation?.coords.latitude || 0,
@@ -189,7 +307,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               experience: user.experience || '1 year',
               petTypes: user.selectedPetTypes || ['dogs', 'cats'],
               selectedBreeds: user.selectedBreeds || ['All breeds welcome'],
-              hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : profileData.hourlyRate,
+              hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
               rating: 4.5,
               reviews: 0,
               bio: user.aboutMe || 'Professional pet sitter ready to help!',
@@ -221,6 +339,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(user);
         
         // If this is a pet sitter, update their location data with latest profile info
+        console.log('AuthContext: Checking user role for login:', user.role, 'is pet_sitter:', user.role === 'pet_sitter');
         if (user.role === 'pet_sitter') {
           console.log('AuthContext: Pet sitter logged in, updating location data with latest profile');
           try {
@@ -289,93 +408,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Location tracking functions
-  const startLocationTracking = React.useCallback(async (radius: number = 1000) => {
-    if (!user) {
-      console.log('Cannot start location tracking: no user logged in');
-      return;
-    }
-
+  // Save location data persistently
+  const saveLocationData = React.useCallback(async (location: Location.LocationObject | null, address: string | null) => {
     try {
-      console.log('Starting location tracking for user:', user.email);
+      if (location) {
+        await AsyncStorage.setItem('user_location', JSON.stringify(location));
+        console.log('📍 Saved location persistently');
+      }
       
-      const config: LocationConfig = {
-        radius,
-        updateInterval: 30000, // 30 seconds
-        onLocationUpdate: async (location) => {
-          setCurrentLocation(location);
-          console.log('Location updated:', {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy,
-            timestamp: new Date(location.timestamp).toLocaleString()
-          });
-
-          // Get address from coordinates
-          try {
-            const address = await locationService.getAddressFromCoordinates(
-              location.coords.latitude,
-              location.coords.longitude
-            );
-            setUserAddress(address);
-            console.log('User address:', address);
-          } catch (error) {
-            console.error('Failed to get address:', error);
-          }
-        },
-        onRadiusEnter: (location) => {
-          console.log('User entered radius:', radius, 'meters');
-        },
-        onRadiusExit: (location) => {
-          console.log('User exited radius:', radius, 'meters');
-        },
-        onError: (error) => {
-          console.error('Location tracking error:', error);
-          setIsLocationTracking(false);
-        }
-      };
-
-      await locationService.startLocationTracking(config);
-      setIsLocationTracking(true);
-      
-      console.log('Location tracking started successfully for user:', user.email);
+      if (address) {
+        await AsyncStorage.setItem('user_address', address);
+        console.log('📍 Saved address persistently');
+      }
     } catch (error) {
-      console.error('Failed to start location tracking:', error);
-      setIsLocationTracking(false);
-    }
-  }, [user]);
-
-  const stopLocationTracking = React.useCallback(() => {
-    try {
-      locationService.stopLocationTracking();
-      setIsLocationTracking(false);
-      setCurrentLocation(null);
-      setUserAddress(null);
-      console.log('Location tracking stopped');
-    } catch (error) {
-      console.error('Error stopping location tracking:', error);
+      console.error('Error saving location data:', error);
     }
   }, []);
-
-  // Start location tracking when user logs in (disabled to prevent crashes)
-  useEffect(() => {
-    if (user && !isLocationTracking) {
-      console.log('User logged in, location tracking available but not auto-started');
-      // startLocationTracking(1000); // Disabled to prevent crashes
-    } else if (!user && isLocationTracking) {
-      console.log('User logged out, stopping location tracking...');
-      stopLocationTracking();
-    }
-  }, [user, isLocationTracking, startLocationTracking, stopLocationTracking]);
-
-  // Cleanup location tracking on unmount
-  useEffect(() => {
-    return () => {
-      if (isLocationTracking) {
-        stopLocationTracking();
-      }
-    };
-  }, [isLocationTracking, stopLocationTracking]);
 
   const value = {
     user,
@@ -393,6 +441,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLocationTracking,
     startLocationTracking,
     stopLocationTracking,
+    // Profile update trigger for global refresh
+    profileUpdateTrigger,
   };
 
   return (

@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 
 const ProfileScreen = () => {
-  const { user, logout, updateUserProfile, refresh, isLoading } = useAuth();
+  const { user, logout, updateUserProfile, refresh, isLoading, currentLocation, userAddress, startLocationTracking } = useAuth();
   const router = useRouter();
   
   console.log('ProfileScreen: Rendering with user:', user);
@@ -115,6 +115,25 @@ const ProfileScreen = () => {
     );
   }
 
+  // Auto-populate location field when userAddress is available
+  React.useEffect(() => {
+    if (userAddress) {
+      console.log('📍 ProfileScreen: Auto-populating location field with:', userAddress);
+      setProfileData(prev => ({
+        ...prev,
+        address: userAddress
+      }));
+    }
+  }, [userAddress]);
+
+  // Start location tracking when user logs in
+  React.useEffect(() => {
+    if (user && !currentLocation) {
+      console.log('📍 ProfileScreen: Starting location tracking for user');
+      startLocationTracking(1000);
+    }
+  }, [user, currentLocation, startLocationTracking]);
+
   // Update profileData when user changes
   React.useEffect(() => {
     console.log('🚀 ProfileScreen: Main useEffect triggered with user:', user);
@@ -141,7 +160,7 @@ const ProfileScreen = () => {
         phone: user.phone || '',
         age: user.age ? user.age.toString() : '',
         gender: user.gender || '',
-        address: user.address || '',
+        address: userAddress || '', // Use only real-time location
         aboutMe: user.aboutMe || '',
         petBreeds: user.selectedBreeds || [],
         // Only include sitter-specific fields for pet sitters
@@ -450,12 +469,6 @@ const ProfileScreen = () => {
                 : 'Enter Your Name'
               }
             </Text>
-            {profileData.address ? (
-              <View style={styles.locationContainer}>
-                <Ionicons name="location" size={16} color="#FF6B6B" />
-                <Text style={styles.locationText}>{profileData.address}</Text>
-              </View>
-            ) : null}
           </View>
         </View>
 
@@ -574,13 +587,22 @@ const ProfileScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Location</Text>
+            <View style={styles.locationInputHeader}>
+              <Text style={styles.inputLabel}>Location</Text>
+              {userAddress && (
+                <View style={styles.autoLocationIndicator}>
+                  <Ionicons name="location" size={14} color="#4CAF50" />
+                  <Text style={styles.autoLocationText}>Auto-detected</Text>
+                </View>
+              )}
+            </View>
             <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
+              style={[styles.input, styles.disabledInput]}
               value={profileData.address}
-              onChangeText={(text) => setProfileData({...profileData, address: text})}
-              editable={isEditing}
-              placeholder="Enter your address"
+              editable={false}
+              selectTextOnFocus={false}
+              pointerEvents="none"
+              placeholder={userAddress ? "Location auto-detected" : "Getting your location..."}
             />
           </View>
 
@@ -834,15 +856,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 5,
   },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 5,
-  },
   buttonContainer: {
     width: '75%',
     marginBottom: 30,
@@ -908,6 +921,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
+  },
+  locationInputHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  autoLocationIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  autoLocationText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+    marginLeft: 4,
   },
   input: {
     borderWidth: 1,

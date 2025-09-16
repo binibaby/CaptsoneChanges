@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const PetSitterProfileScreen = () => {
   const router = useRouter();
-  const { user, logout, updateUserProfile } = useAuth();
+  const { user, logout, updateUserProfile, currentLocation, userAddress, startLocationTracking } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
     name: '',
@@ -47,6 +47,25 @@ const PetSitterProfileScreen = () => {
     { type: 'driver', label: "Driver's License (LTO)", icon: 'car', color: '#795548', verified: false },
   ]);
 
+  // Auto-populate location field when userAddress is available
+  useEffect(() => {
+    if (userAddress) {
+      console.log('📍 PetSitterProfileScreen: Auto-populating location field with:', userAddress);
+      setProfile(prev => ({
+        ...prev,
+        location: userAddress
+      }));
+    }
+  }, [userAddress]);
+
+  // Start location tracking when user logs in
+  useEffect(() => {
+    if (user && !currentLocation) {
+      console.log('📍 PetSitterProfileScreen: Starting location tracking for user');
+      startLocationTracking(1000);
+    }
+  }, [user, currentLocation, startLocationTracking]);
+
   // Update profile data when user changes
   useEffect(() => {
     if (user) {
@@ -63,7 +82,7 @@ const PetSitterProfileScreen = () => {
         phone: user.phone || '',
         bio: user.aboutMe || '',
         hourlyRate: user.hourlyRate || '',
-        location: user.address || '',
+        location: userAddress || '', // Use only real-time location
         specialties: user.specialties || [],
         experience: user.experience || '',
         rating: 0,
@@ -77,7 +96,7 @@ const PetSitterProfileScreen = () => {
     } else {
       console.log('📱 PetSitterProfileScreen: No user data available');
     }
-  }, [user]);
+  }, [user, userAddress]);
 
   // Refresh user data when screen comes into focus
   useFocusEffect(
@@ -365,6 +384,8 @@ const PetSitterProfileScreen = () => {
           </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile.name}</Text>
+            
+            
             {/* Badge Row */}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               {verifiedIDs.filter((id) => id.verified).map((id) => (
@@ -386,7 +407,6 @@ const PetSitterProfileScreen = () => {
             <View style={styles.ratingContainer}>
               <Text style={styles.reviewsText}>({profile.reviews} reviews)</Text>
             </View>
-            <Text style={styles.locationText}>📍 {profile.location}</Text>
           </View>
         </View>
 
@@ -493,12 +513,22 @@ const PetSitterProfileScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Location</Text>
+            <View style={styles.locationInputHeader}>
+              <Text style={styles.inputLabel}>Location</Text>
+              {userAddress && (
+                <View style={styles.autoLocationIndicator}>
+                  <Ionicons name="location" size={14} color="#4CAF50" />
+                  <Text style={styles.autoLocationText}>Auto-detected</Text>
+                </View>
+              )}
+            </View>
             <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
+              style={[styles.input, styles.disabledInput]}
               value={profile.location}
-              onChangeText={(text) => setProfile({...profile, location: text})}
-              editable={isEditing}
+              editable={false}
+              selectTextOnFocus={false}
+              pointerEvents="none"
+              placeholder={userAddress ? "Location auto-detected" : "Getting your location..."}
             />
           </View>
 
@@ -516,16 +546,15 @@ const PetSitterProfileScreen = () => {
         </View>
 
         {/* Experience Section */}
-        <View style={[styles.section, { marginBottom: 30, paddingBottom: 25 }]}>
+        <View style={[styles.section, { marginBottom: 20, paddingBottom: 15 }]}>
           <Text style={styles.sectionTitle}>Years of Experience</Text>
           <TextInput
-            style={[styles.bioInput, !isEditing && styles.disabledInput]}
+            style={[styles.experienceInput, !isEditing && styles.disabledInput]}
             value={profile.experience}
             onChangeText={(text) => setProfile({...profile, experience: text})}
             editable={isEditing}
             placeholder="e.g., 3, 1.5, 0.5"
             keyboardType="numeric"
-            numberOfLines={4}
           />
         </View>
 
@@ -673,10 +702,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 5,
   },
-  locationText: {
-    fontSize: 14,
-    color: '#666',
-  },
   statsContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -761,6 +786,26 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 5,
   },
+  locationInputHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  autoLocationIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  autoLocationText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -769,6 +814,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  experienceInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    height: 45,
   },
   disabledInput: {
     backgroundColor: '#F8F9FA',

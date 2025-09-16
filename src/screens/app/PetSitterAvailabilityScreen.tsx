@@ -2,22 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import Modal from 'react-native-modal';
-import { makeApiCall } from '../../services/networkService';
 import { getAuthHeaders } from '../../constants/config';
 import authService from '../../services/authService';
+import { makeApiCall } from '../../services/networkService';
 
 interface TimeRange {
   id: string;
@@ -51,6 +51,17 @@ const PetSitterAvailabilityScreen = () => {
   const [tempStartTime, setTempStartTime] = useState(new Date());
   const [tempEndTime, setTempEndTime] = useState(new Date());
   const [openedFromEdit, setOpenedFromEdit] = useState(false);
+  
+  // Week availability popup state
+  const [showWeekPopup, setShowWeekPopup] = useState(false);
+  const [weekStartDate, setWeekStartDate] = useState(new Date());
+  const [weekEndDate, setWeekEndDate] = useState(new Date());
+  const [weekStartTime, setWeekStartTime] = useState(new Date());
+  const [weekEndTime, setWeekEndTime] = useState(new Date());
+  const [showWeekStartDatePicker, setShowWeekStartDatePicker] = useState(false);
+  const [showWeekEndDatePicker, setShowWeekEndDatePicker] = useState(false);
+  const [showWeekStartTimePicker, setShowWeekStartTimePicker] = useState(false);
+  const [showWeekEndTimePicker, setShowWeekEndTimePicker] = useState(false);
 
   // Save availability data to AsyncStorage and backend
   const saveAvailabilityData = async (data: { [date: string]: TimeRange[] }) => {
@@ -482,6 +493,33 @@ const PetSitterAvailabilityScreen = () => {
           />
         </View>
 
+        {/* Set for a Week Button */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#8B5CF6',
+            borderRadius: 20,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            margin: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            elevation: 3,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+          }}
+          onPress={() => {
+            console.log('Set for a Week button pressed');
+            setShowWeekPopup(true);
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="calendar" size={20} color="#fff" />
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Set for a Week</Text>
+        </TouchableOpacity>
 
         {/* Show selected availabilities */}
         <View style={styles.availabilitiesSection}>
@@ -838,6 +876,174 @@ const PetSitterAvailabilityScreen = () => {
         </View>
       )}
 
+      {/* Week Availability Popup */}
+      {showWeekPopup && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }}>
+          <View style={{ 
+            backgroundColor: '#fff', 
+            borderRadius: 16, 
+            padding: 24, 
+            alignItems: 'center',
+            width: '90%',
+            maxWidth: 400,
+          }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 16 }}>Set Availability for a Week</Text>
+            
+            {/* Start Date */}
+            <View style={{ width: '100%', marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>Start Date</Text>
+              <TouchableOpacity
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  backgroundColor: '#F8F9FA',
+                }}
+                onPress={() => setShowWeekStartDatePicker(true)}
+              >
+                <Text style={{ fontSize: 16, color: '#333' }}>
+                  {weekStartDate.toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* End Date */}
+            <View style={{ width: '100%', marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>End Date</Text>
+              <TouchableOpacity
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  backgroundColor: '#F8F9FA',
+                }}
+                onPress={() => setShowWeekEndDatePicker(true)}
+              >
+                <Text style={{ fontSize: 16, color: '#333' }}>
+                  {weekEndDate.toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Start Time */}
+            <View style={{ width: '100%', marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>Start Time</Text>
+              <TouchableOpacity
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  backgroundColor: '#F8F9FA',
+                }}
+                onPress={() => setShowWeekStartTimePicker(true)}
+              >
+                <Text style={{ fontSize: 16, color: '#333' }}>
+                  {weekStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* End Time */}
+            <View style={{ width: '100%', marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>End Time</Text>
+              <TouchableOpacity
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E0E0E0',
+                  borderRadius: 8,
+                  padding: 12,
+                  backgroundColor: '#F8F9FA',
+                }}
+                onPress={() => setShowWeekEndTimePicker(true)}
+              >
+                <Text style={{ fontSize: 16, color: '#333' }}>
+                  {weekEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Buttons */}
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                style={{ 
+                  backgroundColor: '#EF4444', 
+                  borderRadius: 8, 
+                  padding: 12, 
+                  flex: 1, 
+                  alignItems: 'center' 
+                }}
+                onPress={() => {
+                  setShowWeekPopup(false);
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ 
+                  backgroundColor: '#10B981', 
+                  borderRadius: 8, 
+                  padding: 12, 
+                  flex: 1, 
+                  alignItems: 'center' 
+                }}
+                onPress={() => {
+                  // Save week availability
+                  const startDate = new Date(weekStartDate);
+                  const endDate = new Date(weekEndDate);
+                  const newAvailabilities = { ...availabilities };
+                  
+                  // Generate time range for each day
+                  const timeRange: TimeRange = {
+                    id: Date.now().toString(),
+                    startTime: weekStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    endTime: weekEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  };
+
+                  // Add availability for each day in the range
+                  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    newAvailabilities[dateStr] = [timeRange];
+                  }
+
+                  setAvailabilities(newAvailabilities);
+                  saveAvailabilityData(newAvailabilities);
+                  
+                  // Update marked dates
+                  const newMarkedDates = { ...markedDates };
+                  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    newMarkedDates[dateStr] = {
+                      selected: true,
+                      selectedColor: '#8B5CF6',
+                      selectedTextColor: '#fff',
+                    };
+                  }
+                  setMarkedDates(newMarkedDates);
+                  
+                  setShowWeekPopup(false);
+                  console.log('Week availability saved:', newAvailabilities);
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Time Pickers - Positioned on top of everything */}
       {showStartTimePicker && (
         <View style={styles.timePickerOverlay}>
@@ -879,6 +1085,143 @@ const PetSitterAvailabilityScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity style={styles.timePickerSaveButton} onPress={handleSaveEndTime}>
                 <Text style={styles.timePickerSaveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Week Date and Time Pickers */}
+      {showWeekStartDatePicker && (
+        <View style={styles.timePickerOverlay}>
+          <View style={styles.timePickerContainer}>
+            <Text style={styles.timePickerTitle}>Select Start Date</Text>
+            <DateTimePicker
+              value={weekStartDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'compact' : 'default'}
+              onChange={(event, selectedDate) => {
+                console.log('Date picker event:', event.type, selectedDate);
+                if (selectedDate) {
+                  setWeekStartDate(selectedDate);
+                }
+                setShowWeekStartDatePicker(false);
+              }}
+            />
+            <View style={styles.timePickerButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowWeekStartDatePicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.timePickerSaveButton} 
+                onPress={() => setShowWeekStartDatePicker(false)}
+              >
+                <Text style={styles.timePickerSaveButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {showWeekEndDatePicker && (
+        <View style={styles.timePickerOverlay}>
+          <View style={styles.timePickerContainer}>
+            <Text style={styles.timePickerTitle}>Select End Date</Text>
+            <DateTimePicker
+              value={weekEndDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'compact' : 'default'}
+              onChange={(event, selectedDate) => {
+                console.log('End date picker event:', event.type, selectedDate);
+                if (selectedDate) {
+                  setWeekEndDate(selectedDate);
+                }
+                setShowWeekEndDatePicker(false);
+              }}
+            />
+            <View style={styles.timePickerButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowWeekEndDatePicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.timePickerSaveButton} 
+                onPress={() => setShowWeekEndDatePicker(false)}
+              >
+                <Text style={styles.timePickerSaveButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {showWeekStartTimePicker && (
+        <View style={styles.timePickerOverlay}>
+          <View style={styles.timePickerContainer}>
+            <Text style={styles.timePickerTitle}>Select Start Time</Text>
+            <DateTimePicker
+              value={weekStartTime}
+              mode="time"
+              is24Hour={false}
+              display="default"
+              onChange={(event, selectedTime) => {
+                if (selectedTime) {
+                  setWeekStartTime(selectedTime);
+                }
+                setShowWeekStartTimePicker(false);
+              }}
+            />
+            <View style={styles.timePickerButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowWeekStartTimePicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.timePickerSaveButton} 
+                onPress={() => setShowWeekStartTimePicker(false)}
+              >
+                <Text style={styles.timePickerSaveButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {showWeekEndTimePicker && (
+        <View style={styles.timePickerOverlay}>
+          <View style={styles.timePickerContainer}>
+            <Text style={styles.timePickerTitle}>Select End Time</Text>
+            <DateTimePicker
+              value={weekEndTime}
+              mode="time"
+              is24Hour={false}
+              display="default"
+              onChange={(event, selectedTime) => {
+                if (selectedTime) {
+                  setWeekEndTime(selectedTime);
+                }
+                setShowWeekEndTimePicker(false);
+              }}
+            />
+            <View style={styles.timePickerButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowWeekEndTimePicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.timePickerSaveButton} 
+                onPress={() => setShowWeekEndTimePicker(false)}
+              >
+                <Text style={styles.timePickerSaveButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>

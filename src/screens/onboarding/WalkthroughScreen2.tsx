@@ -16,7 +16,7 @@ const WalkthroughScreen2: React.FC<WalkthroughScreen2Props> = ({ onNext }) => {
   return (
     <View style={styles.container}>
       <Image
-        source={require('../../assets/images/walkthrough2.png')} // Placeholder image
+        source={require('../../assets/images/on2.png')} // Placeholder image
         style={styles.image}
       />
       <View style={styles.content}>

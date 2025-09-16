@@ -14,7 +14,7 @@ echo ""
 
 # Test the login API
 echo "🌐 Testing backend login API..."
-response=$(curl -s -X POST http://192.168.100.175:8000/api/login \
+response=$(curl -s -X POST http://172.20.10.2:8000/api/login \
   -H "Content-Type: application/json" \
   -d "{\"email\": \"$EMAIL\", \"password\": \"$PASSWORD\"}")
 
@@ -38,7 +38,7 @@ fi
 
 echo ""
 echo "💡 If login fails, check:"
-echo "   1. Backend server is running on http://192.168.100.175:8000"
+echo "   1. Backend server is running on http://172.20.10.2:8000"
 echo "   2. User exists in database"
 echo "   3. Password is correct"
 echo "   4. Network connectivity"

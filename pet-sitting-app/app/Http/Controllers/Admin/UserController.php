@@ -573,4 +573,62 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Check for user status updates (API endpoint for auto-refresh)
+     */
+    public function statusUpdates(Request $request)
+    {
+        // Get the last check time from session or default to 5 minutes ago
+        $lastCheck = session('last_user_check', now()->subMinutes(5));
+        
+        // Check for any user updates since last check
+        $updatedUsers = User::where('updated_at', '>', $lastCheck)
+            ->orWhere('created_at', '>', $lastCheck)
+            ->get(['id', 'name', 'email', 'status', 'updated_at', 'created_at']);
+        
+        $hasUpdates = $updatedUsers->count() > 0;
+        
+        // Update the last check time
+        session(['last_user_check' => now()]);
+        
+        return response()->json([
+            'hasUpdates' => $hasUpdates,
+            'updatedCount' => $updatedUsers->count(),
+            'updatedUsers' => $updatedUsers->map(function($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'status' => $user->status,
+                    'updated_at' => $user->updated_at->toISOString(),
+                    'is_new' => $user->created_at > $lastCheck
+                ];
+            }),
+            'timestamp' => now()->toISOString()
+        ]);
+    }
+
+    /**
+     * Update user status (API endpoint for real-time updates)
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+        
+        $request->validate([
+            'status' => 'required|in:active,pending,suspended,banned'
+        ]);
+        
+        $user->update([
+            'status' => $request->status,
+            'updated_at' => now()
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'User status updated successfully',
+            'user' => $user->fresh()
+        ]);
+    }
 }

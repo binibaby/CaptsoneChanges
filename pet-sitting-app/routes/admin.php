@@ -32,6 +32,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         // Profile Image Management
         Route::post('/{user}/profile-image', [UserController::class, 'updateProfileImage'])->name('update-profile-image');
         Route::delete('/{user}/profile-image', [UserController::class, 'deleteProfileImage'])->name('delete-profile-image');
+        
+        // API endpoints for auto-refresh
+        Route::get('/api/status-updates', [UserController::class, 'statusUpdates'])->name('api.status-updates');
+        Route::post('/api/{user}/status', [UserController::class, 'updateStatus'])->name('api.update-status');
     });
 
     // Payment Management

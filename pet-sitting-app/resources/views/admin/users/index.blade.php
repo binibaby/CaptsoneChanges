@@ -159,4 +159,173 @@
         </div>
     </div>
 </div>
+
+<script>
+let refreshInterval = null;
+let isRefreshing = false;
+
+// Auto-refresh user data every 30 seconds
+function startAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+    
+    refreshInterval = setInterval(function() {
+        if (!isRefreshing) {
+            checkForUpdates();
+        }
+    }, 30000);
+}
+
+// Check for updates without full page reload
+function checkForUpdates() {
+    isRefreshing = true;
+    showRefreshIndicator();
+    
+    fetch('/admin/api/users/status-updates')
+        .then(response => response.json())
+        .then(data => {
+            hideRefreshIndicator();
+            if (data.hasUpdates) {
+                // Show detailed update notification
+                const message = data.updatedCount === 1 
+                    ? `1 user updated - refreshing...`
+                    : `${data.updatedCount} users updated - refreshing...`;
+                showUpdateNotification(message);
+                
+                // Log updated users for debugging
+                if (data.updatedUsers && data.updatedUsers.length > 0) {
+                    console.log('Updated users:', data.updatedUsers);
+                }
+                
+                // Refresh the page to show updated data
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            }
+        })
+        .catch(error => {
+            hideRefreshIndicator();
+            console.log('User status check failed:', error);
+        })
+        .finally(() => {
+            isRefreshing = false;
+        });
+}
+
+// Real-time user updates
+function updateUserStatus(userId, status) {
+    fetch(`/admin/api/users/${userId}/status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showUpdateNotification('User status updated successfully');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+    })
+    .catch(error => console.error('Error updating user status:', error));
+}
+
+// Show loading indicator during refresh
+function showRefreshIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'refresh-indicator';
+    indicator.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+    indicator.innerHTML = '<div class="flex items-center"><div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>Checking for updates...</div>';
+    document.body.appendChild(indicator);
+}
+
+// Remove loading indicator
+function hideRefreshIndicator() {
+    const indicator = document.getElementById('refresh-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+// Show update notification
+function showUpdateNotification(message = 'User data updated - refreshing...') {
+    const notification = document.createElement('div');
+    notification.id = 'update-notification';
+    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <div class="animate-pulse mr-2">✓</div>
+            ${message}
+        </div>
+    `;
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+// Manual refresh button functionality
+function manualRefresh() {
+    if (!isRefreshing) {
+        checkForUpdates();
+    }
+}
+
+// Add refresh button to the page
+function addRefreshButton() {
+    const existingButton = document.getElementById('manual-refresh-btn');
+    if (existingButton) return;
+    
+    const refreshButton = document.createElement('button');
+    refreshButton.id = 'manual-refresh-btn';
+    refreshButton.className = 'inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 ml-3';
+    refreshButton.innerHTML = `
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        Refresh
+    `;
+    refreshButton.onclick = manualRefresh;
+    
+    // Add to the existing button group
+    const buttonGroup = document.querySelector('.flex.space-x-3');
+    if (buttonGroup) {
+        buttonGroup.appendChild(refreshButton);
+    }
+}
+
+// Initialize auto-refresh when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startAutoRefresh();
+    addRefreshButton();
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+
+// Pause auto-refresh when page is not visible
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+        }
+    } else {
+        startAutoRefresh();
+    }
+});
+</script>
 @endsection 
