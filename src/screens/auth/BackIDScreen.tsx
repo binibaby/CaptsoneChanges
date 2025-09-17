@@ -17,7 +17,7 @@ interface BackIDScreenProps {
   userData?: any;
   phoneVerified?: boolean;
   frontImage?: string;
-  onBackIDComplete?: (phoneVerified: boolean, frontImage: string, backImage: string) => void;
+  onBackIDComplete?: (phoneVerified: boolean, frontImage: string, backImage: string, userData?: any) => void;
 }
 
 const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, phoneVerified: propPhoneVerified, frontImage: propFrontImage, onBackIDComplete }) => {
@@ -76,8 +76,8 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
 
     // Use callback if available, otherwise use navigation
     if (onBackIDComplete) {
-      console.log('Using callback for navigation');
-      onBackIDComplete(phoneVerified, frontImage, backImage);
+      console.log('Using callback for navigation with user data');
+      onBackIDComplete(phoneVerified, frontImage, backImage, userData);
     } else {
       console.log('Using navigation prop');
       // Navigate to selfie screen with all collected data
@@ -125,7 +125,7 @@ const BackIDScreen: React.FC<BackIDScreenProps> = ({ userData: propUserData, pho
                       onPress: () => {
                         // Navigate to selfie screen without back image
                         if (onBackIDComplete) {
-                          onBackIDComplete(phoneVerified, frontImage, '');
+                          onBackIDComplete(phoneVerified, frontImage, '', userData);
                         } else {
                           navigation.navigate('Selfie', {
                             userData: userData,

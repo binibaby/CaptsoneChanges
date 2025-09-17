@@ -58,7 +58,7 @@ class LocationController extends Controller
             'specialties' => $user->specialties ?: ['General Pet Care'],
             'experience' => $user->experience ?: '1 year',
             'pet_types' => $user->selected_pet_types ?: ['dogs', 'cats'],
-            'selected_breeds' => $user->pet_breeds ?: ['All breeds welcome'],
+            'selected_breeds' => $user->pet_breeds ? $this->formatBreedNames($user->pet_breeds) : ['All breeds welcome'],
             'hourly_rate' => $user->hourly_rate ?: 25,
             'rating' => 4.5, // Default rating
             'reviews' => 0, // Default reviews
@@ -168,7 +168,7 @@ class LocationController extends Controller
                         'specialties' => $user->specialties ?: $sitterData['specialties'],
                         'experience' => $user->experience ?: $sitterData['experience'],
                         'petTypes' => $user->selected_pet_types ?: $sitterData['pet_types'],
-                        'selectedBreeds' => $user->pet_breeds ?: $sitterData['selected_breeds'],
+                        'selectedBreeds' => ($user->pet_breeds && count($user->pet_breeds) > 0) ? $this->formatBreedNames($user->pet_breeds) : $this->formatBreedNames($sitterData['selected_breeds']),
                         'hourlyRate' => $user->hourly_rate ?: $sitterData['hourly_rate'],
                         'rating' => $sitterData['rating'],
                         'reviews' => $sitterData['reviews'],
@@ -196,7 +196,7 @@ class LocationController extends Controller
                     'specialties' => $sitterData['specialties'],
                     'experience' => $sitterData['experience'],
                     'petTypes' => $sitterData['pet_types'],
-                    'selectedBreeds' => $sitterData['selected_breeds'],
+                    'selectedBreeds' => ($sitterData['selected_breeds'] && count($sitterData['selected_breeds']) > 0) ? $this->formatBreedNames($sitterData['selected_breeds']) : ['All breeds welcome'],
                     'hourlyRate' => $sitterData['hourly_rate'],
                     'rating' => $sitterData['rating'],
                     'reviews' => $sitterData['reviews'],
@@ -468,5 +468,49 @@ class LocationController extends Controller
         $c = 2 * atan2(sqrt($a), sqrt(1-$a));
         $distance = $R * $c; // Distance in kilometers
         return $distance;
+    }
+
+    /**
+     * Convert breed IDs to readable names
+     */
+    private function formatBreedNames($breeds)
+    {
+        if (!$breeds || !is_array($breeds)) {
+            return $breeds;
+        }
+
+        $breedMapping = [
+            // Dog breeds
+            'labrador' => 'Labrador Retriever',
+            'golden' => 'Golden Retriever',
+            'german-shepherd' => 'German Shepherd',
+            'bulldog' => 'Bulldog',
+            'beagle' => 'Beagle',
+            'poodle' => 'Poodle',
+            'rottweiler' => 'Rottweiler',
+            'yorkshire' => 'Yorkshire Terrier',
+            'boxer' => 'Boxer',
+            'dachshund' => 'Dachshund',
+            // Cat breeds
+            'persian' => 'Persian',
+            'siamese' => 'Siamese',
+            'maine-coon' => 'Maine Coon',
+            'ragdoll' => 'Ragdoll',
+            'british-shorthair' => 'British Shorthair',
+            'abyssinian' => 'Abyssinian',
+            'russian-blue' => 'Russian Blue',
+            'bengal' => 'Bengal',
+            'sphynx' => 'Sphynx',
+            'scottish-fold' => 'Scottish Fold',
+        ];
+
+        return array_map(function($breed) use ($breedMapping) {
+            // If we have a mapping for this ID, use the readable name
+            if (isset($breedMapping[$breed])) {
+                return $breedMapping[$breed];
+            }
+            // Otherwise, return the original value (it might already be a readable name)
+            return $breed;
+        }, $breeds);
     }
 }

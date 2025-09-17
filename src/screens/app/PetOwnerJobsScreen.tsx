@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Image,
     SafeAreaView,
@@ -31,6 +32,23 @@ const PetOwnerJobsScreen = () => {
   const [jobs, setJobs] = useState<Job[]>([
     // New users start with no jobs
   ]);
+
+  // Check if user is logged out and redirect to onboarding
+  useEffect(() => {
+    const checkLogoutStatus = async () => {
+      try {
+        const loggedOut = await AsyncStorage.getItem('user_logged_out');
+        if (loggedOut === 'true') {
+          console.log('PetOwnerJobsScreen: User was logged out, redirecting to onboarding');
+          router.replace('/onboarding');
+        }
+      } catch (error) {
+        console.error('Error checking logout status:', error);
+      }
+    };
+    
+    checkLogoutStatus();
+  }, [router]);
 
   const handleBack = () => {
     router.back();

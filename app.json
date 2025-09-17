@@ -53,6 +53,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "packagerOpts": {
+      "config": "metro.config.js",
+      "https": false,
+      "port": 8081,
+      "host": "0.0.0.0"
     }
   }
 }

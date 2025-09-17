@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Auth\LoginController;
 
 // Root route - redirect to admin login
@@ -15,13 +16,19 @@ Route::get('/admin/login', function () {
 
 Route::post('/admin/login', [LoginController::class, 'adminLogin'])->name('admin.login.post');
 
+// Handle admin redirect for unauthenticated users (must be before admin routes)
+Route::get('/admin', function () {
+    if (Auth::check()) {
+        return redirect()->route('admin.dashboard');
+    }
+    return redirect()->route('admin.login');
+})->name('admin.redirect');
+
 // Include admin routes
 require __DIR__.'/admin.php';
 require __DIR__.'/auth.php';
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->name('dashboard');
+// Removed conflicting dashboard route - admin dashboard is the main one
 
 // Support Routes
 Route::middleware(['auth'])->group(function () {
@@ -46,6 +53,19 @@ Route::get('/admin-test/support/live-chat', function () {
 Route::get('/live-chat-test', function () {
     return view('admin.support.live-chat', ['activeChats' => collect([])]);
 })->name('live-chat.test');
+
+// Test admin dashboard without authentication
+Route::get('/admin-test', function () {
+    $stats = [
+        'total_users' => 0,
+        'total_bookings' => 0,
+        'total_payments' => 0,
+        'total_verifications' => 0,
+    ];
+    $recentActivities = collect([]);
+    $chartsData = [];
+    return view('admin.dashboard', compact('stats', 'recentActivities', 'chartsData'));
+})->name('admin.test');
 
 // Simple admin login and dashboard (working version)
 Route::get('/admin-dashboard', function () {

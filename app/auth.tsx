@@ -43,11 +43,19 @@ export default function Auth() {
     setAuthStep('signup2');
   };
   const goToSignup3 = (selectedPetTypes: ('dogs' | 'cats')[]) => {
-    setSignupData({ ...signupData, selectedPetTypes });
+    const newSignupData = { ...signupData, selectedPetTypes };
+    console.log('🔄 goToSignup3 - Previous signupData:', signupData);
+    console.log('🔄 goToSignup3 - New selectedPetTypes:', selectedPetTypes);
+    console.log('🔄 goToSignup3 - New signupData:', newSignupData);
+    setSignupData(newSignupData);
     setAuthStep('signup3');
   };
   const goToSignup4 = (selectedBreeds: string[]) => {
-    setSignupData({ ...signupData, selectedBreeds });
+    const newSignupData = { ...signupData, selectedBreeds };
+    console.log('🔄 goToSignup4 - Previous signupData:', signupData);
+    console.log('🔄 goToSignup4 - New selectedBreeds:', selectedBreeds);
+    console.log('🔄 goToSignup4 - New signupData:', newSignupData);
+    setSignupData(newSignupData);
     setAuthStep('signup4');
   };
 
@@ -60,12 +68,18 @@ export default function Auth() {
     setSignupData({ ...signupData, phoneVerified });
     setAuthStep('front-id');
   };
-  const goToBackID = (phoneVerified: boolean, frontImage: string) => {
-    setSignupData({ ...signupData, phoneVerified, frontImage });
+  
+  const goToFrontIDWithUserData = (phoneVerified: boolean, userData: any) => {
+    console.log('goToFrontIDWithUserData called with:', { phoneVerified, userData });
+    setSignupData({ ...signupData, phoneVerified, userData: userData || signupData.userData });
+    setAuthStep('front-id');
+  };
+  const goToBackID = (phoneVerified: boolean, frontImage: string, userData?: any) => {
+    setSignupData({ ...signupData, phoneVerified, frontImage, userData: userData || signupData.userData });
     setAuthStep('back-id');
   };
-  const goToSelfie = (phoneVerified: boolean, frontImage: string, backImage: string) => {
-    setSignupData({ ...signupData, phoneVerified, frontImage, backImage });
+  const goToSelfie = (phoneVerified: boolean, frontImage: string, backImage: string, userData?: any) => {
+    setSignupData({ ...signupData, phoneVerified, frontImage, backImage, userData: userData || signupData.userData });
     setAuthStep('selfie');
   };
 
@@ -123,8 +137,14 @@ export default function Auth() {
         await updateUserProfile(userForUpdate);
       } else {
         console.log('Saving user data to backend in onAuthSuccess');
-        // Save the user data to the backend
-        const response = await fetch('http://172.20.10.2:8000/api/register', {
+        // Save the user data to the backend using network service
+        const { networkService } = await import('../src/services/networkService');
+        const baseUrl = networkService.getBaseUrl();
+        const registerUrl = `${baseUrl}/api/register`;
+        
+        console.log('🚀 Using network service URL in onAuthSuccess:', registerUrl);
+        
+        const response = await fetch(registerUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -209,38 +229,67 @@ export default function Auth() {
 
   // Modified completion handler for both pet sitters and pet owners
   const onRegistrationComplete = async (userData: any) => {
+    console.log('Saving complete user data to backend:', userData);
+    console.log('UserData hourlyRate:', userData.hourlyRate);
+    console.log('UserData role:', userData.userRole);
+    console.log('SignupData state:', signupData);
+    console.log('SignupData selectedPetTypes:', signupData.selectedPetTypes);
+    console.log('SignupData selectedBreeds:', signupData.selectedBreeds);
+    console.log('UserData selectedPetTypes:', userData.selectedPetTypes);
+    console.log('UserData selectedBreeds:', userData.selectedBreeds);
+    
+    // Merge userData from screen 4 with data from previous screens (1-3)
+    const completeUserData = {
+      ...userData,
+      userRole: userData.userRole || signupData.userRole,
+      selectedPetTypes: userData.selectedPetTypes || signupData.selectedPetTypes || [],
+      selectedBreeds: userData.selectedBreeds || signupData.selectedBreeds || []
+    };
+    
+    console.log('Complete merged user data:', completeUserData);
+    console.log('Complete selectedPetTypes:', completeUserData.selectedPetTypes);
+    console.log('Complete selectedBreeds:', completeUserData.selectedBreeds);
+    console.log('Complete selectedPetTypes length:', completeUserData.selectedPetTypes?.length);
+    console.log('Complete selectedBreeds length:', completeUserData.selectedBreeds?.length);
+    
     try {
-      console.log('Saving complete user data to backend:', userData);
-      console.log('UserData hourlyRate:', userData.hourlyRate);
-      console.log('UserData role:', userData.userRole);
       
       // Prepare the request body
       const requestBody = {
-        name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-        first_name: userData.firstName || '',
-        last_name: userData.lastName || '',
-        email: userData.email,
-        password: userData.password,
-        password_confirmation: userData.password, // Add password confirmation
-        role: userData.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
-        phone: userData.phone || '',
-        address: userData.address || '',
-        gender: userData.gender || '',
-        age: userData.age || null,
-        experience: userData.experience || '',
-        hourly_rate: userData.hourlyRate || null,
-        pet_breeds: userData.selectedBreeds || [],
-        specialties: userData.specialties || [],
-        selected_pet_types: userData.selectedPetTypes || [],
-        bio: userData.aboutMe || '',
+        name: `${completeUserData.firstName || ''} ${completeUserData.lastName || ''}`.trim(),
+        first_name: completeUserData.firstName || '',
+        last_name: completeUserData.lastName || '',
+        email: completeUserData.email,
+        password: completeUserData.password,
+        password_confirmation: completeUserData.password, // Add password confirmation
+        role: completeUserData.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
+        phone: completeUserData.phone || '',
+        address: completeUserData.address || '',
+        gender: completeUserData.gender || '',
+        age: completeUserData.age || null,
+        experience: completeUserData.experience || '',
+        hourly_rate: completeUserData.hourlyRate || '',
+        pet_breeds: completeUserData.selectedBreeds || [],
+        specialties: completeUserData.specialties || [],
+        selected_pet_types: completeUserData.selectedPetTypes || [],
+        bio: completeUserData.aboutMe || '',
       };
 
       console.log('🚀 Request body being sent to backend:', requestBody);
       console.log('🚀 hourly_rate in request body:', requestBody.hourly_rate);
       console.log('🚀 hourly_rate type:', typeof requestBody.hourly_rate);
+      console.log('🚀 selected_pet_types in request body:', requestBody.selected_pet_types);
+      console.log('🚀 pet_breeds in request body:', requestBody.pet_breeds);
+      console.log('🚀 specialties in request body:', requestBody.specialties);
 
-      // Save the complete user data to the backend
-      const response = await fetch('http://172.20.10.2:8000/api/register', {
+      // Save the complete user data to the backend using network service
+      const { networkService } = await import('../src/services/networkService');
+      const baseUrl = networkService.getBaseUrl();
+      const registerUrl = `${baseUrl}/api/register`;
+      
+      console.log('🚀 Using network service URL:', registerUrl);
+      
+      const response = await fetch(registerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -273,7 +322,12 @@ export default function Auth() {
         console.log('Backend hourly_rate:', result.user.hourly_rate);
         console.log('Backend hourly_rate type:', typeof result.user.hourly_rate);
         console.log('Backend hourly_rate value:', JSON.stringify(result.user.hourly_rate));
+        console.log('Backend selected_pet_types:', result.user.selected_pet_types);
+        console.log('Backend pet_breeds:', result.user.pet_breeds);
+        console.log('Backend specialties:', result.user.specialties);
         console.log('Frontend userData.hourlyRate:', userData.hourlyRate);
+        console.log('Frontend completeUserData.selectedPetTypes:', completeUserData.selectedPetTypes);
+        console.log('Frontend completeUserData.selectedBreeds:', completeUserData.selectedBreeds);
         
         // Create a complete user object for the auth context
         const completeUser = {
@@ -294,14 +348,16 @@ export default function Auth() {
           specialties: result.user.specialties || userData.specialties || [],
           email_verified: result.user.email_verified,
           phone_verified: result.user.phone_verified,
-          selectedPetTypes: userData.selectedPetTypes,
-          selectedBreeds: result.user.pet_breeds,
+          selectedPetTypes: result.user.selected_pet_types || completeUserData.selectedPetTypes,
+          selectedBreeds: result.user.pet_breeds || completeUserData.selectedBreeds,
           profileImage: undefined,
           token: result.token, // Add the authentication token
         };
 
         console.log('Complete user object before storing:', completeUser);
         console.log('Complete user hourlyRate:', completeUser.hourlyRate);
+        console.log('Complete user selectedPetTypes:', completeUser.selectedPetTypes);
+        console.log('Complete user selectedBreeds:', completeUser.selectedBreeds);
         console.log('Complete user hourlyRate type:', typeof completeUser.hourlyRate);
         console.log('Complete user hourlyRate value:', JSON.stringify(completeUser.hourlyRate));
 
@@ -329,7 +385,7 @@ export default function Auth() {
       Alert.alert('Error', `Failed to save user data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       // Continue with the flow even if backend save fails
       // Both pet sitters and pet owners need phone verification
-      setSignupData({ ...signupData, userData });
+      setSignupData({ ...signupData, userData: completeUserData });
       setAuthStep('phone-verification');
     }
   };
@@ -370,12 +426,12 @@ export default function Auth() {
     case 'phone-verification':
       return <PhoneVerificationScreen 
         userData={signupData.userData} 
-        onPhoneVerified={signupData.userRole === 'Pet Sitter' ? goToFrontID : () => onAuthSuccess(signupData.userData)} 
+        onPhoneVerified={signupData.userRole === 'Pet Sitter' ? (phoneVerified) => goToFrontIDWithUserData(phoneVerified, signupData.userData) : () => onAuthSuccess(signupData.userData)} 
       />;
     case 'front-id':
-      return <FrontIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} onFrontIDComplete={goToBackID} />;
+      return <FrontIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} onFrontIDComplete={(phoneVerified, frontImage, userData) => goToBackID(phoneVerified, frontImage, userData)} />;
     case 'back-id':
-      return <BackIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} onBackIDComplete={goToSelfie} />;
+      return <BackIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} onBackIDComplete={(phoneVerified, frontImage, backImage, userData) => goToSelfie(phoneVerified, frontImage, backImage, userData)} />;
     case 'selfie':
       return <SelfieScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} backImage={signupData.backImage} onSelfieComplete={onAuthSuccess} />;
     default:

@@ -16,7 +16,7 @@ import { networkService } from '../../services/networkService';
 
 interface PhoneVerificationScreenProps {
   userData?: any;
-  onPhoneVerified?: (phoneVerified: boolean) => void;
+  onPhoneVerified?: (phoneVerified: boolean, userData?: any) => void;
 }
 
 const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userData: propUserData, onPhoneVerified }) => {
@@ -233,8 +233,8 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
         
         // Use callback if available, otherwise use navigation
         if (onPhoneVerified) {
-          console.log('Using callback for navigation');
-          onPhoneVerified(true);
+          console.log('Using callback for navigation with user data');
+          onPhoneVerified(true, userData);
         } else {
           console.log('No callback available, staying on current screen');
           // If no callback is provided, we stay on the current screen

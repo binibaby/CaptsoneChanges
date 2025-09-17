@@ -16,7 +16,7 @@ import { makeApiCall } from '../../services/networkService';
 interface FrontIDScreenProps {
   userData?: any;
   phoneVerified?: boolean;
-  onFrontIDComplete?: (phoneVerified: boolean, frontImage: string) => void;
+  onFrontIDComplete?: (phoneVerified: boolean, frontImage: string, userData?: any) => void;
 }
 
 const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, phoneVerified: propPhoneVerified, onFrontIDComplete }) => {
@@ -72,8 +72,8 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
 
     // Use callback if available, otherwise use navigation
     if (onFrontIDComplete) {
-      console.log('Using callback for navigation');
-      onFrontIDComplete(phoneVerified, frontImage);
+      console.log('Using callback for navigation with user data');
+      onFrontIDComplete(phoneVerified, frontImage, userData);
     } else {
       console.log('Using navigation prop');
       // Navigate to back ID screen with all collected data

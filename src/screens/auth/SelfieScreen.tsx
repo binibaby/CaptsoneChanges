@@ -122,7 +122,7 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
       const selfieImageBase64 = await convertImageToBase64(selfieImage);
 
       const payload = {
-        user_id: userData?.id || '1',
+        user_id: userData?.id || null,
         document_type: 'ph_national_id',
         document_number: '123456789',
         front_image: frontImageBase64,

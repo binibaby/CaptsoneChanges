@@ -58,9 +58,13 @@ class AuthController extends Controller
                 'hourly_rate' => $request->hourly_rate,
                 'hourly_rate_type' => gettype($request->hourly_rate),
                 'specialties' => $request->specialties,
+                'raw_pet_breeds' => $request->pet_breeds,
+                'formatted_pet_breeds' => $this->formatBreedNames($request->pet_breeds),
+                'selected_pet_types' => $request->selected_pet_types,
             ]);
 
-            $user = User::create([
+            // Debug: Log the exact data being passed to User::create
+            $userData = [
                 'name' => $request->name,
                 'first_name' => $request->first_name,
                 'last_name' => $request->last_name,
@@ -79,8 +83,26 @@ class AuthController extends Controller
                 'selected_pet_types' => $request->selected_pet_types,
                 'bio' => $request->bio,
                 'phone_verification_code' => $phoneVerificationCode,
-                'email_verified_at' => now(), // Auto-verify email
+                'email_verified_at' => now(),
                 'phone_verified_at' => null,
+            ];
+            
+            \Log::info('🔍 EXACT USER CREATE DATA:', $userData);
+
+            $user = User::create($userData);
+            
+            // Immediately check what was actually saved
+            \Log::info('🔍 IMMEDIATELY AFTER CREATE - User object:', [
+                'pet_breeds_in_memory' => $user->pet_breeds,
+                'selected_pet_types_in_memory' => $user->selected_pet_types,
+                'attributes' => $user->getAttributes(),
+            ]);
+            
+            // Also check fresh from database
+            $freshUser = User::find($user->id);
+            \Log::info('🔍 FRESH FROM DB - User data:', [
+                'pet_breeds_fresh' => $freshUser->pet_breeds,
+                'selected_pet_types_fresh' => $freshUser->selected_pet_types,
             ]);
 
             \Log::info('✅ User created successfully:', [
@@ -91,6 +113,8 @@ class AuthController extends Controller
                 'hourly_rate' => $user->hourly_rate,
                 'hourly_rate_type' => gettype($user->hourly_rate),
                 'specialties' => $user->specialties,
+                'pet_breeds_saved' => $user->pet_breeds,
+                'selected_pet_types_saved' => $user->selected_pet_types,
             ]);
 
             \Log::info('✅ User created successfully - ID: ' . $user->id);
@@ -214,9 +238,28 @@ class AuthController extends Controller
             ], 400);
         }
 
+        // Store current pet data before update
+        $currentPetBreeds = $user->pet_breeds;
+        $currentSelectedPetTypes = $user->selected_pet_types;
+        
+        \Log::info('🔍 BEFORE PHONE VERIFY UPDATE - Pet data:', [
+            'user_id' => $user->id,
+            'pet_breeds' => $currentPetBreeds,
+            'selected_pet_types' => $currentSelectedPetTypes,
+        ]);
+        
         $user->update([
             'phone_verified_at' => now(),
             'phone_verification_code' => null,
+            // Preserve existing pet data
+            'pet_breeds' => $currentPetBreeds,
+            'selected_pet_types' => $currentSelectedPetTypes,
+        ]);
+        
+        \Log::info('🔍 AFTER PHONE VERIFY UPDATE - Pet data preserved:', [
+            'user_id' => $user->id,
+            'pet_breeds' => $user->fresh()->pet_breeds,
+            'selected_pet_types' => $user->fresh()->selected_pet_types,
         ]);
 
         // Check if user can be activated
@@ -285,7 +328,21 @@ class AuthController extends Controller
             // Pet owners only need phone verification (email is auto-verified)
             $hasPhoneVerified = $user->phone_verified_at !== null || empty($user->phone);
             if ($hasPhoneVerified) {
-                $user->update(['status' => 'active']);
+                // Preserve pet data during status update
+                $currentPetBreeds = $user->pet_breeds;
+                $currentSelectedPetTypes = $user->selected_pet_types;
+                
+                $user->update([
+                    'status' => 'active',
+                    'pet_breeds' => $currentPetBreeds,
+                    'selected_pet_types' => $currentSelectedPetTypes,
+                ]);
+                
+                \Log::info('🔍 Pet owner status updated - Pet data preserved:', [
+                    'user_id' => $user->id,
+                    'pet_breeds' => $currentPetBreeds,
+                    'selected_pet_types' => $currentSelectedPetTypes,
+                ]);
             }
         } elseif ($user->role === 'pet_sitter') {
             // Pet sitters need phone + ID verification (email is auto-verified)
@@ -296,12 +353,40 @@ class AuthController extends Controller
                 ->first();
             
             if ($hasPhoneVerified && $idVerification) {
-                $user->update(['status' => 'active']);
+                // Preserve pet data during status update
+                $currentPetBreeds = $user->pet_breeds;
+                $currentSelectedPetTypes = $user->selected_pet_types;
+                
+                $user->update([
+                    'status' => 'active',
+                    'pet_breeds' => $currentPetBreeds,
+                    'selected_pet_types' => $currentSelectedPetTypes,
+                ]);
+                
+                \Log::info('🔍 Pet sitter status updated to active - Pet data preserved:', [
+                    'user_id' => $user->id,
+                    'pet_breeds' => $currentPetBreeds,
+                    'selected_pet_types' => $currentSelectedPetTypes,
+                ]);
                 
                 // Award verification badges
                 $this->awardVerificationBadges($idVerification);
             } elseif ($hasPhoneVerified) {
-                $user->update(['status' => 'pending_id_verification']);
+                // Preserve pet data during status update
+                $currentPetBreeds = $user->pet_breeds;
+                $currentSelectedPetTypes = $user->selected_pet_types;
+                
+                $user->update([
+                    'status' => 'pending_id_verification',
+                    'pet_breeds' => $currentPetBreeds,
+                    'selected_pet_types' => $currentSelectedPetTypes,
+                ]);
+                
+                \Log::info('🔍 Pet sitter status updated to pending_id_verification - Pet data preserved:', [
+                    'user_id' => $user->id,
+                    'pet_breeds' => $currentPetBreeds,
+                    'selected_pet_types' => $currentSelectedPetTypes,
+                ]);
             }
         }
     }
@@ -401,7 +486,7 @@ class AuthController extends Controller
             $profile['hourly_rate'] = $user->hourly_rate;
             $profile['specialties'] = $user->specialties;
             $profile['selected_pet_types'] = $user->selected_pet_types;
-            $profile['pet_breeds'] = $user->pet_breeds;
+            $profile['pet_breeds'] = $this->formatBreedNames($user->pet_breeds);
             
             \Log::info('🔍 buildUserProfile - Pet sitter fields:', [
                 'user_id' => $user->id,
@@ -409,10 +494,12 @@ class AuthController extends Controller
                 'hourly_rate' => $user->hourly_rate,
                 'hourly_rate_type' => gettype($user->hourly_rate),
                 'specialties' => $user->specialties,
+                'raw_pet_breeds' => $user->pet_breeds,
+                'raw_selected_pet_types' => $user->selected_pet_types,
             ]);
         } else {
             // Pet owner specific fields (no sitter-specific fields)
-            $profile['pet_breeds'] = $user->pet_breeds; // Pet owners can have pet breeds they own
+            $profile['pet_breeds'] = $this->formatBreedNames($user->pet_breeds); // Pet owners can have pet breeds they own
         }
 
         \Log::info('🔍 buildUserProfile - Final profile:', $profile);
@@ -652,5 +739,49 @@ class AuthController extends Controller
         }
         
         return $phone;
+    }
+
+    /**
+     * Convert breed IDs to readable names
+     */
+    private function formatBreedNames($breeds)
+    {
+        if (!$breeds || !is_array($breeds)) {
+            return $breeds;
+        }
+
+        $breedMapping = [
+            // Dog breeds
+            'labrador' => 'Labrador Retriever',
+            'golden' => 'Golden Retriever',
+            'german-shepherd' => 'German Shepherd',
+            'bulldog' => 'Bulldog',
+            'beagle' => 'Beagle',
+            'poodle' => 'Poodle',
+            'rottweiler' => 'Rottweiler',
+            'yorkshire' => 'Yorkshire Terrier',
+            'boxer' => 'Boxer',
+            'dachshund' => 'Dachshund',
+            // Cat breeds
+            'persian' => 'Persian',
+            'siamese' => 'Siamese',
+            'maine-coon' => 'Maine Coon',
+            'ragdoll' => 'Ragdoll',
+            'british-shorthair' => 'British Shorthair',
+            'abyssinian' => 'Abyssinian',
+            'russian-blue' => 'Russian Blue',
+            'bengal' => 'Bengal',
+            'sphynx' => 'Sphynx',
+            'scottish-fold' => 'Scottish Fold',
+        ];
+
+        return array_map(function($breed) use ($breedMapping) {
+            // If we have a mapping for this ID, use the readable name
+            if (isset($breedMapping[$breed])) {
+                return $breedMapping[$breed];
+            }
+            // Otherwise, return the original value (it might already be a readable name)
+            return $breed;
+        }, $breeds);
     }
 } 

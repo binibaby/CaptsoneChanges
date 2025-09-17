@@ -214,11 +214,11 @@ const PetOwnerProfileScreen = () => {
         name: 'profile_image.jpg',
       } as any);
 
-      const response = await fetch('http://192.168.100.184:8000/api/profile/upload-image', {
+      const { makeApiCall } = await import('../../services/networkService');
+      const response = await makeApiCall('/api/profile/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user?.token || ''}`,
-          'Accept': 'application/json',
         },
         body: formData,
       });

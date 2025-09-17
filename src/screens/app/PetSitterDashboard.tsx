@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -56,15 +57,66 @@ const PetSitterDashboard = () => {
   const [imageError, setImageError] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Check if user is logged out and redirect to onboarding
   useEffect(() => {
-    loadUserData();
+    const checkLogoutStatus = async () => {
+      try {
+        const loggedOut = await AsyncStorage.getItem('user_logged_out');
+        if (loggedOut === 'true') {
+          console.log('PetSitterDashboard: User was logged out, redirecting to onboarding');
+          router.replace('/onboarding');
+        }
+      } catch (error) {
+        console.error('Error checking logout status:', error);
+      }
+    };
+    
+    checkLogoutStatus();
+  }, [router]);
+
+  useEffect(() => {
+    checkAuthentication();
   }, []);
+
+  // Check authentication status
+  const checkAuthentication = async () => {
+    try {
+      // Check if user is logged out
+      const loggedOut = await AsyncStorage.getItem('user_logged_out');
+      if (loggedOut === 'true') {
+        console.log('🚪 User is logged out, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // Check if user is authenticated
+      const user = await authService.getCurrentUser();
+      if (!user) {
+        console.log('🚪 No user found, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // Check if user is a pet sitter
+      if (user.role !== 'pet_sitter') {
+        console.log('🚪 User is not a pet sitter, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // User is authenticated and is a pet sitter
+      loadUserData();
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      router.replace('/onboarding');
+    }
+  };
 
   // Refresh user data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('📱 PetSitterDashboard: Screen focused, refreshing user data');
-      loadUserData();
+      console.log('📱 PetSitterDashboard: Screen focused, checking authentication');
+      checkAuthentication();
     }, [])
   );
 

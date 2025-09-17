@@ -289,14 +289,14 @@ const ProfileScreen = () => {
         name: 'profile_image.jpg',
       } as any);
 
-      console.log('Uploading profile image to:', 'http://192.168.100.184:8000/api/profile/upload-image');
+      const { makeApiCall } = await import('../../services/networkService');
+      console.log('Uploading profile image using network service');
       console.log('User token:', user?.token ? 'Present' : 'Missing');
 
-      const response = await fetch('http://192.168.100.184:8000/api/profile/upload-image', {
+      const response = await makeApiCall('/api/profile/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user?.token || ''}`,
-          'Accept': 'application/json',
         },
         body: formData,
       });

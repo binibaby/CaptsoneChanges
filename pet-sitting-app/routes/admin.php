@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController;
@@ -9,6 +10,14 @@ use App\Http\Controllers\Admin\VerificationController;
 use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Admin\NotificationController;
+
+// Handle admin redirect for unauthenticated users
+Route::get('/admin', function () {
+    if (Auth::check()) {
+        return redirect()->route('admin.dashboard');
+    }
+    return redirect()->route('admin.login');
+})->name('admin.redirect');
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     

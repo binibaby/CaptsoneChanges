@@ -221,18 +221,29 @@ class RealtimeLocationService {
             profileImage: sitter.profile_image,
             images: sitter.images,
             avatar: sitter.avatar,
+            petTypes: sitter.petTypes,
+            selectedPetTypes: sitter.selected_pet_types,
+            selectedBreeds: sitter.selectedBreeds,
+            petBreeds: sitter.pet_breeds,
             allKeys: Object.keys(sitter)
           });
+          console.log(`👤 Raw sitter data from API:`, JSON.stringify(sitter, null, 2));
           
-          return {
+          const mappedSitter = {
             ...sitter,
             lastSeen: new Date(sitter.lastSeen),
             // Map different possible image fields and ensure proper URL handling
             images: sitter.images || (sitter.profile_image ? [sitter.profile_image] : undefined),
             profileImage: sitter.profile_image || sitter.avatar,
             // Add helper to determine if image is a URL or local asset
-            imageSource: sitter.profile_image || sitter.avatar || sitter.images?.[0]
+            imageSource: sitter.profile_image || sitter.avatar || sitter.images?.[0],
+            // Map pet types and breeds from backend field names to frontend field names
+            petTypes: sitter.petTypes || (sitter.selected_pet_types && sitter.selected_pet_types.length > 0 ? sitter.selected_pet_types : ['dogs', 'cats']),
+            selectedBreeds: sitter.selectedBreeds || (sitter.pet_breeds && sitter.pet_breeds.length > 0 ? sitter.pet_breeds : ['All breeds welcome'])
           };
+          
+          console.log(`👤 Final mapped sitter:`, JSON.stringify(mappedSitter, null, 2));
+          return mappedSitter;
         });
         
         // Update local cache
@@ -320,6 +331,7 @@ class RealtimeLocationService {
     try {
       // Check if current user is a pet sitter before setting online status
       const currentUser = await authService.getCurrentUser();
+      console.log('👤 Current user for setSitterOnline:', currentUser);
       if (currentUser && currentUser.role !== 'pet_sitter') {
         console.warn('⚠️ Only pet sitters can set online status. Current user role:', currentUser.role);
         return;
@@ -344,6 +356,7 @@ class RealtimeLocationService {
         return;
       }
 
+      console.log('👤 Making API call to set sitter offline...');
       const response = await makeApiCall('/api/location/status', {
         method: 'POST',
         headers: getAuthHeaders(token || undefined),
@@ -352,7 +365,9 @@ class RealtimeLocationService {
         }),
       });
 
+      console.log('👤 API response status:', response.status);
       const data = await response.json();
+      console.log('👤 API response data:', data);
       
       if (data.success) {
         console.log(`✅ Sitter ${sitterId} status updated successfully via API`);

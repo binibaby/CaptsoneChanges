@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import authService from '../../services/authService';
@@ -53,14 +54,48 @@ const PetOwnerDashboard = () => {
   const [imageError, setImageError] = useState<boolean>(false);
 
   useEffect(() => {
-    loadUserData();
+    checkAuthentication();
   }, []);
+
+  // Check authentication status
+  const checkAuthentication = async () => {
+    try {
+      // Check if user is logged out
+      const loggedOut = await AsyncStorage.getItem('user_logged_out');
+      if (loggedOut === 'true') {
+        console.log('🚪 User is logged out, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // Check if user is authenticated
+      const user = await authService.getCurrentUser();
+      if (!user) {
+        console.log('🚪 No user found, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // Check if user is a pet owner
+      if (user.role !== 'pet_owner') {
+        console.log('🚪 User is not a pet owner, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // User is authenticated and is a pet owner
+      loadUserData();
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      router.replace('/onboarding');
+    }
+  };
 
   // Refresh user data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('📱 PetOwnerDashboard: Screen focused, refreshing user data');
-      loadUserData();
+      console.log('📱 PetOwnerDashboard: Screen focused, checking authentication');
+      checkAuthentication();
     }, [])
   );
 

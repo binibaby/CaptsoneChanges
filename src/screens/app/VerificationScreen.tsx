@@ -246,12 +246,10 @@ const VerificationScreen = () => {
   const resendCode = async (type: 'email' | 'phone') => {
     try {
       // Call the resend verification code API
-      const response = await fetch('http://192.168.100.184:8000/api/resend-verification-code', {
+      const { makeApiCall } = await import('../../services/networkService');
+      const response = await makeApiCall('/api/resend-verification-code', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: {},
         body: JSON.stringify({
           type: type
         }),

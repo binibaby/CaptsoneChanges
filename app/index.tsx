@@ -39,9 +39,26 @@ function AppContent() {
   useEffect(() => {
     if (!isLoading) {
       try {
-        // Force fresh start - always go to onboarding
-        console.log('App started - FORCING FRESH START, redirecting to onboarding');
-        router.replace('/onboarding');
+        // Check logout status first
+        const checkLogoutStatus = async () => {
+          try {
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+            const loggedOut = await AsyncStorage.getItem('user_logged_out');
+            if (loggedOut === 'true') {
+              console.log('App started - User was logged out, redirecting to onboarding');
+              router.replace('/onboarding');
+              return;
+            }
+          } catch (error) {
+            console.error('Error checking logout status:', error);
+          }
+          
+          // Always redirect to onboarding on app restart for fresh start
+          console.log('App started - Always redirecting to onboarding for fresh start');
+          router.replace('/onboarding');
+        };
+        
+        checkLogoutStatus();
       } catch (error) {
         console.error('Navigation error:', error);
         // Fallback to onboarding on error

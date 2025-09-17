@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,6 +15,7 @@ import {
 import PlatformMap from '../../components/PlatformMap';
 import SitterProfilePopup from '../../components/SitterProfilePopup';
 import { useAuth } from '../../contexts/AuthContext';
+import authService from '../../services/authService';
 import realtimeLocationService from '../../services/realtimeLocationService';
 
 // Lazy import for react-native-maps to avoid duplicate registration
@@ -51,10 +53,37 @@ const FindSitterMapScreen = () => {
   const router = useRouter();
   const { currentLocation, userAddress, isLocationTracking, startLocationTracking, profileUpdateTrigger } = useAuth();
 
-  // Initialize with empty array - will be populated by real-time data
+  // Check authentication and initialize
   useEffect(() => {
-    setSitters([]);
+    checkAuthentication();
   }, []);
+
+  // Check authentication status
+  const checkAuthentication = async () => {
+    try {
+      // Check if user is logged out
+      const loggedOut = await AsyncStorage.getItem('user_logged_out');
+      if (loggedOut === 'true') {
+        console.log('🚪 User is logged out, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // Check if user is authenticated
+      const user = await authService.getCurrentUser();
+      if (!user) {
+        console.log('🚪 No user found, redirecting to onboarding');
+        router.replace('/onboarding');
+        return;
+      }
+
+      // User is authenticated, initialize
+      setSitters([]);
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      router.replace('/onboarding');
+    }
+  };
 
   const handleBack = () => {
     router.back();

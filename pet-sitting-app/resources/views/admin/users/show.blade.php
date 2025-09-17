@@ -125,16 +125,86 @@
                             </dd>
                         </div>
                         @endif
+                        @if($user->role === 'pet_sitter')
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-3">🐾 Pet Sitter Specializations</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <dt class="text-sm font-medium text-blue-700">Pet Types</dt>
+                                    <dd class="text-sm text-blue-900 font-semibold">
+                                        @if($user->selected_pet_types && is_array($user->selected_pet_types) && count($user->selected_pet_types) > 0)
+                                            @foreach($user->selected_pet_types as $petType)
+                                                <span class="inline-block bg-blue-200 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded mr-1 mb-1">
+                                                    {{ ucfirst($petType) }}
+                                                </span>
+                                            @endforeach
+                                        @else
+                                            <span class="text-gray-500 italic">No pet types selected during registration</span>
+                                        @endif
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-sm font-medium text-blue-700">Pet Breeds</dt>
+                                    <dd class="text-sm text-blue-900 font-semibold">
+                                        @if($user->pet_breeds && is_array($user->pet_breeds) && count($user->pet_breeds) > 0)
+                                            <div class="flex flex-wrap gap-1">
+                                                @foreach($user->pet_breeds as $breed)
+                                                    <span class="inline-block bg-green-200 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                                                        {{ $breed }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <span class="text-gray-500 italic">No breeds selected during registration</span>
+                                        @endif
+                                    </dd>
+                                </div>
+                                @if($user->hourly_rate)
+                                <div>
+                                    <dt class="text-sm font-medium text-blue-700">Hourly Rate</dt>
+                                    <dd class="text-sm text-blue-900 font-semibold">${{ $user->hourly_rate }}/hour</dd>
+                                </div>
+                                @endif
+                                @if($user->experience)
+                                <div>
+                                    <dt class="text-sm font-medium text-blue-700">Experience</dt>
+                                    <dd class="text-sm text-blue-900 font-semibold">{{ $user->experience }} years</dd>
+                                </div>
+                                @endif
+                            </div>
+                        </div>
+                        @else
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Pet Types</dt>
+                            <dd class="text-sm text-gray-900">
+                                @if($user->selected_pet_types && is_array($user->selected_pet_types) && count($user->selected_pet_types) > 0)
+                                    @foreach($user->selected_pet_types as $petType)
+                                        <span class="inline-block bg-gray-200 text-gray-700 text-xs font-medium px-2.5 py-0.5 rounded mr-1 mb-1">
+                                            {{ ucfirst($petType) }}
+                                        </span>
+                                    @endforeach
+                                @else
+                                    <span class="text-gray-500 italic">Not specified</span>
+                                @endif
+                            </dd>
+                        </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Pet Breeds</dt>
                             <dd class="text-sm text-gray-900">
                                 @if($user->pet_breeds && is_array($user->pet_breeds) && count($user->pet_breeds) > 0)
-                                    {{ implode(', ', $user->pet_breeds) }}
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach($user->pet_breeds as $breed)
+                                            <span class="inline-block bg-purple-200 text-purple-700 text-xs font-medium px-2.5 py-0.5 rounded">
+                                                {{ $breed }}
+                                            </span>
+                                        @endforeach
+                                    </div>
                                 @else
-                                    Not specified
+                                    <span class="text-gray-500 italic">Not specified</span>
                                 @endif
                             </dd>
                         </div>
+                        @endif
                         <div>
                             <dt class="text-sm font-medium text-gray-500">About Me</dt>
                             <dd class="text-sm text-gray-900">{{ $user->bio ?: 'No bio provided' }}</dd>

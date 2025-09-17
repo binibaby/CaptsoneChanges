@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const PetSitterProfileScreen = () => {
   const router = useRouter();
   const { user, logout, updateUserProfile, currentLocation, userAddress, startLocationTracking } = useAuth();
+  
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
     name: '',
@@ -74,7 +75,6 @@ const PetSitterProfileScreen = () => {
       console.log('📱 PetSitterProfileScreen: user.experience:', user.experience);
       console.log('📱 PetSitterProfileScreen: user.role:', user.role);
       console.log('📱 PetSitterProfileScreen: user.userRole:', user.userRole);
-      console.log('📱 PetSitterProfileScreen: user object keys:', Object.keys(user));
       
       const updatedProfile = {
         name: user.name || '',
@@ -216,11 +216,11 @@ const PetSitterProfileScreen = () => {
         name: 'profile_image.jpg',
       } as any);
 
-      const response = await fetch('http://192.168.100.184:8000/api/profile/upload-image', {
+      const { makeApiCall } = await import('../../services/networkService');
+      const response = await makeApiCall('/api/profile/upload-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user?.token || ''}`,
-          'Accept': 'application/json',
         },
         body: formData,
       });
@@ -572,6 +572,7 @@ const PetSitterProfileScreen = () => {
           />
         </View>
 
+
         {/* Specialties */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Specialties</Text>
@@ -856,6 +857,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  emptyText: {
+    color: '#666',
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 10,
   },
   actionItem: {
     flexDirection: 'row',

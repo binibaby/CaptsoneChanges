@@ -75,11 +75,11 @@ const MyPetsScreen = () => {
             console.log('Loading pets from backend for user:', user.id);
             console.log('Using token:', user.token ? 'Present' : 'Missing');
             
-            const response = await fetch('http://192.168.100.184:8000/api/pets', {
+            const { makeApiCall } = await import('../../services/networkService');
+            const response = await makeApiCall('/api/pets', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${user.token}`,
-                    'Accept': 'application/json',
                 },
             });
 
@@ -181,12 +181,11 @@ const MyPetsScreen = () => {
             console.log('Saving pet with token:', user.token ? 'Present' : 'Missing');
             console.log('Pet data:', petData);
 
-            const response = await fetch('http://192.168.100.184:8000/api/pets', {
+            const { makeApiCall } = await import('../../services/networkService');
+            const response = await makeApiCall('/api/pets', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${user.token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
                 },
                 body: JSON.stringify(petData),
             });

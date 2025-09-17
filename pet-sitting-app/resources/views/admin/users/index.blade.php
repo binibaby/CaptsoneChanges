@@ -102,10 +102,38 @@
                                         N/A
                                     @endif
                                 </div>
-                                @if($user->pet_breeds && is_array($user->pet_breeds))
-                                <div class="text-xs text-gray-400 mt-1">
-                                    Breeds: {{ implode(', ', $user->pet_breeds) }}
-                                </div>
+                                @if($user->role === 'pet_sitter')
+                                    @if($user->selected_pet_types && is_array($user->selected_pet_types))
+                                    <div class="text-xs text-blue-600 font-semibold mt-1">
+                                        🐾 Pet Types: {{ implode(', ', $user->selected_pet_types) }}
+                                    </div>
+                                    @endif
+                                    @if($user->pet_breeds && is_array($user->pet_breeds))
+                                    <div class="text-xs text-green-600 font-semibold mt-1">
+                                        🐕 Breeds: {{ implode(', ', $user->pet_breeds) }}
+                                    </div>
+                                    @endif
+                                    @if($user->hourly_rate)
+                                    <div class="text-xs text-purple-600 font-semibold mt-1">
+                                        💰 Rate: ${{ $user->hourly_rate }}/hour
+                                    </div>
+                                    @endif
+                                    @if($user->experience)
+                                    <div class="text-xs text-orange-600 font-semibold mt-1">
+                                        ⭐ Experience: {{ $user->experience }} years
+                                    </div>
+                                    @endif
+                                @else
+                                    @if($user->selected_pet_types && is_array($user->selected_pet_types))
+                                    <div class="text-xs text-blue-400 mt-1">
+                                        Pet Types: {{ implode(', ', $user->selected_pet_types) }}
+                                    </div>
+                                    @endif
+                                    @if($user->pet_breeds && is_array($user->pet_breeds))
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        Breeds: {{ implode(', ', $user->pet_breeds) }}
+                                    </div>
+                                    @endif
                                 @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">

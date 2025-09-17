@@ -12,6 +12,7 @@
                 <th>Phone</th>
                 <th>Age</th>
                 <th>Gender</th>
+                <th>Pet Types</th>
                 <th>Pet Breeds</th>
                 <th>Role</th>
                 <th>Status</th>
@@ -33,6 +34,13 @@
                 <td>{{ $user->phone ?? 'N/A' }}</td>
                 <td>{{ $user->age ?? 'N/A' }}</td>
                 <td>{{ $user->gender ? ucfirst($user->gender) : 'N/A' }}</td>
+                <td>
+                    @if($user->selected_pet_types && is_array($user->selected_pet_types))
+                        {{ implode(', ', $user->selected_pet_types) }}
+                    @else
+                        N/A
+                    @endif
+                </td>
                 <td>
                     @if($user->pet_breeds && is_array($user->pet_breeds))
                         {{ implode(', ', $user->pet_breeds) }}

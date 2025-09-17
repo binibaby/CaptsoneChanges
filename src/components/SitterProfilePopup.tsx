@@ -43,8 +43,13 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
         profileImage: sitter.profileImage,
         imageSource: sitter.imageSource,
         images: sitter.images,
+        petTypes: sitter.petTypes,
+        selected_pet_types: sitter.selected_pet_types,
+        selectedBreeds: sitter.selectedBreeds,
+        pet_breeds: sitter.pet_breeds,
         allKeys: Object.keys(sitter)
       });
+      console.log('🖼️ Popup - Raw sitter object:', JSON.stringify(sitter, null, 2));
     }
   }, [sitter?.id]);
   
@@ -102,6 +107,43 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
 
   const formatPetTypes = (petTypes: ('dogs' | 'cats')[]) => {
     return petTypes.map(type => type.charAt(0).toUpperCase() + type.slice(1)).join(' & ');
+  };
+
+  // Breed mapping for converting IDs to readable names
+  const breedMapping: { [key: string]: string } = {
+    // Dog breeds
+    'labrador': 'Labrador Retriever',
+    'golden': 'Golden Retriever',
+    'german-shepherd': 'German Shepherd',
+    'bulldog': 'Bulldog',
+    'beagle': 'Beagle',
+    'poodle': 'Poodle',
+    'rottweiler': 'Rottweiler',
+    'yorkshire': 'Yorkshire Terrier',
+    'boxer': 'Boxer',
+    'dachshund': 'Dachshund',
+    // Cat breeds
+    'persian': 'Persian',
+    'siamese': 'Siamese',
+    'maine-coon': 'Maine Coon',
+    'ragdoll': 'Ragdoll',
+    'british-shorthair': 'British Shorthair',
+    'abyssinian': 'Abyssinian',
+    'russian-blue': 'Russian Blue',
+    'bengal': 'Bengal',
+    'sphynx': 'Sphynx',
+    'scottish-fold': 'Scottish Fold',
+  };
+
+  const formatBreedNames = (breeds: string[]) => {
+    return breeds.map(breed => {
+      // If it's already a readable name, return it
+      if (breedMapping[breed]) {
+        return breedMapping[breed];
+      }
+      // If it's already a readable name (not an ID), return as is
+      return breed;
+    });
   };
 
   return (
@@ -233,7 +275,22 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
             <View style={styles.infoRow}>
               <Ionicons name="paw" size={16} color="#F59E0B" />
               <Text style={styles.infoLabel}>Pet Types:</Text>
-              <Text style={styles.infoValue}>{formatPetTypes(sitter.petTypes)}</Text>
+              <Text style={styles.infoValue}>
+                {(() => {
+                  // Check multiple sources for pet types
+                  const petTypes = sitter.petTypes || sitter.selected_pet_types || [];
+                  console.log('🐾 Pet Types Debug:', { 
+                    petTypes: sitter.petTypes, 
+                    selected_pet_types: sitter.selected_pet_types, 
+                    final: petTypes 
+                  });
+                  
+                  if (petTypes && petTypes.length > 0) {
+                    return formatPetTypes(petTypes);
+                  }
+                  return 'No pet types specified'; // Fallback
+                })()}
+              </Text>
             </View>
 
             {/* Breeds */}
@@ -241,7 +298,25 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               <Ionicons name="heart" size={16} color="#F59E0B" />
               <Text style={styles.infoLabel}>Breeds:</Text>
               <Text style={styles.infoValue}>
-                {sitter.selectedBreeds?.join(', ') || 'All breeds welcome'}
+                {(() => {
+                  // Check multiple sources for breeds
+                  const breeds = sitter.selectedBreeds || sitter.pet_breeds || [];
+                  console.log('🐕 Breeds Debug:', { 
+                    selectedBreeds: sitter.selectedBreeds, 
+                    pet_breeds: sitter.pet_breeds, 
+                    final: breeds 
+                  });
+                  
+                  if (breeds && breeds.length > 0) {
+                    // Filter out empty strings and handle various data formats
+                    const validBreeds = breeds.filter(breed => breed && breed.trim() !== '');
+                    if (validBreeds.length > 0) {
+                      const formattedBreeds = formatBreedNames(validBreeds);
+                      return formattedBreeds.join(', ');
+                    }
+                  }
+                  return 'No breeds specified'; // Fallback
+                })()}
               </Text>
             </View>
 

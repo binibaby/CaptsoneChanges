@@ -30,6 +30,12 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   // Debug logging
   console.log('SignUpScreen4_FinalSteps - userRole:', userRole);
   console.log('SignUpScreen4_FinalSteps - isPetSitter:', userRole === 'Pet Sitter');
+  console.log('SignUpScreen4_FinalSteps - selectedPetTypes:', selectedPetTypes);
+  console.log('SignUpScreen4_FinalSteps - selectedPetTypes length:', selectedPetTypes?.length);
+  console.log('SignUpScreen4_FinalSteps - selectedPetTypes type:', typeof selectedPetTypes);
+  console.log('SignUpScreen4_FinalSteps - selectedBreeds:', selectedBreeds);
+  console.log('SignUpScreen4_FinalSteps - selectedBreeds length:', selectedBreeds?.length);
+  console.log('SignUpScreen4_FinalSteps - selectedBreeds type:', typeof selectedBreeds);
   
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -92,9 +98,9 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
            password === confirmPassword &&
            password.length >= 8;
     
-    // For pet sitters, also require experience
+    // For pet sitters, also require experience and hourlyRate
     if (userRole === 'Pet Sitter') {
-      return baseValidation && experience.trim();
+      return baseValidation && experience.trim() && hourlyRate.trim();
     }
     
     return baseValidation;
@@ -133,7 +139,6 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
     setIsLoading(true);
     try {
       const user = {
-        id: '1',
         firstName,
         lastName,
         email,
@@ -146,7 +151,9 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
         selectedPetTypes,
         selectedBreeds,
         experience: userRole === 'Pet Sitter' ? experience : '',
+        hourlyRate: userRole === 'Pet Sitter' ? hourlyRate : '',
         specialties: userRole === 'Pet Sitter' ? specialties : [],
+        aboutMe: '',
         isVerified: false,
         verificationPending: userRole === 'Pet Sitter',
         createdAt: new Date().toISOString(),
@@ -155,6 +162,10 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
       console.log('🚀 SignUpScreen4_FinalSteps: User object created:', user);
       console.log('🚀 SignUpScreen4_FinalSteps: userRole:', userRole);
       console.log('🚀 SignUpScreen4_FinalSteps: isPetSitter:', userRole === 'Pet Sitter');
+      console.log('🚀 SignUpScreen4_FinalSteps: user.selectedPetTypes:', user.selectedPetTypes);
+      console.log('🚀 SignUpScreen4_FinalSteps: user.selectedBreeds:', user.selectedBreeds);
+      console.log('🚀 SignUpScreen4_FinalSteps: selectedPetTypes prop:', selectedPetTypes);
+      console.log('🚀 SignUpScreen4_FinalSteps: selectedBreeds prop:', selectedBreeds);
 
       onComplete(user);
     } catch (error) {
@@ -182,6 +193,45 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
           <Text style={styles.description}>
             Please provide your personal information and create your login credentials to complete your registration.
           </Text>
+        </View>
+
+        {/* Selection Summary */}
+        <View style={styles.summarySection}>
+          <Text style={styles.summaryTitle}>Your Selections</Text>
+          
+          {/* Pet Types Summary */}
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Pet Types:</Text>
+            <View style={styles.summaryChips}>
+              {selectedPetTypes && selectedPetTypes.length > 0 ? (
+                selectedPetTypes.map((petType, index) => (
+                  <View key={index} style={styles.summaryChip}>
+                    <Text style={styles.summaryChipText}>
+                      {petType === 'dogs' ? 'Dogs' : 'Cats'}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.summaryEmpty}>No pet types selected</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Pet Breeds Summary */}
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Pet Breeds:</Text>
+            <View style={styles.summaryChips}>
+              {selectedBreeds && selectedBreeds.length > 0 ? (
+                selectedBreeds.map((breed, index) => (
+                  <View key={index} style={styles.summaryChip}>
+                    <Text style={styles.summaryChipText}>{breed}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.summaryEmpty}>No breeds selected</Text>
+              )}
+            </View>
+          </View>
         </View>
 
         <View style={styles.formSection}>
@@ -314,6 +364,21 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
                   />
                   {userRole === 'Pet Sitter' && experience.length === 0 && (
                     <Text style={styles.errorText}>Experience is required for pet sitters</Text>
+                  )}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Hourly Rate (₱) *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., 150, 200, 300"
+                    placeholderTextColor="#999"
+                    value={hourlyRate}
+                    onChangeText={setHourlyRate}
+                    keyboardType="numeric"
+                  />
+                  {userRole === 'Pet Sitter' && hourlyRate.length === 0 && (
+                    <Text style={styles.errorText}>Hourly rate is required for pet sitters</Text>
                   )}
                 </View>
 
@@ -861,6 +926,54 @@ const styles = StyleSheet.create({
   disabledAddButton: {
     backgroundColor: '#E0E0E0',
     opacity: 0.7,
+  },
+  summarySection: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  summaryItem: {
+    marginBottom: 16,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  summaryChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  summaryChip: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E67E22',
+  },
+  summaryChipText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  summaryEmpty: {
+    color: '#666',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });
 

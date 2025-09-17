@@ -222,6 +222,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const user = await authService.login(email, password);
       setUser(user);
+      
+      // Clear ALL logout flags when user logs in
+      try {
+        await AsyncStorage.multiRemove(['user_logged_out', 'logout_timestamp']);
+        console.log('AuthContext: All logout flags cleared on login');
+      } catch (error) {
+        console.error('AuthContext: Error clearing logout flags:', error);
+      }
+      
       return user; // Return the user object
     } catch (error) {
       console.error('Login error:', error);
@@ -250,6 +259,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const user = await authService.register(userData);
       setUser(user);
+      
+      // Clear ALL logout flags when user registers
+      try {
+        await AsyncStorage.multiRemove(['user_logged_out', 'logout_timestamp']);
+        console.log('AuthContext: All logout flags cleared on registration');
+      } catch (error) {
+        console.error('AuthContext: Error clearing logout flags:', error);
+      }
+      
       return user; // Return the user object
     } catch (error) {
       console.error('Registration error:', error);
@@ -342,6 +360,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('AuthContext: Checking user role for login:', user.role, 'is pet_sitter:', user.role === 'pet_sitter');
         if (user.role === 'pet_sitter') {
           console.log('AuthContext: Pet sitter logged in, updating location data with latest profile');
+          console.log('AuthContext: User data for sitter:', {
+            id: user.id,
+            name: user.name,
+            selectedPetTypes: user.selectedPetTypes,
+            selectedBreeds: user.selectedBreeds,
+            specialties: user.specialties,
+            experience: user.experience,
+            hourlyRate: user.hourlyRate,
+            aboutMe: user.aboutMe,
+            profileImage: user.profileImage
+          });
           try {
             await realtimeLocationService.updateSitterLocation({
               id: user.id,
@@ -393,18 +422,126 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      console.log('AuthContext: Logging out user');
-      // Clear all user data completely
+      console.log('AuthContext: COMPLETE LOGOUT - Clearing everything');
+      
+      // 1. If user is a pet sitter, remove them from sitter visibility
+      if (user && (user.role === 'pet_sitter' || user.userRole === 'Pet Sitter')) {
+        console.log('AuthContext: Removing pet sitter from visibility');
+        console.log('AuthContext: Sitter ID:', user.id);
+        console.log('AuthContext: Sitter name:', user.name);
+        try {
+          // Set sitter as offline to remove from find sitter map
+          console.log('AuthContext: Setting sitter offline via API...');
+          const offlineResult = await realtimeLocationService.setSitterOnline(user.id, false);
+          console.log('AuthContext: Offline API result:', offlineResult);
+          
+          // Wait a moment for the API call to complete
+          console.log('AuthContext: Waiting for API call to complete...');
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
+          
+          // Force remove from local cache as well
+          console.log('AuthContext: Removing sitter from local cache...');
+          realtimeLocationService.removeSitter(user.id);
+          
+          // Clear all sitters from cache to force refresh
+          console.log('AuthContext: Clearing all sitters cache...');
+          realtimeLocationService.clearAllSitters();
+          
+          console.log('AuthContext: Pet sitter removed from visibility');
+        } catch (error) {
+          console.error('AuthContext: Error removing sitter from visibility:', error);
+          // Even if API fails, remove from local cache
+          console.log('AuthContext: Fallback - removing from local cache only');
+          realtimeLocationService.removeSitter(user.id);
+          realtimeLocationService.clearAllSitters();
+        }
+      } else {
+        console.log('AuthContext: User is not a pet sitter, skipping offline process');
+        console.log('AuthContext: User role:', user?.role);
+        console.log('AuthContext: User userRole:', user?.userRole);
+      }
+      
+      // 2. Stop ALL location tracking
+      stopLocationTracking();
+      
+      // 3. Clear ALL user data from AuthService
       await authService.clearAllData();
-      // Clear user from AuthService memory
       authService.clearCurrentUser();
+      
+      // 4. Clear user state immediately
       setUser(null);
-      console.log('AuthContext: User logged out and data cleared');
+      setIsLoading(false);
+      
+      // 5. Clear ALL AsyncStorage data
+      try {
+        await AsyncStorage.multiRemove([
+          'user_data',
+          'user_token',
+          'user_profile',
+          'user_logged_out',
+          'location_data',
+          'notifications',
+          'sitter_data',
+          'booking_data'
+        ]);
+        console.log('AuthContext: All AsyncStorage data cleared');
+      } catch (error) {
+        console.error('AuthContext: Error clearing AsyncStorage:', error);
+      }
+      
+      // 6. Clear notifications
+      try {
+        const { notificationService } = await import('../services/notificationService');
+        await notificationService.clearAllNotifications();
+        console.log('AuthContext: Notifications cleared');
+      } catch (error) {
+        console.error('AuthContext: Error clearing notifications:', error);
+      }
+      
+      // 7. Clear realtime location service cache
+      try {
+        realtimeLocationService.clearAllSitters();
+        console.log('AuthContext: Realtime location cache cleared');
+      } catch (error) {
+        console.error('AuthContext: Error clearing location cache:', error);
+      }
+      
+      // 8. Set logout flag to prevent ANY access
+      try {
+        await AsyncStorage.setItem('user_logged_out', 'true');
+        await AsyncStorage.setItem('logout_timestamp', Date.now().toString());
+        console.log('🔒 AuthContext: LOGOUT FLAGS SET - NAVIGATION DISABLED');
+      } catch (error) {
+        console.error('AuthContext: Error setting logout flags:', error);
+      }
+      
+      // 9. Trigger profile update to refresh all screens
+      setProfileUpdateTrigger(prev => prev + 1);
+      console.log('AuthContext: Triggered profile update refresh for logout');
+      
+      // 9. Force immediate app refresh to trigger navigation change
+      try {
+        // Force a state change to trigger re-render of navigation
+        setIsLoading(true);
+        setTimeout(() => setIsLoading(false), 100);
+        console.log('🔒 AuthContext: FORCED APP REFRESH - NAVIGATION LOCKED');
+      } catch (error) {
+        console.error('AuthContext: Error forcing refresh:', error);
+      }
+      
+      console.log('AuthContext: COMPLETE LOGOUT SUCCESSFUL');
     } catch (error) {
       console.error('Logout error:', error);
-      // Even if there's an error, clear the user state
+      // Even if there's an error, clear everything
       authService.clearCurrentUser();
       setUser(null);
+      setIsLoading(false);
+      try {
+        await AsyncStorage.clear();
+        console.log('AuthContext: Emergency clear of all data');
+      } catch (clearError) {
+        console.error('AuthContext: Emergency clear failed:', clearError);
+      }
     }
   };
 

@@ -349,10 +349,10 @@ class VerificationService {
   }> {
     try {
       // In a real implementation, this would call your backend API
-      const response = await fetch('http://192.168.100.184:8000/api/verification/status', {
+      const { makeApiCall } = await import('./networkService');
+      const response = await makeApiCall('/api/verification/status', {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.getAuthToken()}`,
         },
       });
@@ -389,11 +389,10 @@ class VerificationService {
   }> {
     try {
       // Send as JSON instead of FormData
-      const response = await fetch('http://192.168.100.184:8000/api/verification/submit', {
+      const { makeApiCall } = await import('./networkService');
+      const response = await makeApiCall('/api/verification/submit', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
           'Authorization': `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
@@ -424,10 +423,10 @@ class VerificationService {
     message?: string;
   }> {
     try {
-      const response = await fetch('http://192.168.100.184:8000/api/verification/session-status', {
+      const { makeApiCall } = await import('./networkService');
+      const response = await makeApiCall('/api/verification/session-status', {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.getAuthToken()}`,
         },
       });
@@ -457,11 +456,10 @@ class VerificationService {
     }>;
   }> {
     try {
-      const response = await fetch('http://192.168.100.184:8000/api/verification/philippine-ids', {
+      const { makeApiCall } = await import('./networkService');
+      const response = await makeApiCall('/api/verification/philippine-ids', {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {},
       });
 
       if (!response.ok) {

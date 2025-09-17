@@ -38,9 +38,20 @@ export class NetworkService {
       });
 
       clearTimeout(timeoutId);
+      
       // Accept any response (even 404) as long as we can reach the server
-      return response.status < 500;
+      // Also accept redirects (3xx) as they indicate server is running
+      const isWorking = response.status < 500;
+      
+      if (isWorking) {
+        console.log(`✅ IP ${ip}:8000 is reachable (status: ${response.status})`);
+      } else {
+        console.log(`❌ IP ${ip}:8000 returned error status: ${response.status}`);
+      }
+      
+      return isWorking;
     } catch (error) {
+      console.log(`❌ IP ${ip}:8000 connection failed:`, error.message || 'Unknown error');
       return false;
     }
   }
@@ -49,36 +60,54 @@ export class NetworkService {
   public async detectWorkingIP(): Promise<string> {
     console.log('🔍 Detecting working IP address...');
 
-    // Fast path: Try current WiFi IP first
-    const wifiIP = '192.168.100.184';
-    console.log(`🌐 Testing current WiFi IP: ${wifiIP}`);
-    
-    const isWifiWorking = await this.testIPConnection(wifiIP);
-    if (isWifiWorking) {
-      this.currentBaseUrl = `http://${wifiIP}:8000`;
-      this.isConnected = true;
-      console.log(`✅ Connected to WiFi: ${this.currentBaseUrl}`);
-      return this.currentBaseUrl;
+    // Try the most likely IPs first (prioritize current network)
+    const priorityIPs = [
+      '192.168.100.184',  // Current WiFi IP (most likely)
+      'localhost',         // Local development
+      '127.0.0.1',        // Local development
+    ];
+
+    // Try priority IPs first
+    for (const ip of priorityIPs) {
+      console.log(`🌐 Testing IP: ${ip}:8000`);
+      const isWorking = await this.testIPConnection(ip);
+      if (isWorking) {
+        this.currentBaseUrl = `http://${ip}:8000`;
+        this.isConnected = true;
+        console.log(`✅ Connected to: ${this.currentBaseUrl}`);
+        return this.currentBaseUrl;
+      } else {
+        console.log(`❌ Failed to connect to: ${ip}:8000`);
+      }
     }
 
-    // Try localhost for development
-    const localhostIP = 'localhost';
-    console.log(`🌐 Testing localhost: ${localhostIP}`);
+    // If priority IPs fail, try all possible IPs from config
+    const allIPs = [
+      ...NETWORK_FALLBACK.PRIMARY_IPS,
+      ...NETWORK_FALLBACK.FALLBACK_IPS,
+    ];
+
+    // Remove duplicates and priority IPs
+    const uniqueIPs = [...new Set(allIPs)].filter(ip => !priorityIPs.includes(ip));
     
-    const isWorking = await this.testIPConnection(localhostIP);
-    if (isWorking) {
-      this.currentBaseUrl = `http://${localhostIP}:8000`;
-      this.isConnected = true;
-      console.log(`✅ Connected to: ${this.currentBaseUrl}`);
-      return this.currentBaseUrl;
+    for (const ip of uniqueIPs) {
+      console.log(`🌐 Testing IP: ${ip}:8000`);
+      const isWorking = await this.testIPConnection(ip);
+      if (isWorking) {
+        this.currentBaseUrl = `http://${ip}:8000`;
+        this.isConnected = true;
+        console.log(`✅ Connected to: ${this.currentBaseUrl}`);
+        return this.currentBaseUrl;
+      } else {
+        console.log(`❌ Failed to connect to: ${ip}:8000`);
+      }
     }
 
-
-    // If both fail, use the primary IP as default (don't test all fallbacks)
-    const primaryIP = NETWORK_FALLBACK.PRIMARY_IPS[0];
-    this.currentBaseUrl = `http://${primaryIP}:8000`;
+    // If all fail, use the current IP as default but mark as disconnected
+    this.currentBaseUrl = `http://192.168.100.184:8000`;
     this.isConnected = false;
-    console.log(`⚠️ Using default IP: ${this.currentBaseUrl}`);
+    console.log(`⚠️ All IPs failed. Using default IP: ${this.currentBaseUrl}`);
+    console.log(`⚠️ Please ensure your server is running and accessible`);
     return this.currentBaseUrl;
   }
 
@@ -142,6 +171,8 @@ export const makeApiCall = async (
 ): Promise<Response> => {
   try {
     const url = await getApiUrl(endpoint);
+    console.log(`🌐 Making API call to: ${url}`);
+    
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -151,17 +182,27 @@ export const makeApiCall = async (
       },
     });
 
-    if (!response.ok && retryCount < 1) { // Reduced retries to 1 for speed
-      console.log(`⚠️ API call failed, retrying... (${retryCount + 1}/1)`);
+    console.log(`📡 API response status: ${response.status} for ${url}`);
+
+    if (!response.ok && retryCount < 1) {
+      console.log(`⚠️ API call failed (${response.status}), retrying... (${retryCount + 1}/1)`);
+      // Force network re-detection on failure
+      await networkService.forceReconnect();
       return makeApiCall(endpoint, options, retryCount + 1);
     }
 
     return response;
   } catch (error) {
-    if (retryCount < 1) { // Reduced retries to 1 for speed
-      console.log(`⚠️ Network error, retrying... (${retryCount + 1}/1)`);
+    console.error(`❌ Network error for ${endpoint}:`, error);
+    
+    if (retryCount < 1) {
+      console.log(`⚠️ Network error, retrying with fresh IP detection... (${retryCount + 1}/1)`);
+      // Force network re-detection on error
+      await networkService.forceReconnect();
       return makeApiCall(endpoint, options, retryCount + 1);
     }
+    
+    console.error(`❌ All retries failed for ${endpoint}. Network service status:`, networkService.getNetworkStatus());
     throw error;
   }
 };
