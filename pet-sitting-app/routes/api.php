@@ -73,6 +73,8 @@ Route::prefix('bookings')->middleware('auth:sanctum')->group(function () {
     Route::get('/{booking}', [BookingController::class, 'show']);
     Route::put('/{booking}', [BookingController::class, 'update']);
     Route::delete('/{booking}', [BookingController::class, 'destroy']);
+    Route::post('/{booking}/confirm', [BookingController::class, 'confirm']);
+    Route::post('/{booking}/cancel', [BookingController::class, 'cancel']);
 });
 
 // Notification routes

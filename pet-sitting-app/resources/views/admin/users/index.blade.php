@@ -192,7 +192,7 @@
 let refreshInterval = null;
 let isRefreshing = false;
 
-// Auto-refresh user data every 30 seconds
+// Auto-refresh user data every 10 seconds
 function startAutoRefresh() {
     if (refreshInterval) {
         clearInterval(refreshInterval);
@@ -202,7 +202,7 @@ function startAutoRefresh() {
         if (!isRefreshing) {
             checkForUpdates();
         }
-    }, 30000);
+    }, 10000); // Reduced from 30 seconds to 10 seconds
 }
 
 // Check for updates without full page reload
@@ -210,10 +210,17 @@ function checkForUpdates() {
     isRefreshing = true;
     showRefreshIndicator();
     
-    fetch('/admin/api/users/status-updates')
+    // Get the last check time from localStorage or use current time
+    const lastCheck = localStorage.getItem('lastUserCheck') || new Date().toISOString();
+    
+    fetch(`/admin/api/users/status-updates?last_check=${encodeURIComponent(lastCheck)}`)
         .then(response => response.json())
         .then(data => {
             hideRefreshIndicator();
+            
+            // Update the last check time
+            localStorage.setItem('lastUserCheck', data.timestamp);
+            
             if (data.hasUpdates) {
                 // Show detailed update notification
                 const message = data.updatedCount === 1 
@@ -224,12 +231,15 @@ function checkForUpdates() {
                 // Log updated users for debugging
                 if (data.updatedUsers && data.updatedUsers.length > 0) {
                     console.log('Updated users:', data.updatedUsers);
+                    data.updatedUsers.forEach(user => {
+                        console.log(`User ${user.id} (${user.name}) updated at ${user.updated_at}`);
+                    });
                 }
                 
                 // Refresh the page to show updated data
                 setTimeout(() => {
                     location.reload();
-                }, 1500);
+                }, 1000); // Reduced delay
             }
         })
         .catch(error => {
@@ -304,6 +314,8 @@ function showUpdateNotification(message = 'User data updated - refreshing...') {
 // Manual refresh button functionality
 function manualRefresh() {
     if (!isRefreshing) {
+        // Force immediate refresh by clearing the last check time
+        localStorage.removeItem('lastUserCheck');
         checkForUpdates();
     }
 }

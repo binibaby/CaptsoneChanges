@@ -1,363 +1,447 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     FlatList,
-    Image,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
-import { Notification, notificationService } from '../../services/notificationService';
+import { useAuth } from '../../contexts/AuthContext';
+import { notificationService } from '../../services/notificationService';
 
-const PetOwnerNotificationsScreen = () => {
-  const router = useRouter();
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  time: string;
+  isRead: boolean;
+  action?: string;
+  data?: any;
+}
+
+const PetOwnerNotificationsScreen: React.FC = () => {
+  const { user } = useAuth();
+  const navigation = useNavigation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Removed unread count for fresh start
 
-  useEffect(() => {
-    // Load notifications on mount
-    loadNotifications();
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    if (!user) return;
 
-    // Subscribe to notification updates
-    const unsubscribe = notificationService.subscribe((updatedNotifications) => {
-      console.log('🔄 Notification subscription update:', updatedNotifications.length);
-      setNotifications(updatedNotifications);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  // Reload notifications when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      console.log('🔄 Screen focused, refreshing notifications...');
-      refreshNotifications();
-    }, [])
-  );
-
-  const refreshNotifications = async () => {
     try {
-      console.log('🔄 Refreshing notifications from API...');
-      const refreshedNotifications = await notificationService.refreshNotifications();
-      setNotifications(refreshedNotifications);
-      console.log('📋 Refreshed notifications:', refreshedNotifications.length);
+      console.log('🔔 Loading notifications for pet owner:', user.id);
+      setLoading(true);
+      
+      const fetchedNotifications = await notificationService.getNotifications();
+      console.log('📱 Fetched notifications:', fetchedNotifications.length);
+      
+      setNotifications(fetchedNotifications);
+      
+      // Update unread count
+      const unread = fetchedNotifications.filter(n => !n.isRead).length;
+      // Removed unread count setting
+      
     } catch (error) {
-      console.error('Error refreshing notifications:', error);
-      // Fallback to regular load
-      loadNotifications();
+      console.error('❌ Error loading notifications:', error);
+      Alert.alert('Error', 'Failed to load notifications');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [user]);
 
-  const loadNotifications = async () => {
-    console.log('🔔 Loading notifications in notification screen...');
-    const loadedNotifications = await notificationService.getNotifications();
-    console.log('📋 Loaded notifications:', loadedNotifications.length);
-    loadedNotifications.forEach(notification => {
-      console.log(`  - ${notification.type}: ${notification.title} (read: ${notification.isRead})`);
-    });
-    setNotifications(loadedNotifications);
-  };
-
-  const handleBack = () => {
-    router.back();
-  };
-
-  const handleNotificationPress = async (notification: Notification) => {
-    // Mark as read first
-    await notificationService.markAsRead(notification.id);
-    
-    // Update local state immediately
-    setNotifications(prev => 
-      prev.map(n => 
-        n.id === notification.id ? { ...n, isRead: true } : n
-      )
-    );
-
-    // Handle different notification types
-    switch (notification.type) {
-      case 'booking':
-        // For pet owners, booking notifications are confirmations/cancellations
-        if (notification.action === 'Message') {
-          // Navigate to messages to chat with the sitter
-          router.push('/pet-owner-messages');
-        } else if (notification.data?.status === 'cancelled' && notification.action === 'Find New Sitter') {
-          router.push('/find-sitter-map');
-        } else {
-          router.push('/pet-owner-jobs');
-        }
-        break;
-      case 'message':
-        router.push('/pet-owner-messages');
-        break;
-      case 'system':
-        router.push('/pet-owner-jobs');
-        break;
-      case 'review':
-        // Navigate to reviews section
-        console.log('Navigate to reviews');
-        break;
-      case 'system':
-        if (notification.action === 'Get Started') {
-          router.push('/find-sitter-map');
-        } else if (notification.data?.type === 'payment_processed') {
-          router.push('/pet-owner-jobs');
-        }
-        break;
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    await notificationService.markAllAsRead();
-    
-    // Update local state immediately
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, isRead: true }))
-    );
-  };
-
-  const onRefresh = async () => {
+  // Refresh notifications
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    console.log('🔄 Refreshing notifications from API...');
     await loadNotifications();
     setRefreshing(false);
-  };
+  }, [loadNotifications]);
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'booking':
-        return <Ionicons name="calendar" size={24} color="#4CAF50" />;
-      case 'message':
-        return <Ionicons name="mail" size={24} color="#3B82F6" />;
-      case 'reminder':
-        return <Ionicons name="alarm" size={24} color="#F59E0B" />;
-      case 'review':
-        return <Ionicons name="star" size={24} color="#FFD700" />;
-      case 'system':
-        return <Ionicons name="notifications" size={24} color="#9C27B0" />;
-      default:
-        return <Ionicons name="notifications" size={24} color="#666" />;
+  // Mark notification as read
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await notificationService.markAsRead(notificationId);
+      await loadNotifications(); // Reload to update UI
+    } catch (error) {
+      console.error('❌ Error marking notification as read:', error);
     }
   };
 
+  // Mark all as read
+  const markAllAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      await loadNotifications(); // Reload to update UI
+      Alert.alert('Success', 'All notifications marked as read');
+    } catch (error) {
+      console.error('❌ Error marking all as read:', error);
+      Alert.alert('Error', 'Failed to mark all notifications as read');
+    }
+  };
+
+  // Delete notification
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      await notificationService.deleteNotification(notificationId);
+      await loadNotifications(); // Reload to update UI
+    } catch (error) {
+      console.error('❌ Error deleting notification:', error);
+      Alert.alert('Error', 'Failed to delete notification');
+    }
+  };
+
+  // Handle notification action
+  const handleNotificationAction = (notification: Notification) => {
+    if (notification.action === 'View Booking' || notification.action === 'View' || notification.action === 'View Details') {
+      // Handle booking confirmation/update
+      if (notification.data?.bookingId) {
+        const bookingType = notification.data.bookingType || (notification.data.isWeekly ? 'Weekly' : 'Daily');
+        const dateInfo = notification.data.isWeekly 
+          ? `${notification.data.startDate} to ${notification.data.endDate}`
+          : notification.data.date;
+        const timeInfo = notification.data.formattedStartTime && notification.data.formattedEndTime
+          ? `${notification.data.formattedStartTime} - ${notification.data.formattedEndTime}`
+          : `${notification.data.startTime} - ${notification.data.endTime}`;
+        
+        Alert.alert(
+          `${bookingType} Booking ${notification.data.status?.charAt(0).toUpperCase() + notification.data.status?.slice(1)}`,
+          `Sitter: ${notification.data.sitterName}\nDate: ${dateInfo}\nTime: ${timeInfo}\nStatus: ${notification.data.status}`,
+          [
+            { text: 'OK', onPress: () => console.log('View booking details') }
+          ]
+        );
+      }
+    }
+    
+    // Mark as read when action is taken
+    if (!notification.isRead) {
+      markAsRead(notification.id);
+    }
+  };
+
+  // Create test notification
+  const createTestNotification = async () => {
+    if (!user) {
+      Alert.alert('Error', 'No user found');
+      return;
+    }
+
+    try {
+      await notificationService.addNotificationForUser(user.id, {
+        type: 'booking',
+        title: 'Booking Confirmed',
+        message: 'Your booking has been confirmed by the pet sitter.',
+        action: 'View Booking',
+        data: {
+          bookingId: `test-${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          status: 'confirmed',
+          sitterName: 'Test Sitter',
+          test: true
+        }
+      });
+
+      Alert.alert('Test', 'Test notification created! Check your notifications.');
+      await loadNotifications(); // Reload to show new notification
+    } catch (error) {
+      console.error('❌ Error creating test notification:', error);
+      Alert.alert('Error', 'Failed to create test notification');
+    }
+  };
+
+  // Load notifications when screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      loadNotifications();
+    }, [loadNotifications])
+  );
+
+  // Render notification item
   const renderNotification = ({ item }: { item: Notification }) => (
     <TouchableOpacity 
-      style={[styles.notificationItem, !item.isRead && styles.unreadNotification]} 
-      onPress={() => handleNotificationPress(item)}
+      style={[
+        styles.notificationItem,
+        !item.isRead && styles.unreadNotification
+      ]}
+      onPress={() => handleNotificationAction(item)}
     >
-      <View style={styles.notificationIcon}>
-        {item.avatar ? (
-          <Image source={item.avatar} style={styles.avatar} />
-        ) : (
-          getNotificationIcon(item.type)
-        )}
-      </View>
-      
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
-          <Text style={[styles.notificationTitle, !item.isRead && styles.unreadTitle]}>
-            {item.title}
-          </Text>
-          <Text style={styles.notificationTime}>{item.time}</Text>
+          <Text style={styles.notificationTitle}>{item.title}</Text>
+          <View style={styles.notificationActions}>
+            {!item.isRead && <View style={styles.unreadDot} />}
+            <TouchableOpacity
+              onPress={() => deleteNotification(item.id)}
+              style={styles.deleteButton}
+            >
+              <Ionicons name="trash-outline" size={16} color="#ff4444" />
+            </TouchableOpacity>
+          </View>
         </View>
         
         <Text style={styles.notificationMessage}>{item.message}</Text>
         
+        <View style={styles.notificationFooter}>
+          <Text style={styles.notificationTime}>{item.time}</Text>
         {item.action && (
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionText}>{item.action}</Text>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleNotificationAction(item)}
+            >
+              <Text style={styles.actionButtonText}>{item.action}</Text>
           </TouchableOpacity>
         )}
+        </View>
       </View>
-      
-      {!item.isRead && <View style={styles.unreadDot} />}
     </TouchableOpacity>
   );
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Render empty state
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="notifications-outline" size={64} color="#ccc" />
+      <Text style={styles.emptyStateTitle}>No Notifications</Text>
+      <Text style={styles.emptyStateMessage}>
+        You'll receive notifications for booking confirmations and updates here.
+      </Text>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading notifications...</Text>
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
+        
         <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity style={styles.markAllButton} onPress={handleMarkAllRead}>
-          <Text style={styles.markAllText}>Mark all read</Text>
-        </TouchableOpacity>
+        
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={createTestNotification}
+            style={styles.testButton}
+          >
+            <Ionicons name="flask-outline" size={20} color="#007AFF" />
+          </TouchableOpacity>
+          
+          {/* Removed mark all read button for fresh start */}
+          
+          <TouchableOpacity
+            onPress={() => Alert.alert('Delete All', 'This feature will be implemented')}
+            style={styles.deleteAllButton}
+          >
+            <Ionicons name="trash-outline" size={20} color="#ff4444" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Notification Count */}
-      {unreadCount > 0 && (
-        <View style={styles.countContainer}>
-          <Text style={styles.countText}>{unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}</Text>
-        </View>
-      )}
+      {/* Unread count banner */}
+      {/* Removed unread count banner for fresh start */}
 
-      {/* Notifications List */}
+      {/* Notifications list */}
       <FlatList
         data={notifications}
         renderItem={renderNotification}
         keyExtractor={(item) => item.id}
-        style={styles.notificationsList}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#3B82F6']}
-            tintColor="#3B82F6"
+            colors={['#007AFF']}
+            tintColor="#007AFF"
           />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off" size={64} color="#ccc" />
-            <Text style={styles.emptyTitle}>No notifications</Text>
-            <Text style={styles.emptySubtitle}>You're all caught up!</Text>
-          </View>
-        }
+        ListEmptyComponent={renderEmptyState}
+        showsVerticalScrollIndicator={false}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#f5f5f5',
+    marginTop: 50,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    marginTop: 50,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#e0e0e0',
   },
   backButton: {
-    padding: 5,
+    padding: 8,
+    marginRight: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  testButton: {
+    padding: 8,
+  },
   markAllButton: {
-    padding: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
   },
   markAllText: {
-    color: '#F59E0B',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  countContainer: {
-    backgroundColor: '#F59E0B',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-  },
-  countText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
-  notificationsList: {
-    flex: 1,
+  deleteAllButton: {
+    padding: 8,
+  },
+  unreadBanner: {
+    backgroundColor: '#ff9500',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+  },
+  unreadBannerText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  listContainer: {
+    flexGrow: 1,
+    padding: 16,
   },
   notificationItem: {
-    flexDirection: 'row',
     backgroundColor: '#fff',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   unreadNotification: {
-    backgroundColor: '#FFFBEB',
-  },
-  notificationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007AFF',
   },
   notificationContent: {
-    flex: 1,
+    padding: 16,
   },
   notificationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   notificationTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
     flex: 1,
+    marginRight: 8,
   },
-  unreadTitle: {
-    fontWeight: 'bold',
-  },
-  notificationTime: {
-    fontSize: 12,
-    color: '#666',
-  },
-  notificationMessage: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  actionButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  actionText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+  notificationActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F59E0B',
-    marginLeft: 8,
-    alignSelf: 'center',
+    backgroundColor: '#ff9500',
   },
-  emptyContainer: {
+  deleteButton: {
+    padding: 4,
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  notificationFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  notificationTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  actionButton: {
+    backgroundColor: '#ff9500',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
-  emptyTitle: {
-    fontSize: 18,
+  emptyStateTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
-    marginTop: 20,
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 5,
+  emptyStateMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
 

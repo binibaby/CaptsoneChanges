@@ -2,12 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Image,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { RealtimeSitter } from '../services/realtimeLocationService';
 
@@ -15,7 +15,6 @@ interface SitterProfilePopupProps {
   sitter: RealtimeSitter | null;
   visible: boolean;
   onClose: () => void;
-  onFollow: (sitterId: string) => void;
   onMessage: (sitterId: string) => void;
   onViewBadges: (sitterId: string) => void;
   onViewCertificates: (sitterId: string) => void;
@@ -25,7 +24,6 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
   sitter = null,
   visible,
   onClose,
-  onFollow,
   onMessage,
   onViewBadges,
   onViewCertificates,
@@ -44,9 +42,7 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
         imageSource: sitter.imageSource,
         images: sitter.images,
         petTypes: sitter.petTypes,
-        selected_pet_types: sitter.selected_pet_types,
         selectedBreeds: sitter.selectedBreeds,
-        pet_breeds: sitter.pet_breeds,
         allKeys: Object.keys(sitter)
       });
       console.log('🖼️ Popup - Raw sitter object:', JSON.stringify(sitter, null, 2));
@@ -192,18 +188,6 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               </View>
             </View>
 
-            {/* Followers/Following Section */}
-            <View style={styles.followSection}>
-              <View style={styles.followItem}>
-                <Text style={styles.followNumber}>{sitter.followers || 0}</Text>
-                <Text style={styles.followLabel}>Followers</Text>
-              </View>
-              <View style={styles.followDivider} />
-              <View style={styles.followItem}>
-                <Text style={styles.followNumber}>{sitter.following || 0}</Text>
-                <Text style={styles.followLabel}>Following</Text>
-              </View>
-            </View>
 
             {/* Middle Section - Credentials */}
             <View style={styles.credentialsSection}>
@@ -225,13 +209,6 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
 
             {/* Bottom Section - Action Buttons */}
             <View style={styles.actionsSection}>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => onFollow(sitter.id)}
-              >
-                <Ionicons name="person-add" size={20} color="#fff" />
-                <Text style={styles.actionText}>Follow</Text>
-              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.actionButton}
                 onPress={() => {
@@ -278,10 +255,9 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               <Text style={styles.infoValue}>
                 {(() => {
                   // Check multiple sources for pet types
-                  const petTypes = sitter.petTypes || sitter.selected_pet_types || [];
+                  const petTypes = sitter.petTypes || [];
                   console.log('🐾 Pet Types Debug:', { 
                     petTypes: sitter.petTypes, 
-                    selected_pet_types: sitter.selected_pet_types, 
                     final: petTypes 
                   });
                   
@@ -300,10 +276,9 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               <Text style={styles.infoValue}>
                 {(() => {
                   // Check multiple sources for breeds
-                  const breeds = sitter.selectedBreeds || sitter.pet_breeds || [];
+                  const breeds = sitter.selectedBreeds || [];
                   console.log('🐕 Breeds Debug:', { 
                     selectedBreeds: sitter.selectedBreeds, 
-                    pet_breeds: sitter.pet_breeds, 
                     final: breeds 
                   });
                   
@@ -514,38 +489,6 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
     fontStyle: 'italic',
-  },
-  followSection: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  followItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 5,
-  },
-  followNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 2,
-  },
-  followLabel: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '400',
-  },
-  followDivider: {
-    width: 1,
-    height: 25,
-    backgroundColor: '#e0e0e0',
-    marginHorizontal: 10,
   },
 });
 

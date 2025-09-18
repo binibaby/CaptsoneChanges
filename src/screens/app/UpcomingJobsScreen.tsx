@@ -158,52 +158,6 @@ const UpcomingJobsScreen = () => {
     router.push('/pet-sitter-messages');
   };
 
-  const calculateEarnings = (job: Booking) => {
-    try {
-      console.log('💰 Calculating earnings for job:', job);
-      
-      // Handle malformed time data
-      let startTime = job.startTime;
-      let endTime = job.endTime;
-      
-      // If time contains weird format like "2025-09-10T18:0", extract just the time part
-      if (startTime && startTime.includes('T')) {
-        const timeMatch = startTime.match(/(\d{1,2}):(\d{2})/);
-        if (timeMatch) {
-          startTime = `${timeMatch[1]}:${timeMatch[2]}`;
-        }
-      }
-      
-      if (endTime && endTime.includes('T')) {
-        const timeMatch = endTime.match(/(\d{1,2}):(\d{2})/);
-        if (timeMatch) {
-          endTime = `${timeMatch[1]}:${timeMatch[2]}`;
-        }
-      }
-      
-      if (!startTime || !endTime || !job.hourlyRate) {
-        console.log('❌ Missing booking data:', { startTime, endTime, hourlyRate: job.hourlyRate });
-        return 0;
-      }
-      
-      const start = new Date(`2000-01-01 ${startTime}`);
-      const end = new Date(`2000-01-01 ${endTime}`);
-      
-      if (end <= start) {
-        end.setDate(end.getDate() + 1);
-      }
-      
-      const diffMs = end.getTime() - start.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-      const total = Math.ceil(diffHours * job.hourlyRate);
-      
-      console.log('💰 Earnings calculation:', { startTime, endTime, hours: diffHours, rate: job.hourlyRate, total });
-      return total;
-    } catch (error) {
-      console.error('❌ Error calculating earnings:', error);
-      return 0;
-    }
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -263,8 +217,6 @@ const UpcomingJobsScreen = () => {
 
   const renderJob = ({ item }: { item: Booking }) => {
     console.log('🎨 Rendering job card:', item);
-    const earnings = calculateEarnings(item);
-    console.log('💰 Calculated earnings:', earnings);
     
     return (
       <TouchableOpacity 
@@ -283,7 +235,6 @@ const UpcomingJobsScreen = () => {
             <Text style={styles.jobDate}>{formatDate(item.date)}</Text>
           </View>
           <View style={styles.jobRightSide}>
-            <Text style={styles.totalAmount}>₱{earnings.toFixed(0)}</Text>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
               <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
             </View>
@@ -338,12 +289,6 @@ const UpcomingJobsScreen = () => {
         <View style={styles.summaryCard}>
           <Text style={styles.summaryNumber}>{upcomingJobs.length}</Text>
           <Text style={styles.summaryLabel}>Upcoming Jobs</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>
-            ₱{upcomingJobs.reduce((total, job) => total + calculateEarnings(job), 0).toFixed(0)}
-          </Text>
-          <Text style={styles.summaryLabel}>Potential Earnings</Text>
         </View>
       </View>
 
@@ -492,12 +437,6 @@ const styles = StyleSheet.create({
   },
   jobRightSide: {
     alignItems: 'flex-end',
-  },
-  totalAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#10B981',
-    marginBottom: 4,
   },
   acceptButtonText: {
     color: '#fff',

@@ -579,8 +579,9 @@ class UserController extends Controller
      */
     public function statusUpdates(Request $request)
     {
-        // Get the last check time from session or default to 5 minutes ago
-        $lastCheck = session('last_user_check', now()->subMinutes(5));
+        // Get the last check time from request parameter or default to 2 minutes ago
+        $lastCheckParam = $request->get('last_check');
+        $lastCheck = $lastCheckParam ? \Carbon\Carbon::parse($lastCheckParam) : now()->subMinutes(2);
         
         // Check for any user updates since last check
         $updatedUsers = User::where('updated_at', '>', $lastCheck)
@@ -588,9 +589,6 @@ class UserController extends Controller
             ->get(['id', 'name', 'email', 'status', 'updated_at', 'created_at']);
         
         $hasUpdates = $updatedUsers->count() > 0;
-        
-        // Update the last check time
-        session(['last_user_check' => now()]);
         
         return response()->json([
             'hasUpdates' => $hasUpdates,
@@ -602,10 +600,11 @@ class UserController extends Controller
                     'email' => $user->email,
                     'status' => $user->status,
                     'updated_at' => $user->updated_at->toISOString(),
-                    'is_new' => $user->created_at > $lastCheck
+                    'is_new' => $user->created_at > now()->subMinutes(2)
                 ];
             }),
-            'timestamp' => now()->toISOString()
+            'timestamp' => now()->toISOString(),
+            'lastCheck' => $lastCheck->toISOString()
         ]);
     }
 

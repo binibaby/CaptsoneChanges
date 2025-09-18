@@ -13,10 +13,8 @@ import {
     View,
 } from 'react-native';
 import SitterLocationSharing from '../../components/SitterLocationSharing';
-import { getAuthHeaders } from '../../constants/config';
 import authService from '../../services/authService';
 import { Booking, bookingService } from '../../services/bookingService';
-import { makeApiCall } from '../../services/networkService';
 import { notificationService } from '../../services/notificationService';
 
 const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
@@ -51,7 +49,7 @@ const PetSitterDashboard = () => {
     completedJobs: 0,
   });
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [notificationCount, setNotificationCount] = useState<number>(0);
+  // Removed notification count for fresh start
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
   const [imageError, setImageError] = useState<boolean>(false);
@@ -123,7 +121,7 @@ const PetSitterDashboard = () => {
   useEffect(() => {
     if (currentUserId) {
       loadDashboardData();
-      loadNotificationCount();
+      // Removed notification count loading
       
       // Subscribe to booking updates with aggressive debouncing
       const unsubscribe = bookingService.subscribe(() => {
@@ -131,7 +129,7 @@ const PetSitterDashboard = () => {
         if (now - lastLoadTime > 10000) { // Only reload if more than 10 seconds have passed
           console.log('🔄 Booking update received, reloading dashboard data');
           loadDashboardData();
-          loadNotificationCount();
+          // Removed notification count loading
           setLastLoadTime(now);
         } else {
           console.log('🚫 Skipping dashboard reload due to recent update');
@@ -141,7 +139,7 @@ const PetSitterDashboard = () => {
       // Subscribe to notification updates to refresh count
       const notificationUnsubscribe = notificationService.subscribe(() => {
         console.log('🔄 Notification update received, refreshing count');
-        loadNotificationCount();
+        // Removed notification count loading
       });
 
       return () => {
@@ -228,73 +226,7 @@ const PetSitterDashboard = () => {
     }
   };
 
-  const loadNotificationCount = async () => {
-    try {
-      const user = await authService.getCurrentUser();
-      if (!user) return;
-
-      console.log('🔔 Loading notification count for user:', user.id);
-
-      // Get or create token for the user
-      let token = user.token;
-      if (!token) {
-        if (user.id === '5') {
-          token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
-        } else if (user.id === '21') {
-          token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
-        } else {
-          console.log('❌ No token available for user:', user.id);
-          return;
-        }
-      }
-
-      console.log('🔑 Using token for API call');
-
-      const response = await makeApiCall(
-        '/api/notifications/unread-count',
-        {
-          method: 'GET',
-          headers: getAuthHeaders(token || undefined),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setNotificationCount(data.unread_count || 0);
-        console.log('📱 Notification count updated from API:', data.unread_count);
-      } else {
-        console.log('⚠️ API call failed, trying local notifications');
-        // Fallback to local notification service
-        const localCount = await notificationService.getUnreadCount();
-        setNotificationCount(localCount);
-        console.log('📱 Notification count from local storage:', localCount);
-        
-        // Debug: Show all notifications
-        const allNotifications = await notificationService.getNotifications();
-        console.log('📋 All notifications in storage:', allNotifications.length);
-        allNotifications.forEach(notification => {
-          console.log(`  - ${notification.type}: ${notification.title} (read: ${notification.isRead})`);
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error loading notification count:', error);
-      // Fallback to local notification service
-      try {
-        const localCount = await notificationService.getUnreadCount();
-        setNotificationCount(localCount);
-        console.log('📱 Fallback notification count from local storage:', localCount);
-        
-        // Debug: Show all notifications in fallback
-        const allNotifications = await notificationService.getNotifications();
-        console.log('📋 All notifications in fallback:', allNotifications.length);
-        allNotifications.forEach(notification => {
-          console.log(`  - ${notification.type}: ${notification.title} (read: ${notification.isRead})`);
-        });
-      } catch (fallbackError) {
-        console.error('❌ Fallback notification count failed:', fallbackError);
-      }
-    }
-  };
+  // Removed loadNotificationCount function for fresh start
 
 
   return (
@@ -309,13 +241,7 @@ const PetSitterDashboard = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={() => router.push('/pet-sitter-notifications')} style={{ marginRight: 16, position: 'relative' }}>
               <Ionicons name="notifications-outline" size={24} color="#222" />
-              {notificationCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {notificationCount > 99 ? '99+' : notificationCount}
-                  </Text>
-                </View>
-              )}
+              {/* Removed notification count badge for fresh start */}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/pet-sitter-profile')} style={styles.profileButton}>
               <Image
@@ -445,61 +371,6 @@ const PetSitterDashboard = () => {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
           {upcomingBookings.map((booking, idx) => {
-            // Fix earnings calculation with proper error handling
-            let totalEarnings = 0;
-            try {
-              console.log('💰 Dashboard calculating earnings for:', booking);
-              
-              // Handle malformed time data
-              let startTime = booking.startTime;
-              let endTime = booking.endTime;
-              
-              // If time contains weird format like "2025-09-10T18:0", extract just the time part
-              if (startTime && startTime.includes('T')) {
-                const timeMatch = startTime.match(/(\d{1,2}):(\d{2})/);
-                if (timeMatch) {
-                  startTime = `${timeMatch[1]}:${timeMatch[2]}`;
-                }
-              }
-              
-              if (endTime && endTime.includes('T')) {
-                const timeMatch = endTime.match(/(\d{1,2}):(\d{2})/);
-                if (timeMatch) {
-                  endTime = `${timeMatch[1]}:${timeMatch[2]}`;
-                }
-              }
-              
-              if (startTime && endTime) {
-                const start = new Date(`2000-01-01 ${startTime}`);
-                const end = new Date(`2000-01-01 ${endTime}`);
-                
-                if (end <= start) {
-                  end.setDate(end.getDate() + 1);
-                }
-                
-                const diffMs = end.getTime() - start.getTime();
-                const hours = diffMs / (1000 * 60 * 60);
-                
-                // Use the user's actual hourly rate from profile
-                const hourlyRate = currentUser?.hourlyRate || 25;
-                totalEarnings = Math.ceil(hours * hourlyRate);
-                
-                console.log('💰 Dashboard earnings calculated:', { 
-                  startTime, 
-                  endTime, 
-                  hours: hours.toFixed(2), 
-                  rate: hourlyRate, 
-                  total: totalEarnings 
-                });
-              } else {
-                console.log('❌ Missing time data for earnings calculation:', { startTime, endTime });
-                totalEarnings = 0;
-              }
-            } catch (error) {
-              console.error('❌ Error calculating dashboard earnings:', error);
-              totalEarnings = 0;
-            }
-            
             return (
               <TouchableOpacity 
                 key={booking.id} 
@@ -523,7 +394,6 @@ const PetSitterDashboard = () => {
                 }}
               >
                 <Text style={styles.jobOwnerName}>{booking.petOwnerName}</Text>
-                <Text style={styles.jobEarnings}>₱{totalEarnings.toFixed(0)}</Text>
                 <View style={styles.jobMetaRow}>
                   <Ionicons name="time-outline" size={16} color="#888" style={{ marginRight: 4 }} />
                   <Text style={styles.jobMetaText}>
@@ -787,11 +657,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 12,
-  },
-  jobEarnings: {
-    color: '#10B981',
-    fontWeight: 'bold',
-    fontSize: 15,
   },
   jobMetaRow: {
     flexDirection: 'row',

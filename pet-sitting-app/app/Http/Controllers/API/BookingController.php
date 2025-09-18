@@ -224,10 +224,35 @@ class BookingController extends Controller
         $booking->update(['status' => 'confirmed']);
 
         // Notify pet owner about confirmation
+        $message = '';
+        if ($booking->is_weekly) {
+            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
+            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $message = "Your weekly booking with {$user->name} has been confirmed from {$startDate} to {$endDate}.";
+        } else {
+            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
+            $time = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $message = "Your booking with {$user->name} has been confirmed for {$date} at {$time}.";
+        }
+        
         Notification::create([
             'user_id' => $booking->user_id,
             'type' => 'booking',
-            'message' => "Your booking with {$user->name} has been confirmed for {$booking->date} at {$booking->time}."
+            'message' => $message,
+            'data' => json_encode([
+                'booking_id' => $booking->id,
+                'booking_type' => $booking->is_weekly ? 'weekly' : 'daily',
+                'pet_owner_name' => $booking->user->name,
+                'sitter_name' => $user->name,
+                'date' => $booking->date,
+                'time' => $booking->time,
+                'start_date' => $booking->start_date,
+                'end_date' => $booking->end_date,
+                'start_time' => $booking->start_time,
+                'end_time' => $booking->end_time,
+                'hourly_rate' => $booking->hourly_rate,
+                'status' => 'confirmed'
+            ])
         ]);
 
         // Notify admin about booking confirmation
@@ -267,10 +292,36 @@ class BookingController extends Controller
 
         // Notify the other party about cancellation
         $otherUserId = ($booking->user_id === $user->id) ? $booking->sitter_id : $booking->user_id;
+        
+        $message = '';
+        if ($booking->is_weekly) {
+            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
+            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $message = "Your weekly booking from {$startDate} to {$endDate} has been cancelled by {$user->name}.";
+        } else {
+            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
+            $time = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $message = "Your booking for {$date} at {$time} has been cancelled by {$user->name}.";
+        }
+        
         Notification::create([
             'user_id' => $otherUserId,
             'type' => 'booking',
-            'message' => "Your booking for {$booking->date} at {$booking->time} has been cancelled by {$user->name}."
+            'message' => $message,
+            'data' => json_encode([
+                'booking_id' => $booking->id,
+                'booking_type' => $booking->is_weekly ? 'weekly' : 'daily',
+                'pet_owner_name' => $booking->user->name,
+                'sitter_name' => $booking->sitter->name,
+                'date' => $booking->date,
+                'time' => $booking->time,
+                'start_date' => $booking->start_date,
+                'end_date' => $booking->end_date,
+                'start_time' => $booking->start_time,
+                'end_time' => $booking->end_time,
+                'hourly_rate' => $booking->hourly_rate,
+                'status' => 'cancelled'
+            ])
         ]);
 
         return response()->json([
@@ -287,21 +338,87 @@ class BookingController extends Controller
     {
         $admins = User::where('is_admin', true)->get();
         
+        $message = '';
+        
+        if ($booking->is_weekly) {
+            // Weekly booking message
+            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
+            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $startTime = \Carbon\Carbon::parse($booking->start_time)->format('g:i A');
+            $endTime = \Carbon\Carbon::parse($booking->end_time)->format('g:i A');
+            
+            $message = "New weekly booking request: {$booking->user->name} booked {$booking->sitter->name} from {$startDate} to {$endDate} at {$startTime} - {$endTime}. Service: {$details['service_type']} for {$details['pet_name']} ({$details['pet_type']}). Duration: {$details['duration']} hours. Total: ₱{$totalAmount}.";
+        } else {
+            // Daily booking message
+            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
+            $startTime = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $endTime = \Carbon\Carbon::parse($booking->time)->addHours($details['duration'] ?? 8)->format('g:i A');
+            
+            $message = "New booking request: {$booking->user->name} booked {$booking->sitter->name} for {$date} at {$startTime} - {$endTime}. Service: {$details['service_type']} for {$details['pet_name']} ({$details['pet_type']}). Duration: {$details['duration']} hours. Total: ₱{$totalAmount}.";
+        }
+        
         foreach ($admins as $admin) {
             Notification::create([
                 'user_id' => $admin->id,
                 'type' => 'booking',
-                'message' => "New booking request: {$booking->user->name} booked {$booking->sitter->name} for {$booking->date} at {$booking->time}. Service: {$details['service_type']} for {$details['pet_name']} ({$details['pet_type']}). Duration: {$details['duration']} hours. Total: ₱{$totalAmount}."
+                'message' => $message,
+                'data' => json_encode([
+                    'booking_id' => $booking->id,
+                    'booking_type' => $booking->is_weekly ? 'weekly' : 'daily',
+                    'pet_owner_name' => $booking->user->name,
+                    'sitter_name' => $booking->sitter->name,
+                    'date' => $booking->date,
+                    'time' => $booking->time,
+                    'start_date' => $booking->start_date,
+                    'end_date' => $booking->end_date,
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                    'hourly_rate' => $booking->hourly_rate,
+                    'status' => $booking->status
+                ])
             ]);
         }
     }
 
     private function notifySitterNewBooking($booking, $sitter)
     {
+        $message = '';
+        
+        if ($booking->is_weekly) {
+            // Weekly booking message
+            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
+            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $startTime = \Carbon\Carbon::parse($booking->start_time)->format('g:i A');
+            $endTime = \Carbon\Carbon::parse($booking->end_time)->format('g:i A');
+            
+            $message = "New weekly booking request from {$booking->user->name} from {$startDate} to {$endDate} at {$startTime} - {$endTime}. Please review and confirm.";
+        } else {
+            // Daily booking message
+            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
+            $startTime = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $endTime = \Carbon\Carbon::parse($booking->time)->addHours($booking->duration ?? 8)->format('g:i A');
+            
+            $message = "New booking request from {$booking->user->name} for {$date} at {$startTime} - {$endTime}. Please review and confirm.";
+        }
+        
         Notification::create([
             'user_id' => $sitter->id,
             'type' => 'booking',
-            'message' => "New booking request from {$booking->user->name} for {$booking->date} at {$booking->time}. Please review and confirm."
+            'message' => $message,
+            'data' => json_encode([
+                'booking_id' => $booking->id,
+                'booking_type' => $booking->is_weekly ? 'weekly' : 'daily',
+                'pet_owner_name' => $booking->user->name,
+                'sitter_name' => $sitter->name,
+                'date' => $booking->date,
+                'time' => $booking->time,
+                'start_date' => $booking->start_date,
+                'end_date' => $booking->end_date,
+                'start_time' => $booking->start_time,
+                'end_time' => $booking->end_time,
+                'hourly_rate' => $booking->hourly_rate,
+                'status' => $booking->status
+            ])
         ]);
     }
 
@@ -309,11 +426,22 @@ class BookingController extends Controller
     {
         $admins = User::where('is_admin', true)->get();
         
+        $message = '';
+        if ($booking->is_weekly) {
+            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
+            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $message = "Weekly booking confirmed: {$booking->sitter->name} confirmed the booking with {$booking->user->name} from {$startDate} to {$endDate}.";
+        } else {
+            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
+            $time = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $message = "Booking confirmed: {$booking->sitter->name} confirmed the booking with {$booking->user->name} for {$date} at {$time}.";
+        }
+        
         foreach ($admins as $admin) {
             Notification::create([
                 'user_id' => $admin->id,
                 'type' => 'booking',
-                'message' => "Booking confirmed: {$booking->sitter->name} confirmed the booking with {$booking->user->name} for {$booking->date} at {$booking->time}."
+                'message' => $message
             ]);
         }
     }

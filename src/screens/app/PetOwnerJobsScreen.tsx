@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+    Alert,
     Image,
     SafeAreaView,
     ScrollView,
@@ -11,6 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
+import { Booking, bookingService } from '../../services/bookingService';
 
 interface Job {
   id: string;
@@ -28,10 +31,13 @@ interface Job {
 
 const PetOwnerJobsScreen = () => {
   const router = useRouter();
-  const [selectedTab, setSelectedTab] = useState<'upcoming' | 'past'>('upcoming');
+  const { user } = useAuth();
+  const [selectedTab, setSelectedTab] = useState<'pending' | 'upcoming' | 'past'>('pending');
   const [jobs, setJobs] = useState<Job[]>([
     // New users start with no jobs
   ]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Check if user is logged out and redirect to onboarding
   useEffect(() => {
@@ -50,6 +56,72 @@ const PetOwnerJobsScreen = () => {
     checkLogoutStatus();
   }, [router]);
 
+  // Load bookings when user changes
+  useEffect(() => {
+    if (user?.id) {
+      loadBookings();
+    }
+  }, [user?.id]);
+
+  // Format time to 12-hour format
+  const formatTime = (time: string) => {
+    if (!time) return 'Invalid Time';
+    try {
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours, 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch (error) {
+      return time;
+    }
+  };
+
+  // Format date to readable format
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Invalid Date';
+    try {
+      const date = new Date(dateString);
+      const options: Intl.DateTimeFormatOptions = { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      };
+      return date.toLocaleDateString('en-US', options);
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  const loadBookings = async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      console.log('🔄 Loading bookings for pet owner:', user.id);
+      
+      // Get all bookings for this pet owner
+      const allBookings = await bookingService.getBookings();
+      const ownerBookings = allBookings.filter(booking => booking.petOwnerId === user.id);
+      
+      console.log('📊 Owner bookings found:', ownerBookings.length);
+      console.log('💰 Booking hourly rates:', ownerBookings.map(b => ({ id: b.id, sitter: b.sitterName, rate: b.hourlyRate })));
+      
+      // Debug: Check if we have the correct booking data
+      if (ownerBookings.length > 0) {
+        console.log('🔍 First booking details:', ownerBookings[0]);
+        console.log('🔍 All booking fields:', Object.keys(ownerBookings[0]));
+      }
+      
+      setBookings(ownerBookings);
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+      Alert.alert('Error', 'Failed to load bookings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBack = () => {
     router.back();
   };
@@ -66,6 +138,24 @@ const PetOwnerJobsScreen = () => {
 
   const handleContactSitter = (job: Job) => {
     router.push('/pet-owner-messages');
+  };
+
+  const handlePendingDetails = (job: any) => {
+    // Get the original booking data to access the true hourly rate
+    const originalBooking = bookings.find(booking => booking.id === job.id);
+    const actualHourlyRate = originalBooking?.hourlyRate || 'N/A';
+    
+    console.log('💰 True sitter hourly rate from booking:', actualHourlyRate);
+    console.log('🔍 Original booking:', originalBooking);
+    console.log('🔍 Job object:', job);
+    
+    Alert.alert(
+      'Booking Details',
+      `Sitter: ${job.petSitterName}\nDate: ${job.date}\nTime: ${job.time}`,
+      [
+        { text: 'OK', style: 'default' }
+      ]
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -102,10 +192,12 @@ const PetOwnerJobsScreen = () => {
     }
   };
 
-  const upcomingJobs = jobs.filter(job => ['pending', 'confirmed', 'in-progress'].includes(job.status));
+  const pendingBookings = bookings.filter(booking => booking.status === 'pending');
+  const upcomingJobs = jobs.filter(job => ['confirmed', 'in-progress'].includes(job.status));
   const pastJobs = jobs.filter(job => ['completed', 'cancelled'].includes(job.status));
 
-  const currentJobs = selectedTab === 'upcoming' ? upcomingJobs : pastJobs;
+  const currentJobs = selectedTab === 'pending' ? pendingBookings : 
+                     selectedTab === 'upcoming' ? upcomingJobs : pastJobs;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -122,6 +214,14 @@ const PetOwnerJobsScreen = () => {
 
       {/* Tab Selector */}
       <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, selectedTab === 'pending' && styles.activeTab]} 
+          onPress={() => setSelectedTab('pending')}
+        >
+          <Text style={[styles.tabText, selectedTab === 'pending' && styles.activeTabText]}>
+            Pending ({pendingBookings.length})
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, selectedTab === 'upcoming' && styles.activeTab]} 
           onPress={() => setSelectedTab('upcoming')}
@@ -142,88 +242,159 @@ const PetOwnerJobsScreen = () => {
 
       <ScrollView style={styles.content}>
         {currentJobs.length > 0 ? (
-          currentJobs.map((job) => (
-            <View key={job.id} style={styles.jobCard}>
-              <View style={styles.jobHeader}>
-                <View style={styles.sitterInfo}>
-                  <Image source={job.avatar} style={styles.sitterAvatar} />
-                  <View style={styles.sitterDetails}>
-                    <Text style={styles.sitterName}>{job.petSitterName}</Text>
-                    <Text style={styles.locationText}>📍 {job.location}</Text>
-                  </View>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-                  <Text style={styles.statusText}>{getStatusText(job.status)}</Text>
-                </View>
-              </View>
+          currentJobs.map((item) => {
+            // Handle both Job objects and Booking objects
+            const isBooking = 'sitterName' in item;
+            const job = isBooking ? {
+              id: item.id,
+              petSitterName: item.sitterName,
+              petName: item.petName || 'Pet',
+              date: formatDate(item.date), // Format date to readable format
+              time: `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`, // Format time to 12-hour format
+              duration: item.duration ? `${item.duration} hours` : 'N/A',
+              rate: item.hourlyRate ? `₱${item.hourlyRate}/hour` : 'Rate not set',
+              status: item.status,
+              avatar: { uri: 'https://via.placeholder.com/50x50/cccccc/666666?text=U' },
+              petImage: { uri: 'https://via.placeholder.com/50x50/cccccc/666666?text=P' },
+              location: 'Location',
+              // Store the actual hourly rate for easy access
+              actualHourlyRate: item.hourlyRate
+            } : item;
 
-              <View style={styles.petInfo}>
-                <Image source={job.petImage} style={styles.petImage} />
-                <View style={styles.petDetails}>
-                  <Text style={styles.petName}>{job.petName}</Text>
-                  <Text style={styles.bookingDate}>{job.date}</Text>
-                </View>
-              </View>
+            // Debug logging to see what's happening with the rates
+            if (isBooking) {
+              console.log('🔍 Creating job for booking:', {
+                id: item.id,
+                sitterName: item.sitterName,
+                hourlyRate: item.hourlyRate,
+                formattedRate: item.hourlyRate ? `₱${item.hourlyRate}/hour` : 'Rate not set'
+              });
+            }
 
-              <View style={styles.bookingDetails}>
-                <View style={styles.detailItem}>
-                  <Ionicons name="time-outline" size={16} color="#666" />
-                  <Text style={styles.detailText}>{job.time}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Ionicons name="calendar-outline" size={16} color="#666" />
-                  <Text style={styles.detailText}>{job.duration}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Ionicons name="cash-outline" size={16} color="#666" />
-                  <Text style={styles.detailText}>{job.rate}</Text>
-                </View>
-              </View>
+            return (
+              <View key={job.id} style={styles.jobCard}>
+                {selectedTab === 'pending' ? (
+                  // Simplified pending card
+                  <>
+                    <View style={styles.pendingCardHeader}>
+                      <Text style={styles.pendingSitterName}>{job.petSitterName}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
+                        <Text style={styles.statusText}>Pending</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.pendingDateTime}>
+                      <Text style={styles.pendingDate}>{job.date}</Text>
+                      <Text style={styles.pendingTime}>{job.time}</Text>
+                    </View>
 
-              <View style={styles.actionButtons}>
-                <TouchableOpacity 
-                  style={styles.contactButton}
-                  onPress={() => handleContactSitter(job)}
-                >
-                  <Ionicons name="chatbubbles-outline" size={16} color="#3B82F6" />
-                  <Text style={styles.contactButtonText}>Message</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.detailsButton}
-                  onPress={() => handleJobPress(job)}
-                >
-                  <Text style={styles.detailsButtonText}>View Details</Text>
-                </TouchableOpacity>
-                
-                {job.status === 'confirmed' && (
-                  <TouchableOpacity 
-                    style={styles.cancelButton}
-                    onPress={() => handleCancelJob(job.id)}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
+                    <View style={styles.pendingActions}>
+                      <TouchableOpacity 
+                        style={styles.contactButton}
+                        onPress={() => handleContactSitter(job)}
+                      >
+                        <Ionicons name="chatbubbles-outline" size={16} color="#3B82F6" />
+                        <Text style={styles.contactButtonText}>Message</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.detailsButton}
+                        onPress={() => handlePendingDetails(job)}
+                      >
+                        <Text style={styles.detailsButtonText}>View Details</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  // Full card for other tabs
+                  <>
+                    <View style={styles.jobHeader}>
+                      <View style={styles.sitterInfo}>
+                        <Image source={job.avatar} style={styles.sitterAvatar} />
+                        <View style={styles.sitterDetails}>
+                          <Text style={styles.sitterName}>{job.petSitterName}</Text>
+                          <Text style={styles.locationText}>📍 {job.location}</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
+                        <Text style={styles.statusText}>{getStatusText(job.status)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.petInfo}>
+                      <Image source={job.petImage} style={styles.petImage} />
+                      <View style={styles.petDetails}>
+                        <Text style={styles.petName}>{job.petName}</Text>
+                        <Text style={styles.bookingDate}>{job.date}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.bookingDetails}>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="time-outline" size={16} color="#666" />
+                        <Text style={styles.detailText}>{job.time}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="calendar-outline" size={16} color="#666" />
+                        <Text style={styles.detailText}>{job.duration}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="cash-outline" size={16} color="#666" />
+                        <Text style={styles.detailText}>{job.rate}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.actionButtons}>
+                      <TouchableOpacity 
+                        style={styles.contactButton}
+                        onPress={() => handleContactSitter(job)}
+                      >
+                        <Ionicons name="chatbubbles-outline" size={16} color="#3B82F6" />
+                        <Text style={styles.contactButtonText}>Message</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.detailsButton}
+                        onPress={() => handleJobPress(job)}
+                      >
+                        <Text style={styles.detailsButtonText}>View Details</Text>
+                      </TouchableOpacity>
+                      
+                      {job.status === 'confirmed' && (
+                        <TouchableOpacity 
+                          style={styles.cancelButton}
+                          onPress={() => handleCancelJob(job.id)}
+                        >
+                          <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </>
                 )}
               </View>
-            </View>
-          ))
+            );
+          })
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons 
-              name={selectedTab === 'upcoming' ? 'calendar-outline' : 'checkmark-circle-outline'} 
+              name={selectedTab === 'pending' ? 'hourglass-outline' : 
+                    selectedTab === 'upcoming' ? 'calendar-outline' : 'checkmark-circle-outline'} 
               size={64} 
               color="#ccc" 
             />
             <Text style={styles.emptyTitle}>
-              {selectedTab === 'upcoming' ? 'No upcoming bookings' : 'No past bookings'}
+              {selectedTab === 'pending' ? 'No pending bookings' :
+               selectedTab === 'upcoming' ? 'No upcoming bookings' : 'No past bookings'}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {selectedTab === 'upcoming' 
+              {selectedTab === 'pending' 
+                ? 'Your pending bookings will appear here' 
+                : selectedTab === 'upcoming' 
                 ? 'Find a pet sitter to get started!' 
                 : 'Your completed bookings will appear here.'
               }
             </Text>
-            {selectedTab === 'upcoming' && (
+            {(selectedTab === 'upcoming' || selectedTab === 'pending') && (
               <TouchableOpacity 
                 style={styles.findSitterButton}
                 onPress={() => router.push('/find-sitter-map')}
@@ -301,6 +472,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  // Pending card specific styles
+  pendingCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pendingSitterName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pendingDateTime: {
+    marginBottom: 15,
+  },
+  pendingDate: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 4,
+  },
+  pendingTime: {
+    fontSize: 14,
+    color: '#888',
+  },
+  pendingActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   jobHeader: {
     flexDirection: 'row',

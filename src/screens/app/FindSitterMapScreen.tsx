@@ -3,14 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AppState,
-  Image,
-  Platform,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    AppState,
+    Image,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import PlatformMap from '../../components/PlatformMap';
 import SitterProfilePopup from '../../components/SitterProfilePopup';
@@ -103,9 +103,6 @@ const FindSitterMapScreen = () => {
     setSelectedSitter(null);
   };
 
-  const handleFollow = (sitterId: string) => {
-    // TODO: Implement follow functionality
-  };
 
   const handleMessage = (sitterId: string) => {
     // TODO: Navigate to messaging
@@ -428,7 +425,7 @@ const FindSitterMapScreen = () => {
                     key={sitter.id}
                     coordinate={sitter.location}
                     title={sitter.name}
-                    description={`₱${sitter.hourlyRate}/hr • ${sitter.rating}⭐ • ${sitter.isOnline ? 'Available' : 'Offline'}`}
+                    description={`₱${sitter.hourlyRate}/hr • ${sitter.isOnline ? 'Available' : 'Offline'}`}
                     onPress={() => handleSitterPress(sitter.id)}
                   >
                     <View style={styles.markerContainer}>
@@ -541,10 +538,6 @@ const FindSitterMapScreen = () => {
                 <Text style={styles.sitterLocation}>📍 {sitter.location.address}</Text>
                 <View style={styles.sitterBadges}>
                   <View style={styles.badge}>
-                    <Ionicons name="star" size={12} color="#FFD700" />
-                    <Text style={styles.badgeText}>{sitter.rating}</Text>
-                  </View>
-                  <View style={styles.badge}>
                     <Ionicons name="time" size={12} color="#F59E0B" />
                     <Text style={styles.badgeText}>{sitter.experience}</Text>
                   </View>
@@ -579,7 +572,6 @@ const FindSitterMapScreen = () => {
         sitter={selectedSitter}
         visible={showProfilePopup}
         onClose={handleClosePopup}
-        onFollow={handleFollow}
         onMessage={handleMessage}
         onViewBadges={handleViewBadges}
         onViewCertificates={handleViewCertificates}

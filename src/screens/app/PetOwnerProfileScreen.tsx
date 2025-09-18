@@ -29,8 +29,6 @@ const PetOwnerProfileScreen = () => {
     phone: '',
     address: '',
     bio: '',
-    emergencyContact: '',
-    emergencyPhone: '',
   });
 
   // Update profile data when user changes
@@ -43,8 +41,6 @@ const PetOwnerProfileScreen = () => {
         phone: user.phone || '',
         address: user.address || '',
         bio: user.aboutMe || '',
-        emergencyContact: '', // New users start with no emergency contact
-        emergencyPhone: '',
       });
     }
   }, [user]);
@@ -410,18 +406,6 @@ const PetOwnerProfileScreen = () => {
             <Text style={styles.actionText}>My Pets</Text>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
-        </View>
-        {/* Emergency Contact */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Emergency Contact</Text>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Contact Name</Text>
-            <Text style={[styles.input, styles.disabledInput]}>{profile.emergencyContact}</Text>
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Contact Phone</Text>
-            <Text style={[styles.input, styles.disabledInput]}>{profile.emergencyPhone}</Text>
-          </View>
         </View>
         {/* Quick Actions */}
         <View style={styles.section}>

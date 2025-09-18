@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     Alert,
     Image,
+    KeyboardAvoidingView,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -36,6 +38,9 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
   console.log('SignUpScreen4_FinalSteps - selectedBreeds:', selectedBreeds);
   console.log('SignUpScreen4_FinalSteps - selectedBreeds length:', selectedBreeds?.length);
   console.log('SignUpScreen4_FinalSteps - selectedBreeds type:', typeof selectedBreeds);
+  
+  const scrollViewRef = useRef<ScrollView>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
   
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -184,7 +189,18 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
       )}
       <Text style={styles.progressText}>4/4</Text>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 10}
+      >
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
         <View style={styles.headerSection}>
           <View style={styles.iconContainer}>
             <Image source={require('../../assets/images/logo.png')} style={styles.logoImage} />
@@ -530,6 +546,7 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
               <Text style={styles.label}>Confirm Password *</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
+                  ref={confirmPasswordRef}
                   style={[styles.input, styles.passwordInput]}
                   placeholder="Confirm your password"
                   placeholderTextColor="#999"
@@ -547,6 +564,12 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
                   caretHidden={false}
                   returnKeyType="done"
                   blurOnSubmit={true}
+                  onFocus={() => {
+                    // Scroll to ensure confirm password field is visible
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
@@ -570,7 +593,8 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
             </View>
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -610,22 +634,28 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginRight: 10,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   content: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: 20, // Minimal padding just above keyboard tip
+  },
   headerSection: {
     alignItems: 'center',
-    paddingVertical: 30,
-    marginBottom: 30,
+    paddingVertical: 15,
+    marginBottom: 15,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#FFFBEB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
     shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -638,25 +668,25 @@ const styles = StyleSheet.create({
     borderRadius: 40,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     color: '#333',
   },
   description: {
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
     color: '#666',
-    lineHeight: 24,
+    lineHeight: 20,
     paddingHorizontal: 20,
   },
   formSection: {
     paddingHorizontal: 10,
-    marginBottom: 20,
+    marginBottom: 15,
     backgroundColor: '#FAFAFA',
     borderRadius: 20,
-    paddingVertical: 20,
+    paddingVertical: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -664,8 +694,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   formGroup: {
-    marginBottom: 32,
-    paddingVertical: 8,
+    marginBottom: 20,
+    paddingVertical: 5,
     paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -676,39 +706,39 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 20,
+    marginBottom: 12,
     marginLeft: 4,
-    paddingBottom: 8,
+    paddingBottom: 6,
     borderBottomWidth: 2,
     borderBottomColor: '#F0F0F0',
   },
   inputContainer: {
-    marginBottom: 28,
+    marginBottom: 18,
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 8,
     marginLeft: 4,
   },
   input: {
     borderWidth: 2,
     borderColor: '#E0E0E0',
-    borderRadius: 15,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    fontSize: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
     backgroundColor: '#F8F9FA',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
-    minHeight: 56,
+    minHeight: 48,
     color: '#333',
   },
   passwordContainer: {
@@ -716,9 +746,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#E0E0E0',
-    borderRadius: 15,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#F8F9FA',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -729,7 +759,7 @@ const styles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     paddingRight: 10,
-    fontSize: 16,
+    fontSize: 15,
     color: '#333',
   },
   eyeButton: {
@@ -813,15 +843,15 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     width: '85%',
-    marginBottom: 40,
+    marginBottom: 25,
     alignSelf: 'center',
-    marginTop: 20,
+    marginTop: 10,
     paddingHorizontal: 20,
   },
   continueButton: {
     backgroundColor: '#F59E0B',
-    paddingVertical: 18,
-    borderRadius: 15,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
     width: '100%',
     shadowColor: '#F59E0B',
@@ -840,7 +870,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   requirementsContainer: {
@@ -929,28 +959,28 @@ const styles = StyleSheet.create({
   },
   summarySection: {
     backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 15,
     marginHorizontal: 10,
-    marginBottom: 20,
+    marginBottom: 15,
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   summaryTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
   },
   summaryItem: {
-    marginBottom: 16,
+    marginBottom: 10,
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   summaryChips: {
     flexDirection: 'row',
