@@ -58,12 +58,18 @@ class BookingController extends Controller
             'sitter_id' => 'required|exists:users,id',
             'date' => 'required|date|after_or_equal:today',
             'time' => 'required|date_format:H:i',
-            'pet_name' => 'required|string|max:100',
-            'pet_type' => 'required|string|max:50',
-            'service_type' => 'required|string|max:50',
-            'duration' => 'required|integer|min:1',
-            'rate_per_hour' => 'required|numeric|min:0',
-            'description' => 'nullable|string|max:500'
+            'pet_name' => 'nullable|string|max:100',
+            'pet_type' => 'nullable|string|max:50',
+            'service_type' => 'nullable|string|max:50',
+            'duration' => 'nullable|integer|min:1',
+            'rate_per_hour' => 'nullable|numeric|min:0',
+            'description' => 'nullable|string|max:500',
+            'is_weekly' => 'nullable|boolean',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i',
+            'total_amount' => 'nullable|numeric|min:0'
         ]);
 
         $user = $request->user();
@@ -80,17 +86,37 @@ class BookingController extends Controller
             ], 404);
         }
 
+        // Determine if this is a weekly booking
+        $isWeekly = $request->boolean('is_weekly', false);
+        
+        // Calculate total amount
+        $totalAmount = 0;
+        if ($isWeekly && $request->total_amount) {
+            $totalAmount = $request->total_amount;
+        } elseif ($request->rate_per_hour && $request->duration) {
+            $totalAmount = $request->rate_per_hour * $request->duration;
+        }
+
         // Create the booking
         $booking = Booking::create([
             'user_id' => $user->id,
             'sitter_id' => $request->sitter_id,
             'date' => $request->date,
             'time' => $request->time,
-            'status' => 'pending'
+            'status' => 'pending',
+            'is_weekly' => $isWeekly,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'hourly_rate' => $request->rate_per_hour,
+            'total_amount' => $totalAmount,
+            'pet_name' => $request->pet_name,
+            'pet_type' => $request->pet_type,
+            'service_type' => $request->service_type,
+            'duration' => $request->duration,
+            'description' => $request->description
         ]);
-
-        // Calculate total amount
-        $totalAmount = $request->rate_per_hour * $request->duration;
 
         // Notify admin about new booking
         $this->notifyAdminNewBooking($booking, $totalAmount, [
@@ -99,7 +125,8 @@ class BookingController extends Controller
             'service_type' => $request->service_type,
             'duration' => $request->duration,
             'rate_per_hour' => $request->rate_per_hour,
-            'description' => $request->description
+            'description' => $request->description,
+            'is_weekly' => $isWeekly
         ]);
 
         // Notify the sitter about new booking request

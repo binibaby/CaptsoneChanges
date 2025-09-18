@@ -126,4 +126,6 @@ Route::post('/location/nearby-sitters', [LocationController::class, 'getNearbySi
 
 // Sitter availability routes
 Route::get('/sitters/{sitterId}/availability', [LocationController::class, 'getSitterAvailability']);
-Route::post('/sitters/availability', [LocationController::class, 'saveSitterAvailability'])->middleware('auth:sanctum'); 
+Route::post('/sitters/availability', [LocationController::class, 'saveSitterAvailability'])->middleware('auth:sanctum');
+Route::get('/sitters/{sitterId}/weekly-availability', [LocationController::class, 'getWeeklyAvailability']);
+Route::post('/sitters/weekly-availability', [LocationController::class, 'saveWeeklyAvailability'])->middleware('auth:sanctum'); 

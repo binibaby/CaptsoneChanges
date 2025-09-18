@@ -16,6 +16,18 @@ class Booking extends Model
         'time',
         'payment_id',
         'status',
+        'is_weekly',
+        'start_date',
+        'end_date',
+        'start_time',
+        'end_time',
+        'hourly_rate',
+        'total_amount',
+        'pet_name',
+        'pet_type',
+        'service_type',
+        'duration',
+        'description',
     ];
 
     protected $casts = [

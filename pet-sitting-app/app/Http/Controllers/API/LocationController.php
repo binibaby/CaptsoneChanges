@@ -4,7 +4,9 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\WeeklyAvailability;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -138,9 +140,15 @@ class LocationController extends Controller
         $activeSitters = Cache::get($sittersKey, []);
 
         $nearbySitters = [];
+        $addedSitterIds = []; // Track added sitter IDs to prevent duplicates
 
         foreach ($activeSitters as $sitterData) {
             if (!$sitterData['is_online']) continue;
+
+            // Skip if we've already added this sitter
+            if (in_array($sitterData['user_id'], $addedSitterIds)) {
+                continue;
+            }
 
             $distance = $this->calculateDistance(
                 $userLat,
@@ -153,37 +161,33 @@ class LocationController extends Controller
                 // Get latest user data from database to ensure we have the most up-to-date profile
                 $user = User::find($sitterData['user_id']);
                 
-                if ($user) {
-                    // Use latest data from database, fallback to cached data if not available
-                    $nearbySitters[] = [
-                        'id' => $sitterData['user_id'],
-                        'userId' => $sitterData['user_id'],
-                        'name' => $user->name ?: $sitterData['name'],
-                        'email' => $user->email ?: $sitterData['email'],
-                        'location' => [
-                            'latitude' => $sitterData['latitude'],
-                            'longitude' => $sitterData['longitude'],
-                            'address' => $sitterData['address'],
-                        ],
-                        'specialties' => $user->specialties ?: $sitterData['specialties'],
-                        'experience' => $user->experience ?: $sitterData['experience'],
-                        'petTypes' => $user->selected_pet_types ?: $sitterData['pet_types'],
-                        'selectedBreeds' => ($user->pet_breeds && count($user->pet_breeds) > 0) ? $this->formatBreedNames($user->pet_breeds) : $this->formatBreedNames($sitterData['selected_breeds']),
-                        'hourlyRate' => $user->hourly_rate ?: $sitterData['hourly_rate'],
-                        'rating' => $sitterData['rating'],
-                        'reviews' => $sitterData['reviews'],
-                        'bio' => $user->bio ?: $sitterData['bio'],
-                        'isOnline' => $sitterData['is_online'],
-                        'lastSeen' => $sitterData['last_seen'],
-                        'distance' => round($distance, 1) . ' km',
-                        'profile_image' => $user->profile_image,
-                        'images' => $user->profile_image ? [$user->profile_image] : null,
-                        'followers' => $user->followers ?? 0,
-                        'following' => $user->following ?? 0
-                    ];
-                } else {
-                    // Fallback to cached data if user not found in database
-                $nearbySitters[] = [
+                // Use database data if available, otherwise fallback to cached data
+                $sitterInfo = $user ? [
+                    'id' => $sitterData['user_id'],
+                    'userId' => $sitterData['user_id'],
+                    'name' => $user->name ?: $sitterData['name'],
+                    'email' => $user->email ?: $sitterData['email'],
+                    'location' => [
+                        'latitude' => $sitterData['latitude'],
+                        'longitude' => $sitterData['longitude'],
+                        'address' => $sitterData['address'],
+                    ],
+                    'specialties' => $user->specialties ?: $sitterData['specialties'],
+                    'experience' => $user->experience ?: $sitterData['experience'],
+                    'petTypes' => $user->selected_pet_types ?: $sitterData['pet_types'],
+                    'selectedBreeds' => ($user->pet_breeds && count($user->pet_breeds) > 0) ? $this->formatBreedNames($user->pet_breeds) : $this->formatBreedNames($sitterData['selected_breeds']),
+                    'hourlyRate' => $user->hourly_rate ?: $sitterData['hourly_rate'],
+                    'rating' => $sitterData['rating'],
+                    'reviews' => $sitterData['reviews'],
+                    'bio' => $user->bio ?: $sitterData['bio'],
+                    'isOnline' => $sitterData['is_online'],
+                    'lastSeen' => $sitterData['last_seen'],
+                    'distance' => round($distance, 1) . ' km',
+                    'profile_image' => $user->profile_image,
+                    'images' => $user->profile_image ? [$user->profile_image] : null,
+                    'followers' => $user->followers ?? 0,
+                    'following' => $user->following ?? 0
+                ] : [
                     'id' => $sitterData['user_id'],
                     'userId' => $sitterData['user_id'],
                     'name' => $sitterData['name'],
@@ -204,12 +208,14 @@ class LocationController extends Controller
                     'isOnline' => $sitterData['is_online'],
                     'lastSeen' => $sitterData['last_seen'],
                     'distance' => round($distance, 1) . ' km',
-                        'profile_image' => null,
-                        'images' => null,
-                        'followers' => 0,
-                        'following' => 0
-                    ];
-                }
+                    'profile_image' => null,
+                    'images' => null,
+                    'followers' => 0,
+                    'following' => 0
+                ];
+
+                $nearbySitters[] = $sitterInfo;
+                $addedSitterIds[] = $sitterData['user_id']; // Mark this sitter as added
             }
         }
 
@@ -291,6 +297,18 @@ class LocationController extends Controller
             } else {
                 // If going offline, remove from active sitters list entirely
                 unset($activeSitters[$user->id]);
+                
+                // Also clear availability data when going offline
+                $availabilityKey = "sitter_availability_{$user->id}";
+                $weeklyAvailabilityKey = "sitter_weekly_availability_{$user->id}";
+                Cache::forget($availabilityKey);
+                Cache::forget($weeklyAvailabilityKey);
+                
+                Log::info('🧹 Cleared availability data for offline sitter', [
+                    'user_id' => $user->id,
+                    'availability_key' => $availabilityKey,
+                    'weekly_availability_key' => $weeklyAvailabilityKey
+                ]);
             }
             
             Cache::put($sittersKey, $activeSitters, 300);
@@ -512,5 +530,248 @@ class LocationController extends Controller
             // Otherwise, return the original value (it might already be a readable name)
             return $breed;
         }, $breeds);
+    }
+
+    /**
+     * Convert 12-hour time format to 24-hour format for comparison
+     */
+    private function convertTo24Hour($timeString)
+    {
+        // Clean the time string - remove extra spaces and normalize
+        $timeString = trim($timeString);
+        
+        Log::info('🕐 Converting time string', [
+            'original' => $timeString,
+            'cleaned' => $timeString,
+            'length' => strlen($timeString)
+        ]);
+        
+        // Try to parse using DateTime for more reliable parsing
+        try {
+            // Handle 12-hour format with AM/PM
+            $time = \DateTime::createFromFormat('g:i A', $timeString);
+            if ($time === false) {
+                // Try alternative format
+                $time = \DateTime::createFromFormat('h:i A', $timeString);
+            }
+            
+            if ($time !== false) {
+                $hour = (int)$time->format('H');
+                $minute = (int)$time->format('i');
+                $result = $hour * 60 + $minute;
+                
+                Log::info('🕐 DateTime parsing successful', [
+                    'hour' => $hour,
+                    'minute' => $minute,
+                    'resultMinutes' => $result
+                ]);
+                
+                return $result;
+            }
+        } catch (Exception $e) {
+            Log::warning('🕐 DateTime parsing failed', [
+                'error' => $e->getMessage(),
+                'timeString' => $timeString
+            ]);
+        }
+        
+        // Fallback to regex parsing
+        if (preg_match('/(\d{1,2}):(\d{2})\s*(AM|PM)/i', $timeString, $matches)) {
+            $hour = (int)$matches[1];
+            $minute = (int)$matches[2];
+            $period = strtoupper(trim($matches[3]));
+            
+            Log::info('🕐 Regex 12-hour format matched', [
+                'hour' => $hour,
+                'minute' => $minute,
+                'period' => $period
+            ]);
+            
+            if ($period === 'PM' && $hour !== 12) {
+                $hour += 12;
+            } elseif ($period === 'AM' && $hour === 12) {
+                $hour = 0;
+            }
+            
+            $result = $hour * 60 + $minute;
+            Log::info('🕐 Regex conversion result', [
+                'finalHour' => $hour,
+                'resultMinutes' => $result
+            ]);
+            
+            return $result;
+        }
+        
+        // If already in 24-hour format (HH:MM)
+        if (preg_match('/(\d{1,2}):(\d{2})/', $timeString, $matches)) {
+            $hour = (int)$matches[1];
+            $minute = (int)$matches[2];
+            $result = $hour * 60 + $minute;
+            
+            Log::info('🕐 24-hour format matched', [
+                'hour' => $hour,
+                'minute' => $minute,
+                'resultMinutes' => $result
+            ]);
+            
+            return $result;
+        }
+        
+        Log::warning('🕐 No time format matched', [
+            'timeString' => $timeString
+        ]);
+        
+        return 0; // Default fallback
+    }
+
+    /**
+     * Convert minutes since midnight back to time format for debugging
+     */
+    private function formatMinutesToTime($minutes)
+    {
+        $hours = floor($minutes / 60);
+        $mins = $minutes % 60;
+        return sprintf('%02d:%02d', $hours, $mins);
+    }
+
+    /**
+     * Get weekly availability for a sitter
+     */
+    public function getWeeklyAvailability($sitterId)
+    {
+        try {
+            // Get from database
+            $availabilities = WeeklyAvailability::where('sitter_id', $sitterId)
+                ->orderBy('start_date', 'asc')
+                ->get()
+                ->map(function ($availability) {
+                    return [
+                        'id' => $availability->id,
+                        'weekId' => $availability->week_id,
+                        'startDate' => $availability->start_date->format('Y-m-d'),
+                        'endDate' => $availability->end_date->format('Y-m-d'),
+                        'startTime' => $availability->start_time->format('H:i'),
+                        'endTime' => $availability->end_time->format('H:i'),
+                        'isWeekly' => $availability->is_weekly,
+                        'createdAt' => $availability->created_at->toISOString()
+                    ];
+                })
+                ->toArray();
+
+            Log::info('📅 Weekly availability requested for sitter', [
+                'sitter_id' => $sitterId,
+                'availabilities_count' => count($availabilities)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'availabilities' => $availabilities
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting weekly availability: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get weekly availability: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Save weekly availability for a sitter
+     */
+    public function saveWeeklyAvailability(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user || $user->role !== 'pet_sitter') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only pet sitters can save availability'
+                ], 403);
+            }
+
+            $request->validate([
+                'availabilities' => 'required|array',
+                'availabilities.*.weekId' => 'required|string',
+                'availabilities.*.startDate' => 'required|date',
+                'availabilities.*.endDate' => 'required|date|after_or_equal:availabilities.*.startDate',
+                'availabilities.*.startTime' => 'required|string',
+                'availabilities.*.endTime' => 'required|string',
+                'availabilities.*.isWeekly' => 'required|boolean'
+            ]);
+
+            // Custom validation for time comparison
+            foreach ($request->availabilities as $index => $availability) {
+                $startTime = $availability['startTime'];
+                $endTime = $availability['endTime'];
+                
+                // Convert time strings to comparable format
+                $startTime24 = $this->convertTo24Hour($startTime);
+                $endTime24 = $this->convertTo24Hour($endTime);
+                
+                Log::info('🕐 Time validation debug', [
+                    'index' => $index,
+                    'startTime' => $startTime,
+                    'endTime' => $endTime,
+                    'startTime24' => $startTime24,
+                    'endTime24' => $endTime24,
+                    'startTime24_formatted' => $this->formatMinutesToTime($startTime24),
+                    'endTime24_formatted' => $this->formatMinutesToTime($endTime24),
+                    'isValid' => $startTime24 < $endTime24
+                ]);
+                
+                if ($startTime24 >= $endTime24) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "The end time must be after the start time for availability {$index}. Start: {$startTime} ({$this->formatMinutesToTime($startTime24)}), End: {$endTime} ({$this->formatMinutesToTime($endTime24)})"
+                    ], 422);
+                }
+            }
+
+            $availabilities = $request->availabilities;
+            $sitterId = $user->id;
+
+            // Clear existing weekly availability for this sitter
+            WeeklyAvailability::where('sitter_id', $sitterId)->delete();
+
+            // Store weekly availability in database
+            $savedAvailabilities = [];
+            foreach ($availabilities as $availability) {
+                $savedAvailability = WeeklyAvailability::create([
+                    'sitter_id' => $sitterId,
+                    'week_id' => $availability['weekId'],
+                    'start_date' => $availability['startDate'],
+                    'end_date' => $availability['endDate'],
+                    'start_time' => $availability['startTime'],
+                    'end_time' => $availability['endTime'],
+                    'is_weekly' => $availability['isWeekly']
+                ]);
+                $savedAvailabilities[] = $savedAvailability;
+            }
+
+            // Also update cache for faster access
+            $cacheKey = "sitter_weekly_availability_{$sitterId}";
+            Cache::put($cacheKey, $availabilities, now()->addDays(30));
+
+            Log::info('📅 Weekly availability saved for sitter', [
+                'sitter_id' => $sitterId,
+                'availabilities_count' => count($savedAvailabilities)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Weekly availability saved successfully',
+                'availabilities' => $availabilities
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error saving weekly availability: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save weekly availability: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

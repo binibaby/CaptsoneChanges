@@ -246,13 +246,20 @@ class RealtimeLocationService {
           return mappedSitter;
         });
         
+        // Deduplicate sitters by ID before updating cache
+        const uniqueSitters = apiSitters.filter((sitter, index, self) => 
+          index === self.findIndex(s => s.id === sitter.id)
+        );
+        
+        console.log(`👥 Deduplicated sitters: ${apiSitters.length} -> ${uniqueSitters.length}`);
+        
         // Update local cache
-        apiSitters.forEach((sitter: RealtimeSitter) => {
+        uniqueSitters.forEach((sitter: RealtimeSitter) => {
           this.sitters.set(sitter.id, sitter);
         });
         
         this.notifyListeners();
-        return apiSitters;
+        return uniqueSitters;
       } else {
         console.error('❌ Failed to get nearby sitters:', data.message);
         return [];

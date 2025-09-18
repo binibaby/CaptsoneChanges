@@ -17,6 +17,28 @@ export interface Booking {
   specialInstructions?: string;
   createdAt: string;
   updatedAt: string;
+  isWeekly?: boolean;
+  startDate?: string;
+  endDate?: string;
+  totalAmount?: number;
+}
+
+export interface WeeklyBooking {
+  id: string;
+  sitterId: string;
+  sitterName: string;
+  petOwnerId: string;
+  petOwnerName: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  hourlyRate: number;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  isWeekly: true;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 class BookingService {
@@ -231,19 +253,265 @@ class BookingService {
   // Create a new booking
   async createBooking(bookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>): Promise<Booking> {
     console.log('📅 Creating new booking with data:', bookingData);
-    const bookings = await this.getBookings();
-    const newBooking: Booking = {
-      ...bookingData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    
+    try {
+      // First, save to database
+      const user = await this.getCurrentUser();
+      if (!user) {
+        throw new Error('No user found');
+      }
 
-    console.log('📋 New booking object:', newBooking);
-    bookings.push(newBooking);
-    console.log('💾 Total bookings after adding:', bookings.length);
-    await this.saveBookings(bookings);
-    return newBooking;
+      const token = user.token;
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      // Convert time to 24-hour format for backend
+      const convertTo24Hour = (time12: string) => {
+        if (!time12.includes('AM') && !time12.includes('PM')) {
+          return time12;
+        }
+        
+        const [time, period] = time12.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour24 = parseInt(hours, 10);
+        
+        if (period === 'PM' && hour24 !== 12) {
+          hour24 += 12;
+        } else if (period === 'AM' && hour24 === 12) {
+          hour24 = 0;
+        }
+        
+        return `${hour24.toString().padStart(2, '0')}:${minutes}`;
+      };
+
+      const bookingPayload = {
+        sitter_id: bookingData.sitterId,
+        date: bookingData.date,
+        time: convertTo24Hour(bookingData.startTime),
+        pet_name: 'My Pet', // Default pet name
+        pet_type: 'Dog', // Default pet type
+        service_type: 'Pet Sitting',
+        duration: 3, // Default duration in hours
+        rate_per_hour: bookingData.hourlyRate,
+        description: 'Pet sitting service requested',
+        is_weekly: false
+      };
+
+      console.log('📝 Sending booking to API:', bookingPayload);
+
+      const { makeApiCall } = await import('./networkService');
+      const response = await makeApiCall('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingPayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API booking failed:', response.status, errorText);
+        throw new Error(`API booking failed: ${response.status}`);
+      }
+
+      const apiResponse = await response.json();
+      console.log('✅ API booking successful:', apiResponse);
+
+      // Create local booking object with API response
+      const newBooking: Booking = {
+        ...bookingData,
+        id: apiResponse.booking?.id?.toString() || Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to local storage as well
+      const bookings = await this.getBookings();
+      bookings.push(newBooking);
+      await this.saveBookings(bookings);
+
+      console.log('✅ Booking created successfully:', newBooking);
+      return newBooking;
+
+    } catch (error) {
+      console.error('❌ Error creating booking:', error);
+      
+      // Fallback to local storage only
+      const bookings = await this.getBookings();
+      const newBooking: Booking = {
+        ...bookingData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      bookings.push(newBooking);
+      await this.saveBookings(bookings);
+      
+      console.log('⚠️ Booking saved locally only:', newBooking);
+      return newBooking;
+    }
+  }
+
+  async createWeeklyBooking(bookingData: Omit<WeeklyBooking, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeeklyBooking> {
+    console.log('📅 ===== CREATING WEEKLY BOOKING =====');
+    console.log('📅 Creating new weekly booking with data:', bookingData);
+    
+    try {
+      // First, save to database
+      const user = await this.getCurrentUser();
+      if (!user) {
+        throw new Error('No user found');
+      }
+
+      const token = user.token;
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      // Convert time to 24-hour format for backend
+      const convertTo24Hour = (time12: string) => {
+        if (!time12.includes('AM') && !time12.includes('PM')) {
+          return time12;
+        }
+        
+        const [time, period] = time12.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour24 = parseInt(hours, 10);
+        
+        if (period === 'PM' && hour24 !== 12) {
+          hour24 += 12;
+        } else if (period === 'AM' && hour24 === 12) {
+          hour24 = 0;
+        }
+        
+        return `${hour24.toString().padStart(2, '0')}:${minutes}`;
+      };
+
+      const bookingPayload = {
+        sitter_id: bookingData.sitterId,
+        date: bookingData.startDate, // Use start date as primary date
+        time: convertTo24Hour(bookingData.startTime),
+        pet_name: 'My Pet', // Default pet name
+        pet_type: 'Dog', // Default pet type
+        service_type: 'Pet Sitting',
+        duration: 3, // Default duration in hours
+        rate_per_hour: bookingData.hourlyRate,
+        description: 'Weekly pet sitting service requested',
+        is_weekly: true,
+        start_date: bookingData.startDate,
+        end_date: bookingData.endDate,
+        start_time: convertTo24Hour(bookingData.startTime),
+        end_time: convertTo24Hour(bookingData.endTime),
+        total_amount: bookingData.totalAmount
+      };
+
+      console.log('📝 Sending weekly booking to API:', bookingPayload);
+
+      const { makeApiCall } = await import('./networkService');
+      const response = await makeApiCall('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingPayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API weekly booking failed:', response.status, errorText);
+        throw new Error(`API weekly booking failed: ${response.status}`);
+      }
+
+      const apiResponse = await response.json();
+      console.log('✅ API weekly booking successful:', apiResponse);
+
+      // Create weekly booking object with API response
+      const newBooking: WeeklyBooking = {
+        ...bookingData,
+        id: apiResponse.booking?.id?.toString() || `weekly_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save weekly booking to a separate storage key
+      const weeklyBookings = await this.getWeeklyBookings();
+      weeklyBookings.push(newBooking);
+      await this.saveWeeklyBookings(weeklyBookings);
+
+      // Also add to regular bookings for compatibility
+      const regularBooking: Booking = {
+        id: newBooking.id,
+        sitterId: newBooking.sitterId,
+        sitterName: newBooking.sitterName,
+        petOwnerId: newBooking.petOwnerId,
+        petOwnerName: newBooking.petOwnerName,
+        date: newBooking.startDate, // Use start date as primary date
+        startTime: newBooking.startTime,
+        endTime: newBooking.endTime,
+        hourlyRate: newBooking.hourlyRate,
+        status: newBooking.status,
+        isWeekly: true,
+        startDate: newBooking.startDate,
+        endDate: newBooking.endDate,
+        totalAmount: newBooking.totalAmount,
+        createdAt: newBooking.createdAt,
+        updatedAt: newBooking.updatedAt,
+      };
+
+      const bookings = await this.getBookings();
+      bookings.push(regularBooking);
+      await this.saveBookings(bookings);
+
+      console.log('✅ Weekly booking created successfully:', newBooking);
+      return newBooking;
+
+    } catch (error) {
+      console.error('❌ Error creating weekly booking:', error);
+      
+      // Fallback to local storage only
+      const newBooking: WeeklyBooking = {
+        ...bookingData,
+        id: `weekly_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save weekly booking to a separate storage key
+      const weeklyBookings = await this.getWeeklyBookings();
+      weeklyBookings.push(newBooking);
+      await this.saveWeeklyBookings(weeklyBookings);
+
+      // Also add to regular bookings for compatibility
+      const regularBooking: Booking = {
+        id: newBooking.id,
+        sitterId: newBooking.sitterId,
+        sitterName: newBooking.sitterName,
+        petOwnerId: newBooking.petOwnerId,
+        petOwnerName: newBooking.petOwnerName,
+        date: newBooking.startDate, // Use start date as primary date
+        startTime: newBooking.startTime,
+        endTime: newBooking.endTime,
+        hourlyRate: newBooking.hourlyRate,
+        status: newBooking.status,
+        isWeekly: true,
+        startDate: newBooking.startDate,
+        endDate: newBooking.endDate,
+        totalAmount: newBooking.totalAmount,
+        createdAt: newBooking.createdAt,
+        updatedAt: newBooking.updatedAt,
+      };
+
+      const bookings = await this.getBookings();
+      bookings.push(regularBooking);
+      await this.saveBookings(bookings);
+      
+      console.log('⚠️ Weekly booking saved locally only:', newBooking);
+      return newBooking;
+    }
   }
 
   // Update booking status
@@ -413,6 +681,26 @@ class BookingService {
     
     await this.saveBookings(updated);
     return true;
+  }
+
+  // Get weekly bookings
+  async getWeeklyBookings(): Promise<WeeklyBooking[]> {
+    try {
+      const data = await AsyncStorage.getItem('weeklyBookings');
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error loading weekly bookings:', error);
+      return [];
+    }
+  }
+
+  // Save weekly bookings
+  private async saveWeeklyBookings(bookings: WeeklyBooking[]) {
+    try {
+      await AsyncStorage.setItem('weeklyBookings', JSON.stringify(bookings));
+    } catch (error) {
+      console.error('Error saving weekly bookings:', error);
+    }
   }
 }
 

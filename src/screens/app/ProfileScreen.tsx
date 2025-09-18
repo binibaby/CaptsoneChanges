@@ -31,6 +31,8 @@ const ProfileScreen = () => {
   
   const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
   const [imageError, setImageError] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [newSpecialty, setNewSpecialty] = useState('');
   const [profileData, setProfileData] = useState<{
@@ -71,40 +73,64 @@ const ProfileScreen = () => {
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    if (uri.startsWith('/storage/')) {
+      const fullUrl = `http://192.168.100.184:8000${uri}`;
+      console.log('🔗 ProfileScreen: Generated full URL:', fullUrl);
+      return fullUrl;
+    }
+    if (uri.startsWith('file://') || uri.startsWith('content://')) return uri; // Keep local URIs as-is
     return uri;
   };
 
   // Handle image load error
   const handleImageError = () => {
-    setImageError(true);
+    console.log('❌ ProfileScreen: Image load failed, retry count:', imageRetryCount);
+    if (imageRetryCount < 3) {
+      setImageRetryCount(prev => prev + 1);
+      setImageError(false);
+      // Force re-render by updating the image source
+      setTimeout(() => {
+        setProfileImage(prev => prev);
+      }, 1000);
+    } else {
+      setImageError(true);
+    }
   };
 
   // Handle image load success
   const handleImageLoad = () => {
     setImageError(false);
+    setImageRetryCount(0); // Reset retry count on successful load
   };
 
-  // Sync profile image with user data - always sync when user data changes
+  // Sync profile image with user data - only sync when user data changes and local state is different
   useEffect(() => {
     console.log('🔍 ProfileScreen: useEffect triggered, user profileImage:', user?.profileImage);
     console.log('🔍 ProfileScreen: Current local profileImage state:', profileImage);
+    console.log('🔍 ProfileScreen: Is uploading:', isUploadingImage);
     console.log('🔍 ProfileScreen: User object:', user);
     
-    // Always sync with user data when it changes
-    // This ensures the profile image updates when user data is refreshed
+    // Don't sync during upload to prevent blinking
+    if (isUploadingImage) {
+      console.log('⏳ ProfileScreen: Skipping sync during upload');
+      return;
+    }
+    
+    // Only sync if the user data has a different profile image than what we currently have
+    // This prevents unnecessary re-renders and blinking
     if (user?.profileImage && user.profileImage !== profileImage) {
       console.log('✅ ProfileScreen: Updating profile image from user data:', user.profileImage);
       setProfileImage(user.profileImage);
       setImageError(false);
-    } else if (!user?.profileImage && profileImage) {
+    } else if (!user?.profileImage && profileImage && !profileImage.startsWith('file://') && !profileImage.startsWith('content://')) {
+      // Only clear if the current image is not a local file (camera/gallery pick)
       console.log('❌ ProfileScreen: User has no profile image, clearing local state');
       setProfileImage(null);
       setImageError(false);
     } else {
       console.log('🔄 ProfileScreen: Profile image already in sync');
     }
-  }, [user?.profileImage]);
+  }, [user?.profileImage, isUploadingImage]);
 
   // Show loading state while auth context is loading
   if (isLoading) {
@@ -252,6 +278,18 @@ const ProfileScreen = () => {
   };
 
   const pickProfileImage = async () => {
+    Alert.alert(
+      'Select Profile Image',
+      'Choose how you want to add a profile image',
+      [
+        { text: 'Camera', onPress: takeProfilePhoto },
+        { text: 'Photo Library', onPress: pickFromGallery },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const takeProfilePhoto = async () => {
     const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
     if (cameraPermission.granted === false) {
       Alert.alert('Camera Permission Required', 'Please allow camera access to take profile photos.');
@@ -269,6 +307,7 @@ const ProfileScreen = () => {
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
+        console.log('📸 ProfileScreen: Image picked from camera, setting local state:', imageUri);
         setProfileImage(imageUri);
         setImageError(false);
         
@@ -280,8 +319,40 @@ const ProfileScreen = () => {
     }
   };
 
+  const pickFromGallery = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.granted === false) {
+      Alert.alert('Permission Required', 'Please allow photo library access to select images.');
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        allowsMultipleSelection: false,
+        selectionLimit: 1,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        console.log('📸 ProfileScreen: Image picked from gallery, setting local state:', imageUri);
+        setProfileImage(imageUri);
+        setImageError(false);
+        
+        // Upload image to backend
+        await uploadProfileImage(imageUri);
+      }
+    } catch (error) {
+      Alert.alert('Gallery Error', 'Failed to open photo library. Please try again.');
+    }
+  };
+
   const uploadProfileImage = async (imageUri: string) => {
     try {
+      setIsUploadingImage(true);
+      setImageError(false);
+      
       const formData = new FormData();
       formData.append('profile_image', {
         uri: imageUri,
@@ -316,14 +387,14 @@ const ProfileScreen = () => {
       
       if (result.success) {
         console.log('Profile image uploaded successfully:', result.profile_image);
-        // Update the local state immediately to show the new image
-        setProfileImage(result.profile_image);
-        setImageError(false);
-        console.log('ProfileScreen: Local profileImage state updated to:', result.profile_image);
         
-        // Update the user context with the new profile image
+        // Update the user context first, then let useEffect handle the local state update
+        // This prevents double state updates and blinking
         await updateUserProfile({ profileImage: result.profile_image });
         console.log('ProfileScreen: User context updated with profile image');
+        
+        // The useEffect will automatically update the local state when user.profileImage changes
+        setImageError(false);
         
         Alert.alert('Success', 'Profile image updated successfully!');
       } else {
@@ -335,6 +406,9 @@ const ProfileScreen = () => {
       console.error('Error uploading profile image:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       Alert.alert('Error', `Failed to upload profile image: ${errorMessage}`);
+      setImageError(true);
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -431,35 +505,47 @@ const ProfileScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <TouchableOpacity onPress={pickProfileImage}>
+          <TouchableOpacity onPress={pickProfileImage} disabled={isUploadingImage}>
           {console.log('🖼️ ProfileScreen: Rendering image with:', {
             profileImage,
             isValidUri: isValidImageUri(profileImage),
             imageError,
+            isUploadingImage,
             willShowDefault: !(profileImage && isValidImageUri(profileImage) && !imageError)
           })}
           <Image
             source={
               profileImage && isValidImageUri(profileImage) && !imageError 
-                ? { uri: getFullImageUrl(profileImage) } 
+                ? { 
+                    uri: getFullImageUrl(profileImage),
+                    cache: 'force-cache' // Force cache for better performance
+                  } 
                 : require('../../assets/images/default-avatar.png')
             }
-            style={styles.profileImage}
+            style={[styles.profileImage, isUploadingImage && styles.uploadingImage]}
             onError={(error) => {
               console.log('❌ ProfileScreen: Image load error:', error);
               console.log('❌ ProfileScreen: Failed to load image URI:', profileImage);
+              console.log('❌ ProfileScreen: Full URL:', getFullImageUrl(profileImage));
               console.log('❌ ProfileScreen: isValidImageUri result:', isValidImageUri(profileImage));
               console.log('❌ ProfileScreen: imageError state:', imageError);
+              console.log('❌ ProfileScreen: Error details:', error.nativeEvent);
               handleImageError();
             }}
             onLoad={() => {
               console.log('✅ ProfileScreen: Image loaded successfully:', profileImage);
+              console.log('✅ ProfileScreen: Full URL used:', getFullImageUrl(profileImage));
               handleImageLoad();
             }}
             defaultSource={require('../../assets/images/default-avatar.png')}
+            resizeMode="cover"
           />
             <View style={styles.cameraIconOverlay}>
-              <Ionicons name="camera" size={20} color="#fff" />
+              {isUploadingImage ? (
+                <Ionicons name="hourglass" size={20} color="#fff" />
+              ) : (
+                <Ionicons name="camera" size={20} color="#fff" />
+              )}
             </View>
           </TouchableOpacity>
           <View style={styles.profileInfo}>
@@ -828,6 +914,9 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginRight: 15,
+  },
+  uploadingImage: {
+    opacity: 0.7,
   },
   cameraIconOverlay: {
     position: 'absolute',

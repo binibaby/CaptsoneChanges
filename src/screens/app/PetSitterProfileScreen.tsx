@@ -39,6 +39,7 @@ const PetSitterProfileScreen = () => {
   const [idImage, setIdImage] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
   const [imageError, setImageError] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [verifiedIDs, setVerifiedIDs] = useState([
     { type: 'umid', label: 'UMID (Unified Multi-Purpose ID)', icon: 'card', color: '#4CAF50', verified: false },
     { type: 'sss', label: 'SSS ID', icon: 'card', color: '#2196F3', verified: false },
@@ -209,6 +210,9 @@ const PetSitterProfileScreen = () => {
 
   const uploadProfileImage = async (imageUri: string) => {
     try {
+      setIsUploadingImage(true);
+      setImageError(false);
+      
       const formData = new FormData();
       formData.append('profile_image', {
         uri: imageUri,
@@ -233,9 +237,13 @@ const PetSitterProfileScreen = () => {
       const result = await response.json();
       
       if (result.success) {
-        setProfileImage(result.profile_image);
-        setImageError(false);
+        // Update the user context first, then let useEffect handle the local state update
+        // This prevents double state updates and blinking
         await updateUserProfile({ profileImage: result.profile_image });
+        
+        // The useEffect will automatically update the local state when user.profileImage changes
+        setImageError(false);
+        
         Alert.alert('Success', 'Profile image updated successfully!');
       } else {
         setImageError(true);
@@ -245,6 +253,9 @@ const PetSitterProfileScreen = () => {
       console.error('Error uploading profile image:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       Alert.alert('Error', `Failed to upload profile image: ${errorMessage}`);
+      setImageError(true);
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -321,18 +332,25 @@ const PetSitterProfileScreen = () => {
     console.log('🔄 PetSitterProfileScreen: user.profileImage:', user?.profileImage);
     console.log('🔄 PetSitterProfileScreen: current profileImage state:', profileImage);
     
+    // Don't sync during upload to prevent blinking
+    if (isUploadingImage) {
+      console.log('⏳ PetSitterProfileScreen: Skipping sync during upload');
+      return;
+    }
+    
     if (user && user.profileImage && user.profileImage !== profileImage) {
       console.log('✅ PetSitterProfileScreen: Updating profile image from user data:', user.profileImage);
       setProfileImage(user.profileImage);
       setImageError(false);
-    } else if (!user?.profileImage && profileImage) {
+    } else if (!user?.profileImage && profileImage && !profileImage.startsWith('file://') && !profileImage.startsWith('content://')) {
+      // Only clear if the current image is not a local file (camera/gallery pick)
       console.log('❌ PetSitterProfileScreen: User has no profile image, clearing local state');
       setProfileImage(null);
       setImageError(false);
     } else {
       console.log('🔄 PetSitterProfileScreen: Profile image already in sync');
     }
-  }, [user?.profileImage]);
+  }, [user?.profileImage, isUploadingImage]);
 
   // Also sync when screen comes into focus
   useFocusEffect(

@@ -2,17 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingService } from '../../services/bookingService';
@@ -43,8 +43,8 @@ const PetSitterNotificationsScreen = () => {
   // Reload notifications when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 Screen focused, refreshing notifications...');
-      refreshNotifications();
+      console.log('🔄 Screen focused, loading notifications...');
+      loadNotifications();
     }, [])
   );
 
@@ -63,10 +63,16 @@ const PetSitterNotificationsScreen = () => {
 
   const loadNotifications = async () => {
     console.log('🔔 Loading notifications in notification screen...');
+    console.log('🔔 Current user:', user?.id, user?.email);
     const loadedNotifications = await notificationService.getNotifications();
     console.log('📋 Loaded notifications:', loadedNotifications.length);
     loadedNotifications.forEach(notification => {
       console.log(`  - ${notification.type}: ${notification.title} (read: ${notification.isRead})`);
+      if (notification.data?.isWeekly) {
+        console.log(`  - WEEKLY NOTIFICATION: ${notification.id} - ${notification.title}`);
+        console.log(`  - Weekly data:`, notification.data);
+        console.log(`  - Weekly userId:`, notification.userId);
+      }
     });
     setNotifications(loadedNotifications);
   };
@@ -76,6 +82,9 @@ const PetSitterNotificationsScreen = () => {
   };
 
   const handleNotificationPress = async (notification: Notification) => {
+    console.log('🔔 Notification pressed:', notification);
+    console.log('🔔 Notification data:', notification.data);
+    
     // Mark as read first
     await notificationService.markAsRead(notification.id);
     
@@ -91,6 +100,7 @@ const PetSitterNotificationsScreen = () => {
       case 'booking':
         // For pet sitters, booking notifications are new requests from owners
         // Always show the specific booking details in a modal
+        console.log('🔔 Setting selected booking:', notification);
         setSelectedBooking(notification);
         setShowBookingModal(true);
         break;
@@ -152,9 +162,19 @@ const PetSitterNotificationsScreen = () => {
 
       // Create confirmation message for pet owner
       const statusText = status === 'confirmed' ? 'confirmed' : 'cancelled';
-      const messageText = status === 'confirmed' 
-        ? `Great news! I've confirmed your booking for ${bookingData.date} from ${bookingData.startTime} to ${bookingData.endTime}. Looking forward to taking care of your pet!`
-        : `I'm sorry, but I won't be able to take care of your pet on ${bookingData.date} from ${bookingData.startTime} to ${bookingData.endTime}. I hope you can find another sitter.`;
+      let messageText: string;
+      
+      if (bookingData.isWeekly) {
+        // Weekly booking message
+        messageText = status === 'confirmed' 
+          ? `Great news! I've confirmed your weekly booking from ${new Date(bookingData.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to ${new Date(bookingData.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} from ${bookingData.startTime} to ${bookingData.endTime}. Total: ₱${bookingData.totalAmount}. Looking forward to taking care of your pet!`
+          : `I'm sorry, but I won't be able to take care of your pet for the weekly booking from ${new Date(bookingData.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to ${new Date(bookingData.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. I hope you can find another sitter.`;
+      } else {
+        // Regular booking message
+        messageText = status === 'confirmed' 
+          ? `Great news! I've confirmed your booking for ${bookingData.date} from ${bookingData.startTime} to ${bookingData.endTime}. Looking forward to taking care of your pet!`
+          : `I'm sorry, but I won't be able to take care of your pet on ${bookingData.date} from ${bookingData.startTime} to ${bookingData.endTime}. I hope you can find another sitter.`;
+      }
 
       // Create message
       await messagingService.createMessage({
@@ -166,17 +186,35 @@ const PetSitterNotificationsScreen = () => {
       });
 
       // Create notification for pet owner
-      await notificationService.createBookingConfirmationNotification({
-        sitterId: user?.id || '', // Current sitter ID from auth context
-        sitterName: user?.name || 'Pet Sitter', // Current sitter name from auth context
-        petOwnerId: bookingData.petOwnerId || '',
-        petOwnerName: bookingData.petOwnerName,
-        bookingId: bookingData.bookingId,
-        date: bookingData.date,
-        startTime: bookingData.startTime,
-        endTime: bookingData.endTime,
-        status: status
-      });
+      if (bookingData.isWeekly) {
+        // Weekly booking confirmation notification
+        await notificationService.createWeeklyBookingConfirmationNotification({
+          sitterId: user?.id || '',
+          sitterName: user?.name || 'Pet Sitter',
+          petOwnerId: bookingData.petOwnerId || '',
+          petOwnerName: bookingData.petOwnerName,
+          bookingId: bookingData.bookingId,
+          startDate: bookingData.startDate,
+          endDate: bookingData.endDate,
+          startTime: bookingData.startTime,
+          endTime: bookingData.endTime,
+          totalAmount: bookingData.totalAmount,
+          status: status
+        });
+      } else {
+        // Regular booking confirmation notification
+        await notificationService.createBookingConfirmationNotification({
+          sitterId: user?.id || '', // Current sitter ID from auth context
+          sitterName: user?.name || 'Pet Sitter', // Current sitter name from auth context
+          petOwnerId: bookingData.petOwnerId || '',
+          petOwnerName: bookingData.petOwnerName,
+          bookingId: bookingData.bookingId,
+          date: bookingData.date,
+          startTime: bookingData.startTime,
+          endTime: bookingData.endTime,
+          status: status
+        });
+      }
 
       // Remove the notification from the list since it's been handled
       // For cancelled bookings, remove immediately. For confirmed, keep for reference
@@ -243,17 +281,30 @@ const PetSitterNotificationsScreen = () => {
       return;
     }
 
+    console.log('🧪 Creating test notification for user:', user.id, user.role);
+
     // Create a test notification for the current user
     await notificationService.addNotificationForUser(user.id, {
       type: 'booking',
-      title: 'Test Booking Confirmed',
+      title: 'Test Booking Request',
       message: 'This is a test notification to verify the system is working.',
-      action: 'View',
+      action: 'View Request',
       data: {
-        status: 'confirmed',
+        sitterId: user.id,
+        sitterName: user.name || 'Test Sitter',
+        petOwnerId: 'test-owner',
+        petOwnerName: 'Test Owner',
+        bookingId: 'test-booking-123',
+        date: new Date().toISOString().split('T')[0],
+        startTime: '10:00 AM',
+        endTime: '2:00 PM',
+        hourlyRate: 25,
         test: true
       }
     });
+
+    // Reload notifications to see the new one
+    await loadNotifications();
 
     Alert.alert('Test', 'Test notification created! Check your notifications.');
   };
@@ -441,6 +492,8 @@ const PetSitterNotificationsScreen = () => {
           >
             {selectedBooking && (
               <View style={styles.bookingDetails}>
+                {console.log('🔔 Rendering booking modal with selectedBooking:', selectedBooking)}
+                {console.log('🔔 Selected booking data:', selectedBooking.data)}
               
               {/* Header with booking icon */}
               <View style={styles.bookingHeader}>
@@ -468,9 +521,10 @@ const PetSitterNotificationsScreen = () => {
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>Pet Owner</Text>
                     <Text style={styles.infoValue}>
-                      {selectedBooking.data?.petOwnerName || 
-                       selectedBooking.data?.sitterName || 
-                       'Jasmine Paneda' || 'Unknown Owner'}
+                      {(() => {
+                        console.log('🔔 Pet Owner data:', selectedBooking.data?.petOwnerName);
+                        return selectedBooking.data?.petOwnerName || 'Unknown Owner';
+                      })()}
                     </Text>
                   </View>
                 </View>
@@ -482,8 +536,14 @@ const PetSitterNotificationsScreen = () => {
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>Date</Text>
                     <Text style={styles.infoValue}>
-                      {selectedBooking.data?.date || 
-                       '2025-09-12' || 'Not specified'}
+                      {(() => {
+                        console.log('🔔 Date data:', selectedBooking.data?.date);
+                        console.log('🔔 Start/End date data:', selectedBooking.data?.startDate, selectedBooking.data?.endDate);
+                        console.log('🔔 Is weekly:', selectedBooking.data?.isWeekly);
+                        return selectedBooking.data?.isWeekly 
+                          ? `${selectedBooking.data.startDate} - ${selectedBooking.data.endDate}`
+                          : selectedBooking.data?.date || 'Not specified';
+                      })()}
                     </Text>
                   </View>
                 </View>
@@ -497,7 +557,7 @@ const PetSitterNotificationsScreen = () => {
                     <Text style={styles.infoValue}>
                       {selectedBooking.data?.startTime && selectedBooking.data?.endTime 
                         ? `${formatTime(selectedBooking.data.startTime)} - ${formatTime(selectedBooking.data.endTime)}`
-                        : '8:00 AM - 5:00 PM'
+                        : 'Not specified'
                       }
                     </Text>
                   </View>
@@ -512,28 +572,12 @@ const PetSitterNotificationsScreen = () => {
                     <Text style={styles.infoValue}>
                       {selectedBooking.data?.hourlyRate 
                         ? `₱${selectedBooking.data.hourlyRate}/hour`
-                        : '₱25/hour'
+                        : 'Not specified'
                       }
                     </Text>
                   </View>
                 </View>
 
-                <View style={styles.divider} />
-
-                <View style={styles.totalCostRow}>
-                  <View style={styles.totalCostContainer}>
-                    <Text style={styles.totalCostLabel}>Estimated Total</Text>
-                    <Text style={styles.totalCostValue}>
-                      {selectedBooking.data?.hourlyRate 
-                        ? `₱${calculateTotalCost(selectedBooking.data.startTime, selectedBooking.data.endTime, selectedBooking.data.hourlyRate)}`
-                        : '₱225'
-                      }
-                    </Text>
-                  </View>
-                  <View style={styles.totalCostIcon}>
-                    <Ionicons name="calculator" size={24} color="#10B981" />
-                  </View>
-                </View>
               </View>
 
               {/* Message Card */}

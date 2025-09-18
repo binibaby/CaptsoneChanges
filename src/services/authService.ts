@@ -66,6 +66,9 @@ class AuthService {
     try {
       console.log('Attempting to login with backend API');
       
+      // Clear all old user data before login
+      await this.clearAllOldUserData();
+      
       // Import network service for dynamic IP detection
       const { makeApiCall } = await import('./networkService');
       
@@ -134,6 +137,11 @@ class AuthService {
 
         this.currentUser = user;
         await this.saveUserToStorage(user);
+        
+        // Clear availability data for new sitters or when switching users
+        if (user.userRole === 'Pet Sitter') {
+          await this.clearAvailabilityDataForNewSitter(user.id);
+        }
         
         // Clear logout flag on successful login
         await AsyncStorage.removeItem('user_logged_out');
@@ -269,6 +277,11 @@ class AuthService {
         this.currentUser = user;
         await this.saveUserToStorage(user);
         
+        // Clear availability data for new sitters
+        if (user.userRole === 'Pet Sitter') {
+          await this.clearAvailabilityDataForNewSitter(user.id);
+        }
+        
         // Restore profile data if available
         const userWithProfileData = await this.restoreProfileData(user);
         return userWithProfileData;
@@ -357,6 +370,10 @@ class AuthService {
       await AsyncStorage.removeItem('notifications');
       await AsyncStorage.removeItem('user_location');
       await AsyncStorage.removeItem('user_address');
+      
+      // Clear availability data to ensure clean state for next user
+      await this.clearAllAvailabilityData();
+      
       console.log('AuthService: All user data cleared');
       
       // Import and clear location service
@@ -795,6 +812,110 @@ class AuthService {
       console.log('saveUserToStorage: User saved successfully to AsyncStorage');
     } catch (error) {
       console.error('Error saving user to storage:', error);
+    }
+  }
+
+  // Clear availability data for new sitters
+  private async clearAvailabilityDataForNewSitter(userId: string): Promise<void> {
+    try {
+      console.log('🆕 Clearing availability data for new sitter:', userId);
+      
+      // Clear all availability data
+      await AsyncStorage.removeItem('petSitterAvailabilities');
+      await AsyncStorage.removeItem('petSitterWeeklyAvailabilities');
+      
+      // Mark this sitter as having initialized their availability
+      await AsyncStorage.setItem(`sitter_${userId}_availability_initialized`, 'true');
+      
+      console.log('✅ Availability data cleared for new sitter');
+    } catch (error) {
+      console.error('❌ Error clearing availability data for new sitter:', error);
+    }
+  }
+
+  // Clear all old user data (used during login)
+  private async clearAllOldUserData(): Promise<void> {
+    try {
+      console.log('🧹 Clearing all old user data before login');
+      
+      // Clear all booking data
+      await AsyncStorage.removeItem('bookings');
+      
+      // Clear all availability data (both old format and new user-specific format)
+      await AsyncStorage.removeItem('petSitterAvailabilities');
+      await AsyncStorage.removeItem('petSitterWeeklyAvailabilities');
+      
+      // Clear all user-specific availability data
+      const keys = await AsyncStorage.getAllKeys();
+      const availabilityKeys = keys.filter(key => 
+        key.startsWith('petSitterAvailabilities_') || 
+        key.startsWith('petSitterWeeklyAvailabilities_')
+      );
+      
+      for (const key of availabilityKeys) {
+        await AsyncStorage.removeItem(key);
+      }
+      
+      // Clear all sitter initialization flags
+      const sitterKeys = keys.filter(key => key.startsWith('sitter_') && key.endsWith('_availability_initialized'));
+      
+      for (const key of sitterKeys) {
+        await AsyncStorage.removeItem(key);
+      }
+      
+      // Clear notification data
+      await AsyncStorage.removeItem('notifications');
+      
+      // Clear location data
+      await AsyncStorage.removeItem('user_location');
+      await AsyncStorage.removeItem('user_address');
+      
+      console.log('✅ All old user data cleared');
+    } catch (error) {
+      console.error('❌ Error clearing old user data:', error);
+    }
+  }
+
+  // Clear all availability data (used during logout)
+  private async clearAllAvailabilityData(): Promise<void> {
+    try {
+      console.log('🧹 Clearing all availability data during logout');
+      
+      // Get current user to clear their specific data
+      const currentUser = this.currentUser;
+      
+      // Clear all availability data (both old format and new user-specific format)
+      await AsyncStorage.removeItem('petSitterAvailabilities');
+      await AsyncStorage.removeItem('petSitterWeeklyAvailabilities');
+      
+      // Clear user-specific availability data if user exists
+      if (currentUser && currentUser.id) {
+        await AsyncStorage.removeItem(`petSitterAvailabilities_${currentUser.id}`);
+        await AsyncStorage.removeItem(`petSitterWeeklyAvailabilities_${currentUser.id}`);
+        console.log(`✅ Cleared availability data for user: ${currentUser.id}`);
+      }
+      
+      // Clear all sitter initialization flags
+      const keys = await AsyncStorage.getAllKeys();
+      const sitterKeys = keys.filter(key => key.startsWith('sitter_') && key.endsWith('_availability_initialized'));
+      
+      for (const key of sitterKeys) {
+        await AsyncStorage.removeItem(key);
+      }
+      
+      // Also clear any user-specific availability data for all users (cleanup)
+      const availabilityKeys = keys.filter(key => 
+        key.startsWith('petSitterAvailabilities_') || 
+        key.startsWith('petSitterWeeklyAvailabilities_')
+      );
+      
+      for (const key of availabilityKeys) {
+        await AsyncStorage.removeItem(key);
+      }
+      
+      console.log('✅ All availability data cleared');
+    } catch (error) {
+      console.error('❌ Error clearing all availability data:', error);
     }
   }
 }

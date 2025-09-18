@@ -19,6 +19,18 @@ return new class extends Migration
             $table->time('time');
             $table->foreignId('payment_id')->nullable()->constrained()->onDelete('set null');
             $table->enum('status', ['pending', 'confirmed', 'completed', 'cancelled'])->default('pending');
+            $table->boolean('is_weekly')->default(false);
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
+            $table->time('start_time')->nullable();
+            $table->time('end_time')->nullable();
+            $table->decimal('hourly_rate', 8, 2)->nullable();
+            $table->decimal('total_amount', 10, 2)->nullable();
+            $table->string('pet_name')->nullable();
+            $table->string('pet_type')->nullable();
+            $table->string('service_type')->nullable();
+            $table->integer('duration')->nullable();
+            $table->text('description')->nullable();
             $table->timestamps();
         });
     }

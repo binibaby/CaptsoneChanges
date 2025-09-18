@@ -4,14 +4,14 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import Modal from 'react-native-modal';
@@ -62,13 +62,22 @@ const PetSitterAvailabilityScreen = () => {
   const [showWeekEndDatePicker, setShowWeekEndDatePicker] = useState(false);
   const [showWeekStartTimePicker, setShowWeekStartTimePicker] = useState(false);
   const [showWeekEndTimePicker, setShowWeekEndTimePicker] = useState(false);
+  
+  // Weekly availability state
+  const [weeklyAvailabilities, setWeeklyAvailabilities] = useState<{[key: string]: any}>({});
 
   // Save availability data to AsyncStorage and backend
   const saveAvailabilityData = async (data: { [date: string]: TimeRange[] }) => {
     try {
-      // Save to local storage
-      await AsyncStorage.setItem('petSitterAvailabilities', JSON.stringify(data));
-      console.log('✅ Availability data saved to local storage');
+      const user = await authService.getCurrentUser();
+      if (!user || user.role !== 'pet_sitter') {
+        console.log('⚠️ User is not a pet sitter, skipping save');
+        return;
+      }
+
+      // Save to user-specific local storage
+      await AsyncStorage.setItem(`petSitterAvailabilities_${user.id}`, JSON.stringify(data));
+      console.log('✅ Availability data saved to local storage for user:', user.id);
 
       // Save to backend
       await saveAvailabilityToBackend(data);
@@ -77,11 +86,31 @@ const PetSitterAvailabilityScreen = () => {
     }
   };
 
+  // Save weekly availability data
+  const saveWeeklyAvailabilityData = async (weeklyData: any) => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || user.role !== 'pet_sitter') {
+        console.log('⚠️ User is not a pet sitter, skipping weekly save');
+        return;
+      }
+
+      // Save to user-specific local storage
+      await AsyncStorage.setItem(`petSitterWeeklyAvailabilities_${user.id}`, JSON.stringify(weeklyData));
+      console.log('✅ Weekly availability data saved to local storage for user:', user.id);
+
+      // Save to backend
+      await saveWeeklyAvailabilityToBackend(weeklyData);
+    } catch (error) {
+      console.error('❌ Error saving weekly availability data:', error);
+    }
+  };
+
   // Save availability to backend
   const saveAvailabilityToBackend = async (data: { [date: string]: TimeRange[] }) => {
     try {
       const user = await authService.getCurrentUser();
-      if (!user || user.userRole !== 'Pet Sitter') {
+      if (!user || user.role !== 'pet_sitter') {
         console.log('⚠️ User is not a pet sitter, skipping backend save');
         return;
       }
@@ -165,34 +194,441 @@ const PetSitterAvailabilityScreen = () => {
     }
   };
 
-  // Load availability data from AsyncStorage
+  // Save weekly availability to backend
+  const saveWeeklyAvailabilityToBackend = async (weeklyData: any) => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || user.role !== 'pet_sitter') {
+        console.log('⚠️ User is not a pet sitter, skipping backend save');
+        return;
+      }
+
+      // Convert weekly data to the format expected by backend
+      const availabilities = Object.entries(weeklyData).map(([weekId, weekData]: [string, any]) => ({
+        weekId,
+        startDate: weekData.startDate,
+        endDate: weekData.endDate,
+        startTime: weekData.startTime,
+        endTime: weekData.endTime,
+        isWeekly: true
+      }));
+
+      console.log('🔄 Saving weekly availability for user:', user.id, user.name);
+      console.log('🔄 Weekly availability data:', availabilities);
+
+      if (availabilities.length === 0) {
+        console.log('⚠️ No weekly availability data to save');
+        return;
+      }
+
+      const token = user.token;
+      if (!token) {
+        console.error('❌ No token available for user');
+        return;
+      }
+
+      const requestBody = {
+        availabilities: availabilities,
+        isWeekly: true
+      };
+
+      console.log('🔄 Request body being sent:', JSON.stringify(requestBody, null, 2));
+
+      const response = await makeApiCall(
+        '/api/sitters/weekly-availability',
+        {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      console.log('🔄 Response status:', response.status);
+      console.log('🔄 Response ok:', response.ok);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('✅ Weekly availability data saved to backend successfully:', responseData);
+      } else {
+        console.error('❌ Failed to save weekly availability to backend:', response.status);
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
+      }
+    } catch (error) {
+      console.error('❌ Error saving weekly availability to backend:', error);
+    }
+  };
+
+  // Generate marked dates combining daily and weekly availability
+  const generateMarkedDates = () => {
+    const markedDatesData: any = {};
+    
+    // Add daily availability with green indicators
+    Object.keys(availabilities).forEach(date => {
+      if (availabilities[date] && availabilities[date].length > 0) {
+        markedDatesData[date] = { 
+          selected: true, 
+          marked: true, 
+          selectedColor: '#10B981',
+          selectedTextColor: '#fff',
+          dots: [{
+            key: 'daily',
+            color: '#10B981',
+            selectedDotColor: '#10B981'
+          }]
+        };
+      }
+    });
+    
+    // Add weekly availability ranges with straight line design
+    Object.values(weeklyAvailabilities).forEach((weekData: any) => {
+      const startDate = new Date(weekData.startDate);
+      const endDate = new Date(weekData.endDate);
+      
+      console.log('🔄 Processing weekly availability:', {
+        startDate: weekData.startDate,
+        endDate: weekData.endDate,
+        startDateObj: startDate,
+        endDateObj: endDate
+      });
+      
+      // Generate all dates in the range
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const dateString = currentDate.toISOString().split('T')[0];
+        
+        // Determine if this is the start, middle, or end of the week
+        const isStart = currentDate.getTime() === startDate.getTime();
+        const isEnd = currentDate.getTime() === endDate.getTime();
+        
+        console.log('📅 Processing date:', {
+          dateString,
+          isStart,
+          isEnd,
+          currentDate: currentDate.toISOString()
+        });
+        
+        // Create dots array for weekly availability
+        const weeklyDots = [{
+          key: 'weekly',
+          color: '#8B5CF6',
+          selectedDotColor: '#8B5CF6'
+        }];
+        
+        // If this date also has daily availability, add both dots
+        if (markedDatesData[dateString] && markedDatesData[dateString].dots) {
+          markedDatesData[dateString].dots.push(weeklyDots[0]);
+        } else {
+          markedDatesData[dateString] = {
+            selected: true,
+            marked: true,
+            selectedColor: '#8B5CF6',
+            selectedTextColor: '#fff',
+            dots: weeklyDots
+          };
+        }
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+    
+    console.log('📅 Generated marked dates:', markedDatesData);
+    return markedDatesData;
+  };
+
+  // Load availability data from backend and local storage
   const loadAvailabilityData = async () => {
     try {
-      const savedData = await AsyncStorage.getItem('petSitterAvailabilities');
+      const user = await authService.getCurrentUser();
+      if (!user || user.role !== 'pet_sitter') {
+        console.log('⚠️ User is not a pet sitter, skipping availability load');
+        return;
+      }
+
+      // First try to load from backend
+      await loadAvailabilityFromBackend(user.id);
+      
+      // Then load from local storage as fallback
+      const savedData = await AsyncStorage.getItem(`petSitterAvailabilities_${user.id}`);
       if (savedData) {
         const parsedData = JSON.parse(savedData);
         setAvailabilities(parsedData);
-        
-        // Also restore marked dates
-        const markedDatesData: any = {};
-        Object.keys(parsedData).forEach(date => {
-          if (parsedData[date] && parsedData[date].length > 0) {
-            markedDatesData[date] = { selected: true, marked: true, selectedColor: '#10B981' };
-          }
-        });
-        setMarkedDates(markedDatesData);
-        
-        console.log('Availability data loaded successfully');
+        console.log('✅ Local availability data loaded successfully');
       }
     } catch (error) {
-      console.error('Error loading availability data:', error);
+      console.error('❌ Error loading availability data:', error);
+    }
+  };
+
+  // Load availability data from backend
+  const loadAvailabilityFromBackend = async (userId: string) => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || !user.token) {
+        console.log('⚠️ No user or token available for backend load');
+        return;
+      }
+
+      console.log('🔄 Loading availability from backend for user:', userId);
+      
+      const response = await makeApiCall(
+        `/api/sitters/${userId}/availability`,
+        {
+          method: 'GET',
+          headers: {
+            ...getAuthHeaders(user.token),
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Backend availability data loaded:', data);
+        
+        if (data.availabilities && data.availabilities.length > 0) {
+          // Convert backend format to local format
+          const availabilityData: { [date: string]: TimeRange[] } = {};
+          data.availabilities.forEach((availability: any) => {
+            availabilityData[availability.date] = availability.timeRanges;
+          });
+          
+          setAvailabilities(availabilityData);
+          
+          // Save to local storage for offline access
+          await AsyncStorage.setItem(`petSitterAvailabilities_${userId}`, JSON.stringify(availabilityData));
+          console.log('✅ Availability data synced to local storage');
+        }
+      } else {
+        console.log('⚠️ No backend availability data found for user:', userId);
+      }
+    } catch (error) {
+      console.error('❌ Error loading availability from backend:', error);
+    }
+  };
+
+  // Load weekly availability data from backend and local storage
+  const loadWeeklyAvailabilityData = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || user.role !== 'pet_sitter') {
+        console.log('⚠️ User is not a pet sitter, skipping weekly availability load');
+        return;
+      }
+
+      console.log('🔄 Starting weekly availability load for user:', user.id);
+
+      // First try to load from local storage as immediate fallback
+      const savedData = await AsyncStorage.getItem(`petSitterWeeklyAvailabilities_${user.id}`);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        setWeeklyAvailabilities(parsedData);
+        console.log('✅ Local weekly availability data loaded immediately:', parsedData);
+      }
+      
+      // Then try to load from backend and update if successful
+      await loadWeeklyAvailabilityFromBackend(user.id);
+      
+    } catch (error) {
+      console.error('❌ Error loading weekly availability data:', error);
+    }
+  };
+
+  // Load weekly availability data from backend
+  const loadWeeklyAvailabilityFromBackend = async (userId: string) => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || !user.token) {
+        console.log('⚠️ No user or token available for weekly backend load');
+        return;
+      }
+
+      console.log('🔄 Loading weekly availability from backend for user:', userId);
+      console.log('🔄 Using token:', user.token ? 'Present' : 'Missing');
+      
+      const response = await makeApiCall(
+        `/api/sitters/${userId}/weekly-availability`,
+        {
+          method: 'GET',
+          headers: {
+            ...getAuthHeaders(user.token),
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('🔄 Weekly availability response status:', response.status);
+      console.log('🔄 Weekly availability response ok:', response.ok);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Backend weekly availability data loaded:', data);
+        console.log('✅ Weekly availability data type:', typeof data);
+        console.log('✅ Weekly availability data keys:', Object.keys(data));
+        
+        if (data.availabilities && data.availabilities.length > 0) {
+          console.log('✅ Found weekly availabilities:', data.availabilities.length);
+          
+          // Convert backend format to local format
+          const weeklyData: { [key: string]: any } = {};
+          data.availabilities.forEach((availability: any, index: number) => {
+            console.log(`📅 Processing weekly availability ${index}:`, availability);
+            
+            // Handle different backend data formats
+            const weekId = availability.weekId || availability.id || `week_${availability.startDate}_${availability.endDate}`;
+            
+            weeklyData[weekId] = {
+              id: weekId,
+              startDate: availability.startDate,
+              endDate: availability.endDate,
+              startTime: availability.startTime,
+              endTime: availability.endTime,
+              isWeekly: availability.isWeekly !== undefined ? availability.isWeekly : true,
+              createdAt: availability.createdAt || new Date().toISOString()
+            };
+          });
+          
+          console.log('✅ Converted weekly data:', weeklyData);
+          setWeeklyAvailabilities(weeklyData);
+          
+          // Save to local storage for offline access
+          await AsyncStorage.setItem(`petSitterWeeklyAvailabilities_${userId}`, JSON.stringify(weeklyData));
+          console.log('✅ Weekly availability data synced to local storage');
+        } else {
+          console.log('⚠️ No weekly availabilities found in response');
+        }
+      } else {
+        const errorText = await response.text();
+        console.log('⚠️ Weekly availability API error:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('❌ Error loading weekly availability from backend:', error);
+    }
+  };
+
+  // Clear availability data for new sitters and implement auto-cleanup
+  const clearAvailabilityDataForNewSitter = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || user.role !== 'pet_sitter') {
+        return;
+      }
+
+      // Check if this is a new sitter by looking for a flag
+      const isNewSitter = await AsyncStorage.getItem(`sitter_${user.id}_availability_initialized`);
+      
+      if (!isNewSitter) {
+        console.log('🆕 New sitter detected, clearing availability data');
+        
+        // Clear all user-specific availability data
+        await AsyncStorage.removeItem(`petSitterAvailabilities_${user.id}`);
+        await AsyncStorage.removeItem(`petSitterWeeklyAvailabilities_${user.id}`);
+        
+        // Reset local state
+        setAvailabilities({});
+        setWeeklyAvailabilities({});
+        setMarkedDates({});
+        
+        // Mark this sitter as having initialized their availability
+        await AsyncStorage.setItem(`sitter_${user.id}_availability_initialized`, 'true');
+        
+        console.log('✅ Availability data cleared for new sitter');
+      } else {
+        // For existing sitters, clean up expired availability data
+        await cleanupExpiredAvailabilityData(user.id);
+      }
+    } catch (error) {
+      console.error('❌ Error clearing availability data for new sitter:', error);
+    }
+  };
+
+  // Clean up expired availability data
+  const cleanupExpiredAvailabilityData = async (userId: string) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Clean up daily availability
+      const dailyData = await AsyncStorage.getItem(`petSitterAvailabilities_${userId}`);
+      if (dailyData) {
+        const parsedData = JSON.parse(dailyData);
+        const cleanedData: { [date: string]: TimeRange[] } = {};
+        
+        Object.keys(parsedData).forEach(date => {
+          const dateObj = new Date(date);
+          if (dateObj >= today) {
+            cleanedData[date] = parsedData[date];
+          }
+        });
+        
+        if (Object.keys(cleanedData).length !== Object.keys(parsedData).length) {
+          await AsyncStorage.setItem(`petSitterAvailabilities_${userId}`, JSON.stringify(cleanedData));
+          setAvailabilities(cleanedData);
+          console.log('✅ Cleaned up expired daily availability data');
+        }
+      }
+      
+      // Clean up weekly availability
+      const weeklyData = await AsyncStorage.getItem(`petSitterWeeklyAvailabilities_${userId}`);
+      if (weeklyData) {
+        const parsedData = JSON.parse(weeklyData);
+        const cleanedData: { [key: string]: any } = {};
+        
+        Object.keys(parsedData).forEach(weekId => {
+          const weekData = parsedData[weekId];
+          const endDate = new Date(weekData.endDate);
+          if (endDate >= today) {
+            cleanedData[weekId] = weekData;
+          }
+        });
+        
+        if (Object.keys(cleanedData).length !== Object.keys(parsedData).length) {
+          await AsyncStorage.setItem(`petSitterWeeklyAvailabilities_${userId}`, JSON.stringify(cleanedData));
+          setWeeklyAvailabilities(cleanedData);
+          console.log('✅ Cleaned up expired weekly availability data');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error cleaning up expired availability data:', error);
     }
   };
 
   // Load data when component mounts
   useEffect(() => {
+    clearAvailabilityDataForNewSitter();
     loadAvailabilityData();
+    loadWeeklyAvailabilityData();
   }, []);
+
+  // Refresh data when screen comes into focus
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 Screen focused, refreshing availability data...');
+      loadAvailabilityData();
+      loadWeeklyAvailabilityData();
+    };
+
+    // Call immediately and set up interval for periodic refresh
+    handleFocus();
+    const interval = setInterval(handleFocus, 5000); // Refresh every 5 seconds
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Update marked dates when availabilities or weekly availabilities change
+  useEffect(() => {
+    console.log('🔄 Updating marked dates...');
+    console.log('📅 Current availabilities:', availabilities);
+    console.log('📅 Current weekly availabilities:', weeklyAvailabilities);
+    
+    const newMarkedDates = generateMarkedDates();
+    setMarkedDates(newMarkedDates);
+  }, [availabilities, weeklyAvailabilities]);
 
   const handleDayPress = (day: any) => {
     setSelectedDate(day.dateString);
@@ -306,6 +742,24 @@ const PetSitterAvailabilityScreen = () => {
     const newMarkedDates = { ...markedDates };
     delete newMarkedDates[date];
     setMarkedDates(newMarkedDates);
+  };
+
+  const handleEditWeeklyAvailability = (weekId: string) => {
+    const weekData = weeklyAvailabilities[weekId];
+    if (weekData) {
+      setWeekStartDate(new Date(weekData.startDate));
+      setWeekEndDate(new Date(weekData.endDate));
+      setWeekStartTime(new Date(`2000-01-01T${weekData.startTime}`));
+      setWeekEndTime(new Date(`2000-01-01T${weekData.endTime}`));
+      setShowWeekPopup(true);
+    }
+  };
+
+  const handleDeleteWeeklyAvailability = (weekId: string) => {
+    const newWeeklyAvailabilities = { ...weeklyAvailabilities };
+    delete newWeeklyAvailabilities[weekId];
+    setWeeklyAvailabilities(newWeeklyAvailabilities);
+    saveWeeklyAvailabilityData(newWeeklyAvailabilities);
   };
 
   const handleAddCustomTimeRange = () => {
@@ -468,6 +922,79 @@ const PetSitterAvailabilityScreen = () => {
     textDayFontSize: 16,
     textMonthFontSize: 20,
     textDayHeaderFontSize: 14,
+    // Ensure all dates are visible
+    'stylesheet.calendar.main': {
+      container: {
+        paddingLeft: 5,
+        paddingRight: 5,
+      }
+    },
+    'stylesheet.day.basic': {
+      base: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 16,
+        margin: 1,
+      },
+      today: {
+        backgroundColor: '#E0E7FF',
+        borderRadius: 16,
+      },
+      todayText: {
+        color: '#8B5CF6',
+        fontWeight: 'bold',
+      },
+      selected: {
+        backgroundColor: '#10B981',
+        borderRadius: 16,
+      },
+      selectedText: {
+        color: '#fff',
+        fontWeight: 'bold',
+      },
+      disabled: {
+        opacity: 0.3,
+      },
+      disabledText: {
+        color: '#ccc',
+      }
+    },
+    // Multi-dot marking styles
+    'stylesheet.day.multi-dot': {
+      base: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 16,
+        margin: 1,
+      },
+      selected: {
+        backgroundColor: '#8B5CF6',
+        borderRadius: 16,
+      },
+      today: {
+        backgroundColor: '#E0E7FF',
+        borderRadius: 16,
+      },
+      text: {
+        color: '#222',
+        fontWeight: '500',
+        fontSize: 16,
+      },
+      selectedText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
+      },
+      todayText: {
+        color: '#8B5CF6',
+        fontWeight: 'bold',
+        fontSize: 16,
+      }
+    }
   }), []);
 
   return (
@@ -484,13 +1011,33 @@ const PetSitterAvailabilityScreen = () => {
         <View style={{ margin: 16, borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff', elevation: 2 }}>
           <Calendar
             onDayPress={handleDayPress}
-            markedDates={markedDates}
+            markedDates={generateMarkedDates()}
             theme={calendarTheme}
             style={{ borderRadius: 16 }}
-            hideExtraDays={true}
+            hideExtraDays={false}
             disableMonthChange={false}
             firstDay={1}
+            markingType="multi-dot"
+            enableSwipeMonths={true}
+            // Ensure all dates are visible
+            minDate="2025-01-01"
+            maxDate="2026-12-31"
           />
+        </View>
+
+        {/* Calendar Legend */}
+        <View style={styles.legendContainer}>
+          <Text style={styles.legendTitle}>Availability Legend</Text>
+          <View style={styles.legendItems}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+              <Text style={styles.legendText}>Daily Availability</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
+              <Text style={styles.legendText}>Weekly Availability</Text>
+            </View>
+          </View>
         </View>
 
         {/* Set for a Week Button */}
@@ -524,7 +1071,7 @@ const PetSitterAvailabilityScreen = () => {
         {/* Show selected availabilities */}
         <View style={styles.availabilitiesSection}>
           {Object.keys(availabilities).length > 0 && (
-            <Text style={styles.availabilitiesTitle}>Your Set Availabilities</Text>
+            <Text style={styles.availabilitiesTitle}>Single Day Availabilities</Text>
           )}
           {Object.entries(availabilities).map(([date, timeRanges], index) => (
             <View key={date} style={[styles.availabilityCard, { backgroundColor: availabilityCardColors[index % availabilityCardColors.length] }]}>
@@ -565,6 +1112,53 @@ const PetSitterAvailabilityScreen = () => {
                   >
                     <Ionicons name="trash" size={16} color="#EF4444" />
                     <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Show weekly availabilities */}
+        <View style={styles.availabilitiesSection}>
+          {Object.keys(weeklyAvailabilities).length > 0 && (
+            <Text style={styles.availabilitiesTitle}>Weekly Availabilities</Text>
+          )}
+          {Object.entries(weeklyAvailabilities).map(([weekId, weekData], index) => (
+            <View key={weekId} style={[styles.weeklyAvailabilityCard, { backgroundColor: '#8B5CF6' }]}>
+              <View style={styles.weeklyCardHeader}>
+                <View style={styles.weeklyDateContainer}>
+                  <Ionicons name="calendar" size={20} color="#fff" />
+                  <View style={styles.weeklyDateTextContainer}>
+                    <Text style={styles.weeklyDateText}>
+                      {new Date(weekData.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(weekData.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                    <Text style={styles.weeklyTimeText}>{weekData.startTime} - {weekData.endTime}</Text>
+                  </View>
+                </View>
+                <View style={styles.weeklyBadge}>
+                  <Text style={styles.weeklyBadgeText}>WEEKLY</Text>
+                </View>
+              </View>
+              <View style={styles.weeklyCardFooter}>
+                <View style={styles.weeklyStats}>
+                  <Ionicons name="time" size={16} color="#fff" />
+                  <Text style={styles.weeklyStatsText}>Available all week</Text>
+                </View>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity 
+                    style={[styles.editButton, { backgroundColor: 'rgba(255, 255, 255, 0.9)' }]}
+                    onPress={() => handleEditWeeklyAvailability(weekId)}
+                  >
+                    <Ionicons name="pencil" size={16} color="#8B5CF6" />
+                    <Text style={[styles.editButtonText, { color: '#8B5CF6' }]}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.deleteButton, { backgroundColor: 'rgba(255, 255, 255, 0.9)' }]}
+                    onPress={() => handleDeleteWeeklyAvailability(weekId)}
+                  >
+                    <Ionicons name="trash" size={16} color="#EF4444" />
+                    <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1000,41 +1594,45 @@ const PetSitterAvailabilityScreen = () => {
                   alignItems: 'center' 
                 }}
                 onPress={() => {
-                  // Save week availability
+                  // Validate that end time is after start time
+                  const startTimeStr = weekStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const endTimeStr = weekEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  
+                  // Convert to 24-hour format for comparison
+                  const startTime24 = weekStartTime.getHours() * 60 + weekStartTime.getMinutes();
+                  const endTime24 = weekEndTime.getHours() * 60 + weekEndTime.getMinutes();
+                  
+                  if (endTime24 <= startTime24) {
+                    alert('End time must be after start time. Please adjust your times.');
+                    return;
+                  }
+                  
+                  // Save week availability as a single weekly card
                   const startDate = new Date(weekStartDate);
                   const endDate = new Date(weekEndDate);
-                  const newAvailabilities = { ...availabilities };
                   
-                  // Generate time range for each day
-                  const timeRange: TimeRange = {
-                    id: Date.now().toString(),
-                    startTime: weekStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    endTime: weekEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  // Create a unique week ID
+                  const weekId = `week_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`;
+                  
+                  // Create weekly availability data
+                  const weeklyData = {
+                    ...weeklyAvailabilities,
+                    [weekId]: {
+                      id: weekId,
+                      startDate: startDate.toISOString().split('T')[0],
+                      endDate: endDate.toISOString().split('T')[0],
+                      startTime: startTimeStr,
+                      endTime: endTimeStr,
+                      isWeekly: true,
+                      createdAt: new Date().toISOString()
+                    }
                   };
 
-                  // Add availability for each day in the range
-                  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                    const dateStr = d.toISOString().split('T')[0];
-                    newAvailabilities[dateStr] = [timeRange];
-                  }
-
-                  setAvailabilities(newAvailabilities);
-                  saveAvailabilityData(newAvailabilities);
-                  
-                  // Update marked dates
-                  const newMarkedDates = { ...markedDates };
-                  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                    const dateStr = d.toISOString().split('T')[0];
-                    newMarkedDates[dateStr] = {
-                      selected: true,
-                      selectedColor: '#8B5CF6',
-                      selectedTextColor: '#fff',
-                    };
-                  }
-                  setMarkedDates(newMarkedDates);
+                  setWeeklyAvailabilities(weeklyData);
+                  saveWeeklyAvailabilityData(weeklyData);
                   
                   setShowWeekPopup(false);
-                  console.log('Week availability saved:', newAvailabilities);
+                  console.log('Weekly availability saved:', weeklyData);
                 }}
               >
                 <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save</Text>
@@ -1542,6 +2140,69 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#EF4444',
+  },
+  weeklyAvailabilityCard: {
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  weeklyCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  weeklyDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  weeklyDateTextContainer: {
+    marginLeft: 12,
+  },
+  weeklyDateText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  weeklyTimeText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
+  },
+  weeklyBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  weeklyBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  weeklyCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  weeklyStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  weeklyStatsText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
   },
   timePickerOverlay: {
     position: 'absolute',

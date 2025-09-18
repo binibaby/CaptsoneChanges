@@ -51,7 +51,8 @@ export class NetworkService {
       
       return isWorking;
     } catch (error) {
-      console.log(`❌ IP ${ip}:8000 connection failed:`, error.message || 'Unknown error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`❌ IP ${ip}:8000 connection failed:`, errorMessage);
       return false;
     }
   }
