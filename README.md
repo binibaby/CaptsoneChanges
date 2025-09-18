@@ -8,6 +8,7 @@ A comprehensive mobile application and web platform that connects pet owners wit
 - **Dual User Roles**: Pet Owners & Pet Sitters with specialized dashboards ✅
 - **Pet Profile Management**: Comprehensive pet profiles with photos and preferences ✅
 - **Advanced Booking System**: Real-time booking with calendar integration ✅
+- **Repeat Weekly Availability**: Recurring weekly availability scheduling for sitters ✅
 - **Phone Verification**: SMS verification system with simulation mode ✅
 - **ID Verification**: Document verification with simulation mode ✅
 - **Location-based Search**: Interactive maps to find nearby sitters ✅
@@ -22,6 +23,7 @@ A comprehensive mobile application and web platform that connects pet owners wit
 - **Admin Dashboard**: Complete backend management system
 
 ### Advanced Features
+- **Repeat Weekly Availability**: Set up recurring weekly schedules (e.g., "Every Tuesday 9 AM - 5 PM")
 - **Phone Verification**: SMS-based authentication with multiple providers
 - **Document Verification**: Front/back ID and selfie verification
 - **Admin Dashboard**: Complete backend management system
@@ -217,6 +219,11 @@ php artisan db:seed                 # Seed database
 php artisan test                    # Run tests
 composer run dev                    # Start all services (server, queue, logs, vite)
 ```
+
+## 📚 Documentation
+
+### Feature Documentation
+- **[Repeat Weekly Availability Feature](./REPEAT_WEEKLY_FEATURE.md)** - Comprehensive guide to the new recurring availability feature
 
 ## 📚 API Documentation
 
