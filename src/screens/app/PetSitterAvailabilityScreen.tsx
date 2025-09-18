@@ -4,14 +4,14 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import Modal from 'react-native-modal';
@@ -51,6 +51,14 @@ const PetSitterAvailabilityScreen = () => {
   const [tempStartTime, setTempStartTime] = useState(new Date());
   const [tempEndTime, setTempEndTime] = useState(new Date());
   const [openedFromEdit, setOpenedFromEdit] = useState(false);
+  
+  // Repeat weekly state
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  
+  // Helper function to check if a date is part of recurring availability
+  const isRecurringAvailability = (date: string) => {
+    return markedDates[date]?.selectedColor === '#8B5CF6';
+  };
   
   // Week availability popup state
   const [showWeekPopup, setShowWeekPopup] = useState(false);
@@ -692,15 +700,54 @@ const PetSitterAvailabilityScreen = () => {
     if (selectedDate) {
       // Always mark the date as selected if there are any time ranges (preset or custom)
       if (availabilities[selectedDate] && availabilities[selectedDate].length > 0) {
-      setMarkedDates({
-        ...markedDates,
-        [selectedDate]: { selected: true, marked: true, selectedColor: '#10B981' }
-      });
+        setMarkedDates({
+          ...markedDates,
+          [selectedDate]: { selected: true, marked: true, selectedColor: '#10B981' }
+        });
+
+        // Handle repeat weekly logic
+        if (repeatWeekly) {
+          console.log('🔄 Setting up weekly recurring availability for:', selectedDate);
+          const baseDate = new Date(selectedDate);
+          const dayOfWeek = baseDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+          const timeRanges = availabilities[selectedDate];
+          
+          // Generate recurring availability for the next 12 weeks
+          const newAvailabilities = { ...availabilities };
+          const newMarkedDates = { ...markedDates };
+          
+          for (let week = 1; week <= 12; week++) {
+            const recurringDate = new Date(baseDate);
+            recurringDate.setDate(baseDate.getDate() + (week * 7));
+            const dateString = recurringDate.toISOString().split('T')[0];
+            
+            // Add the same time ranges for this recurring date
+            newAvailabilities[dateString] = [...timeRanges];
+            
+            // Mark the date on the calendar
+            newMarkedDates[dateString] = { 
+              selected: true, 
+              marked: true, 
+              selectedColor: '#8B5CF6' // Purple color for recurring availability
+            };
+          }
+          
+          setAvailabilities(newAvailabilities);
+          setMarkedDates(newMarkedDates);
+          
+          // Save the updated availability data
+          saveAvailabilityData(newAvailabilities);
+          
+          console.log('✅ Weekly recurring availability set for 12 weeks');
+        }
       } else {
         // If no time ranges selected, still close the modal but don't mark the date
         console.log('No time ranges selected for this date');
       }
     }
+    
+    // Reset repeat weekly checkbox
+    setRepeatWeekly(false);
     setShowModal(false);
   };
 
@@ -734,6 +781,14 @@ const PetSitterAvailabilityScreen = () => {
   };
 
   const handleDeleteAvailability = (date: string) => {
+    const isRecurring = isRecurringAvailability(date);
+    
+    if (isRecurring) {
+      // For recurring availability, show a confirmation dialog
+      // For now, we'll just delete this instance
+      console.log('🗑️ Deleting recurring availability instance for:', date);
+    }
+    
     const newAvailabilities = { ...availabilities };
     delete newAvailabilities[date];
     setAvailabilities(newAvailabilities);
@@ -742,6 +797,8 @@ const PetSitterAvailabilityScreen = () => {
     const newMarkedDates = { ...markedDates };
     delete newMarkedDates[date];
     setMarkedDates(newMarkedDates);
+    
+    console.log('✅ Availability deleted for:', date);
   };
 
   const handleEditWeeklyAvailability = (weekId: string) => {
@@ -1073,11 +1130,34 @@ const PetSitterAvailabilityScreen = () => {
           {Object.keys(availabilities).length > 0 && (
             <Text style={styles.availabilitiesTitle}>Single Day Availabilities</Text>
           )}
-          {Object.entries(availabilities).map(([date, timeRanges], index) => (
+          {Object.entries(availabilities).map(([date, timeRanges], index) => {
+            // Check if this is a recurring availability
+            const isRecurring = isRecurringAvailability(date);
+            
+            return (
             <View key={date} style={[styles.availabilityCard, { backgroundColor: availabilityCardColors[index % availabilityCardColors.length] }]}>
               <View style={styles.availabilityCardHeader}>
                 <View style={styles.dateContainer}>
-                  <Text style={styles.dateText}>{formatDate(date)}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.dateText}>{formatDate(date)}</Text>
+                    {isRecurring && (
+                      <View style={{ 
+                        marginLeft: 8, 
+                        backgroundColor: 'rgba(139, 92, 246, 0.2)', 
+                        paddingHorizontal: 6, 
+                        paddingVertical: 2, 
+                        borderRadius: 8 
+                      }}>
+                        <Text style={{ 
+                          fontSize: 10, 
+                          color: '#8B5CF6', 
+                          fontWeight: '600' 
+                        }}>
+                          🔄 WEEKLY
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.dayText}>{getDayName(date)}</Text>
                 </View>
                 <ScrollView 
@@ -1116,7 +1196,8 @@ const PetSitterAvailabilityScreen = () => {
                 </View>
               </View>
             </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Show weekly availabilities */}
@@ -1195,6 +1276,52 @@ const PetSitterAvailabilityScreen = () => {
             })}
           </View>
           
+          {/* Repeat Weekly Checkbox */}
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            marginBottom: 16, 
+            paddingHorizontal: 8,
+            backgroundColor: '#F8F9FA',
+            borderRadius: 12,
+            padding: 12
+          }}>
+            <TouchableOpacity
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 4,
+                borderWidth: 2,
+                borderColor: repeatWeekly ? '#8B5CF6' : '#D1D5DB',
+                backgroundColor: repeatWeekly ? '#8B5CF6' : 'transparent',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 12,
+              }}
+              onPress={() => setRepeatWeekly(!repeatWeekly)}
+            >
+              {repeatWeekly && (
+                <Ionicons name="checkmark" size={16} color="#fff" />
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: '#374151',
+                marginBottom: 2
+              }}>
+                Repeat Weekly
+              </Text>
+              <Text style={{ 
+                fontSize: 12, 
+                color: '#6B7280',
+                lineHeight: 16
+              }}>
+                This availability will repeat every {selectedDate ? new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' }) : 'week'} at the same time
+              </Text>
+            </View>
+          </View>
 
           <TouchableOpacity
             style={{ 
