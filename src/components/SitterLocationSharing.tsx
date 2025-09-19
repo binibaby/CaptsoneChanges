@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
@@ -6,8 +7,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { getAuthHeaders } from '../constants/config';
 import { useAuth } from '../contexts/AuthContext';
 import locationService from '../services/locationService';
+import { makeApiCall } from '../services/networkService';
 import realtimeLocationService from '../services/realtimeLocationService';
 
 interface SitterLocationSharingProps {
@@ -20,6 +23,50 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
   const { user, currentLocation, userAddress } = useAuth();
   const [isSharing, setIsSharing] = useState(false);
   const [sharingStatus, setSharingStatus] = useState<string>('Not available');
+
+  // Restore availability data when sitter comes online
+  const restoreAvailabilityData = async () => {
+    try {
+      if (!user || user.userRole !== 'Pet Sitter') return;
+
+      console.log('🔄 Restoring availability data for online sitter...');
+      
+      // Get saved availability data from local storage
+      const savedData = await AsyncStorage.getItem(`petSitterAvailabilities_${user.id}`);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        
+        // Convert to the format expected by the backend
+        const availabilities = Object.entries(parsedData).map(([date, timeRanges]) => ({
+          date,
+          timeRanges
+        }));
+
+        if (availabilities.length > 0) {
+          // Send to backend to restore in cache
+          const token = user.token;
+          if (token) {
+            const response = await makeApiCall('/api/sitters/restore-availability', {
+              method: 'POST',
+              headers: {
+                ...getAuthHeaders(token),
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ availabilities }),
+            });
+
+            if (response.ok) {
+              console.log('✅ Availability data restored successfully');
+            } else {
+              console.log('⚠️ Failed to restore availability data to backend');
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error restoring availability data:', error);
+    }
+  };
 
   useEffect(() => {
     if (user && user.userRole === 'Pet Sitter' && currentLocation) {
@@ -96,6 +143,9 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
         await realtimeLocationService.setSitterOnline(user.id, true);
         realtimeLocationService.startRealtimeUpdates();
 
+        // Restore availability data when coming online
+        await restoreAvailabilityData();
+
         setIsSharing(true);
         setSharingStatus('Available - Pet owners can find you!');
         onLocationShared?.(true);
@@ -157,6 +207,9 @@ const SitterLocationSharing: React.FC<SitterLocationSharingProps> = ({
       await realtimeLocationService.updateSitterLocation(sitterData);
       await realtimeLocationService.setSitterOnline(user.id, true);
       realtimeLocationService.startRealtimeUpdates();
+
+      // Restore availability data when coming online
+      await restoreAvailabilityData();
 
       setIsSharing(true);
       setSharingStatus('Available - Pet owners can find you!');

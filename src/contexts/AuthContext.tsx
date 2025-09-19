@@ -14,6 +14,8 @@ interface AuthContextType {
     email: string;
     password: string;
     name: string;
+    firstName?: string;
+    lastName?: string;
     userRole: 'Pet Owner' | 'Pet Sitter';
     selectedPetTypes?: ('dogs' | 'cats')[];
     selectedBreeds?: string[];
@@ -80,6 +82,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('User profile image:', currentUser.profileImage);
           console.log('User hourly rate:', currentUser.hourlyRate);
           
+          // Enhanced debugging for name fields
+          console.log('🔍 AUTH CONTEXT DEBUG - Current user name fields:');
+          console.log('  - currentUser.firstName:', JSON.stringify(currentUser.firstName));
+          console.log('  - currentUser.lastName:', JSON.stringify(currentUser.lastName));
+          console.log('  - currentUser.name:', JSON.stringify(currentUser.name));
+          
           // Restore profile data if available
           const userWithProfileData = await authService.restoreProfileData(currentUser);
           setUser(userWithProfileData);
@@ -87,8 +95,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('AuthContext: User restored with profile data');
           console.log('AuthContext: Restored hourly rate:', userWithProfileData.hourlyRate);
           console.log('AuthContext: Restored profile image:', userWithProfileData.profileImage);
+          
+          // Enhanced debugging for restored user name fields
+          console.log('🔍 AUTH CONTEXT DEBUG - Restored user name fields:');
+          console.log('  - userWithProfileData.firstName:', JSON.stringify(userWithProfileData.firstName));
+          console.log('  - userWithProfileData.lastName:', JSON.stringify(userWithProfileData.lastName));
+          console.log('  - userWithProfileData.name:', JSON.stringify(userWithProfileData.name));
+          
+          // If name fields are still empty, try to get from AsyncStorage directly
+          if (!userWithProfileData.firstName && !userWithProfileData.lastName && !userWithProfileData.name) {
+            console.log('🔍 AUTH CONTEXT - Name fields are empty, trying to get from AsyncStorage...');
+            try {
+              const userData = await AsyncStorage.getItem('user');
+              if (userData) {
+                const storedUser = JSON.parse(userData);
+                if (storedUser.firstName || storedUser.lastName || storedUser.name) {
+                  console.log('🔍 AUTH CONTEXT - Found name data in AsyncStorage, updating user...');
+                  userWithProfileData.firstName = storedUser.firstName || '';
+                  userWithProfileData.lastName = storedUser.lastName || '';
+                  userWithProfileData.name = storedUser.name || '';
+                  setUser(userWithProfileData);
+                }
+              }
+            } catch (error) {
+              console.error('Error getting user data from AsyncStorage in AuthContext:', error);
+            }
+          }
         } else {
           console.log('No existing user found');
+          // Try to get user data from AsyncStorage directly
+          try {
+            const userData = await AsyncStorage.getItem('user');
+            if (userData) {
+              const storedUser = JSON.parse(userData);
+              console.log('🔍 AUTH CONTEXT - Found user data in AsyncStorage:', storedUser);
+              if (storedUser.id && storedUser.email) {
+                console.log('🔍 AUTH CONTEXT - Setting user from AsyncStorage...');
+                setUser(storedUser);
+              }
+            }
+          } catch (error) {
+            console.error('Error getting user data from AsyncStorage:', error);
+          }
           setUser(null);
         }
       } catch (error) {
@@ -289,62 +337,67 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Profile data is required');
       }
       
-      await authService.updateUserProfile(profileData);
-      // Update the local user state with the new profile data
-      if (user) {
-        const updatedUser = { ...user, ...profileData };
-        setUser(updatedUser);
-        console.log('AuthContext: User state updated successfully');
-        console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
-        
-        // Trigger global refresh for all components
-        setProfileUpdateTrigger(prev => prev + 1);
-        console.log('AuthContext: Triggered global profile update refresh');
-        
-        // If this is a pet sitter and profile was updated, refresh location data
-        console.log('AuthContext: Checking user role for profile update:', user.role, 'is pet_sitter:', user.role === 'pet_sitter');
-        if (user.role === 'pet_sitter' && (profileData.hourlyRate !== undefined || profileData.name !== undefined)) {
-          console.log('AuthContext: Pet sitter profile updated, refreshing location data');
-          try {
-            // Clear sitter cache to force refresh in find sitter map
-            realtimeLocationService.clearSitterCache();
-            console.log('AuthContext: Cleared sitter cache for profile update');
-            
-            // Update the sitter's location data with the new profile info
-            await realtimeLocationService.updateSitterLocation({
-              id: user.id,
-              userId: user.id,
-              name: updatedUser.name,
-              email: user.email,
-              location: {
-                latitude: currentLocation?.coords.latitude || 0,
-                longitude: currentLocation?.coords.longitude || 0,
-                address: userAddress || '',
-              },
-              specialties: user.specialties || ['General Pet Care'],
-              experience: user.experience || '1 year',
-              petTypes: user.selectedPetTypes || ['dogs', 'cats'],
-              selectedBreeds: user.selectedBreeds || ['All breeds welcome'],
-              hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
-              rating: 4.5,
-              reviews: 0,
-              bio: user.aboutMe || 'Professional pet sitter ready to help!',
-              isOnline: true,
-              lastSeen: new Date(),
-              profileImage: user.profileImage,
-              followers: 0,
-              following: 0,
-            });
-          } catch (error) {
-            console.error('AuthContext: Error updating sitter location data:', error);
-          }
+      const updatedUser = await authService.updateUserProfile(profileData);
+      // Update the local user state with the updated user data from authService
+      setUser(updatedUser);
+      console.log('AuthContext: User state updated successfully');
+      console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
+      console.log('AuthContext: Updated user name:', updatedUser.name);
+      
+      // Trigger global refresh for all components
+      setProfileUpdateTrigger(prev => prev + 1);
+      console.log('AuthContext: Triggered global profile update refresh');
+      
+      // If this is a pet sitter and profile was updated, refresh location data
+      console.log('AuthContext: Checking user role for profile update:', updatedUser.role, 'is pet_sitter:', updatedUser.role === 'pet_sitter');
+      if (updatedUser.role === 'pet_sitter' && (profileData.hourlyRate !== undefined || profileData.name !== undefined)) {
+        console.log('AuthContext: Pet sitter profile updated, refreshing location data');
+        try {
+          // Clear sitter cache to force refresh in find sitter map
+          realtimeLocationService.clearSitterCache();
+          console.log('AuthContext: Cleared sitter cache for profile update');
+          
+          // Update the sitter's location data with the new profile info
+          await realtimeLocationService.updateSitterLocation({
+            id: updatedUser.id,
+            userId: updatedUser.id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+            location: {
+              latitude: currentLocation?.coords.latitude || 0,
+              longitude: currentLocation?.coords.longitude || 0,
+              address: userAddress || '',
+            },
+            specialties: updatedUser.specialties || ['General Pet Care'],
+            experience: updatedUser.experience || '1 year',
+            petTypes: updatedUser.selectedPetTypes || ['dogs', 'cats'],
+            selectedBreeds: updatedUser.selectedBreeds || ['All breeds welcome'],
+            hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
+            rating: 4.5,
+            reviews: 0,
+            bio: updatedUser.aboutMe || 'Professional pet sitter ready to help!',
+            isOnline: true,
+            lastSeen: new Date(),
+            profileImage: updatedUser.profileImage,
+            followers: 0,
+            following: 0,
+          });
+        } catch (error) {
+          console.error('AuthContext: Error updating sitter location data:', error);
         }
-      } else {
-        console.warn('AuthContext: No current user to update');
       }
     } catch (error) {
       console.error('Error updating user profile:', error);
-      throw error;
+      
+      // Check if this is a backend sync error
+      if (error instanceof Error && error.message.includes('Backend update failed')) {
+        console.warn('AuthContext: Profile updated locally but backend sync failed');
+        // Don't throw the error - local update was successful
+        // The user will see their changes locally
+      } else {
+        // For other errors, still throw them
+        throw error;
+      }
     }
   };
 
@@ -412,11 +465,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refresh = async () => {
     try {
-      // Clear all data including profile data and return to onboarding
-      await authService.clearAllDataIncludingProfile();
-      setUser(null);
+      console.log('AuthContext: Refreshing user data from backend');
+      
+      // Get current user to ensure we have the token
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser || !currentUser.token) {
+        console.log('AuthContext: No current user or token found, skipping refresh');
+        return;
+      }
+      
+      // Fetch latest user data from backend
+      const { makeApiCall } = await import('../services/networkService');
+      
+      const response = await makeApiCall('/api/user/profile', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${currentUser.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.user) {
+          console.log('AuthContext: Refreshed user data from backend:', result.user);
+          // Store the updated user data
+          await authService.storeUserFromBackend(result.user);
+          // Update the local state
+          const updatedUser = await authService.getCurrentUser();
+          setUser(updatedUser);
+          console.log('AuthContext: User state updated with refreshed data');
+        }
+      } else {
+        console.error('AuthContext: Failed to refresh user data:', response.status);
+      }
     } catch (error) {
-      console.error('Error refreshing:', error);
+      console.error('Error refreshing user data:', error);
     }
   };
 
@@ -430,6 +514,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('AuthContext: Sitter ID:', user.id);
         console.log('AuthContext: Sitter name:', user.name);
         try {
+          // IMMEDIATELY remove from local cache first to prevent showing in UI
+          console.log('AuthContext: Immediately removing sitter from local cache...');
+          realtimeLocationService.removeSitter(user.id);
+          realtimeLocationService.clearAllSitters();
+          
           // Set sitter as offline to remove from find sitter map
           console.log('AuthContext: Setting sitter offline via API...');
           const offlineResult = await realtimeLocationService.setSitterOnline(user.id, false);
@@ -437,14 +526,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Wait a moment for the API call to complete
           console.log('AuthContext: Waiting for API call to complete...');
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 seconds
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced to 1 second
           
-          // Force remove from local cache as well
-          console.log('AuthContext: Removing sitter from local cache...');
-          realtimeLocationService.removeSitter(user.id);
-          
-          // Clear all sitters from cache to force refresh
-          console.log('AuthContext: Clearing all sitters cache...');
+          // Force clear cache again to ensure it's empty
+          console.log('AuthContext: Force clearing all sitters cache again...');
           realtimeLocationService.clearAllSitters();
           
           console.log('AuthContext: Pet sitter removed from visibility');

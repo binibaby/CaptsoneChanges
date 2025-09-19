@@ -170,7 +170,7 @@ const PetSitterDashboard = () => {
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    if (uri.startsWith('/storage/')) return `http://172.20.10.2:8000${uri}`;
     return uri;
   };
 

@@ -1,31 +1,31 @@
 // Network detection utility for dual WiFi/mobile data support
 const getNetworkIP = () => {
   if (__DEV__) {
-    // Use WiFi IP for development
-    return '192.168.100.184';
+    // Use mobile data IP for development
+    return '172.20.10.2';
   }
   return 'https://your-production-domain.com';
 };
 
 // Network fallback configuration for dual connectivity
 export const NETWORK_FALLBACK = {
-  // Primary IPs to try in order - WiFi first for current connection
+  // Primary IPs to try in order - Mobile data first for current connection
   PRIMARY_IPS: [
-    '192.168.100.184',  // WiFi IP (primary)
-    '192.168.100.184',  // WiFi IP (fallback)
+    '172.20.10.2',      // Mobile data IP (primary)
+    '172.20.10.2',      // Mobile data IP (fallback)
   ],
   
   // Fallback IPs for different network scenarios
   FALLBACK_IPS: [
-    '192.168.100.184',  // Current WiFi IP (primary)
+    '172.20.10.2',      // Current mobile data IP (primary)
+    '172.20.10.1',      // Common mobile hotspot
+    '192.168.100.184',  // WiFi IP (fallback)
     '192.168.100.179',  // Previous WiFi IP
     '192.168.1.100',    // Common home WiFi
     '192.168.0.100',    // Common home WiFi
     '192.168.43.1',     // Android hotspot
     '192.168.137.1',    // Windows mobile hotspot
     '10.0.0.100',       // Corporate networks
-    '172.20.10.2',      // Mobile data IP (fallback)
-    '172.20.10.1',      // Common mobile hotspot
   ],
   
   // Connection test timeout (reduced for faster detection)

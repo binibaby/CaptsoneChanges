@@ -408,9 +408,35 @@ class BookingService {
         return `${hour24.toString().padStart(2, '0')}:${minutes}`;
       };
 
+      // Ensure date is in Y-m-d format and not in the past
+      const formatDateForAPI = (dateString: string) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time to start of day
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+          console.log('⚠️ Invalid date format, using today\'s date instead');
+          return today.toISOString().split('T')[0];
+        }
+        
+        // Reset time to start of day for comparison
+        date.setHours(0, 0, 0, 0);
+        
+        // If the date is in the past, use today's date instead
+        if (date < today) {
+          console.log('⚠️ Date is in the past, using today\'s date instead');
+          return today.toISOString().split('T')[0];
+        }
+        
+        return date.toISOString().split('T')[0];
+      };
+
+      const formattedDate = formatDateForAPI(bookingData.date);
+
       const bookingPayload = {
         sitter_id: bookingData.sitterId,
-        date: bookingData.date,
+        date: formattedDate,
         time: convertTo24Hour(bookingData.startTime),
         pet_name: 'My Pet', // Default pet name
         pet_type: 'Dog', // Default pet type
@@ -422,6 +448,15 @@ class BookingService {
       };
 
       console.log('📝 Sending booking to API:', bookingPayload);
+      console.log('📝 Original date:', bookingData.date);
+      console.log('📝 Formatted date:', formattedDate);
+      console.log('📝 Date validation - is today or future:', formattedDate >= new Date().toISOString().split('T')[0]);
+      console.log('📝 Today\'s date:', new Date().toISOString().split('T')[0]);
+      console.log('📝 Date comparison details:');
+      console.log('  - Input date:', bookingData.date);
+      console.log('  - Parsed date:', new Date(bookingData.date));
+      console.log('  - Today:', new Date());
+      console.log('  - Is past?', new Date(bookingData.date) < new Date());
 
       const { makeApiCall } = await import('./networkService');
       const response = await makeApiCall('/api/bookings', {
@@ -513,6 +548,24 @@ class BookingService {
         return `${hour24.toString().padStart(2, '0')}:${minutes}`;
       };
 
+      // Calculate total amount for weekly booking
+      const calculateTotalAmount = () => {
+        const startDate = new Date(bookingData.startDate);
+        const endDate = new Date(bookingData.endDate);
+        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+        
+        // Calculate hours per day
+        const startTime24 = convertTo24Hour(bookingData.startTime);
+        const endTime24 = convertTo24Hour(bookingData.endTime);
+        const [startHour, startMin] = startTime24.split(':').map(Number);
+        const [endHour, endMin] = endTime24.split(':').map(Number);
+        const hoursPerDay = (endHour + endMin/60) - (startHour + startMin/60);
+        
+        return daysDiff * hoursPerDay * bookingData.hourlyRate;
+      };
+
+      const totalAmount = calculateTotalAmount();
+
       const bookingPayload = {
         sitter_id: bookingData.sitterId,
         date: bookingData.startDate, // Use start date as primary date
@@ -528,10 +581,12 @@ class BookingService {
         end_date: bookingData.endDate,
         start_time: convertTo24Hour(bookingData.startTime),
         end_time: convertTo24Hour(bookingData.endTime),
-        total_amount: bookingData.totalAmount
+        total_amount: totalAmount
       };
 
       console.log('📝 Sending weekly booking to API:', bookingPayload);
+      console.log('📝 Calculated total amount:', totalAmount);
+      console.log('📝 Time conversion - start:', convertTo24Hour(bookingData.startTime), 'end:', convertTo24Hour(bookingData.endTime));
 
       const { makeApiCall } = await import('./networkService');
       const response = await makeApiCall('/api/bookings', {
@@ -556,6 +611,7 @@ class BookingService {
       const newBooking: WeeklyBooking = {
         ...bookingData,
         id: apiResponse.booking?.id?.toString() || `weekly_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        totalAmount: totalAmount,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

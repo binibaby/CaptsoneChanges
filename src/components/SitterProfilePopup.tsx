@@ -74,7 +74,7 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
     
     // If it's a relative URL (starts with /storage/), convert to full URL
     if (typeof imageSource === 'string' && imageSource.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.184:8000${imageSource}`;
+      const fullUrl = `http://172.20.10.2:8000${imageSource}`;
       console.log('🖼️ Popup - Converting storage URL to full URL:', fullUrl);
       return { uri: fullUrl };
     }
@@ -178,7 +178,9 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                 />
               </View>
               <View style={styles.userDetails}>
-                <Text style={styles.userName}>{sitter.name}</Text>
+                <Text style={styles.userName}>
+                  {sitter.name || 'Enter Your Name'}
+                </Text>
                 <Text style={styles.userLocation}>
                   📍 {sitter.location?.address || `${sitter.location?.latitude?.toFixed(4)}, ${sitter.location?.longitude?.toFixed(4)}`}
                 </Text>

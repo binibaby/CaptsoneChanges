@@ -103,6 +103,12 @@ class AuthService {
           
       if (result.success) {
         console.log('✅ Login successful, user data from backend:', result.user);
+        
+        // Enhanced debugging for login user data
+        console.log('🔍 LOGIN DEBUG - Backend user data:');
+        console.log('  - result.user.first_name:', JSON.stringify(result.user.first_name));
+        console.log('  - result.user.last_name:', JSON.stringify(result.user.last_name));
+        console.log('  - result.user.name:', JSON.stringify(result.user.name));
             
         // Check if user data exists and has required fields
         if (!result.user || !result.user.id) {
@@ -136,6 +142,13 @@ class AuthService {
         };
 
         this.currentUser = user;
+        
+        // Enhanced debugging for created user object
+        console.log('🔍 LOGIN DEBUG - Created user object:');
+        console.log('  - user.firstName:', JSON.stringify(user.firstName));
+        console.log('  - user.lastName:', JSON.stringify(user.lastName));
+        console.log('  - user.name:', JSON.stringify(user.name));
+        
         await this.saveUserToStorage(user);
         
         // Clear availability data for new sitters or when switching users
@@ -174,6 +187,8 @@ class AuthService {
     email: string;
     password: string;
     name: string;
+    firstName?: string;
+    lastName?: string;
     userRole: 'Pet Owner' | 'Pet Sitter';
     selectedPetTypes?: ('dogs' | 'cats')[];
     selectedBreeds?: string[];
@@ -199,8 +214,8 @@ class AuthService {
         },
         body: JSON.stringify({
           name: userData.name,
-          first_name: (userData as any).firstName || (userData.name && typeof userData.name === 'string' ? userData.name.split(' ')[0] : null) || null,
-          last_name: (userData as any).lastName || (userData.name && typeof userData.name === 'string' ? userData.name.split(' ').slice(1).join(' ') : null) || null,
+          first_name: userData.firstName || (userData.name && typeof userData.name === 'string' ? userData.name.split(' ')[0] : ''),
+          last_name: userData.lastName || (userData.name && typeof userData.name === 'string' ? userData.name.split(' ').slice(1).join(' ') : ''),
           email: userData.email,
           password: userData.password,
           password_confirmation: userData.password,
@@ -277,14 +292,18 @@ class AuthService {
         this.currentUser = user;
         await this.saveUserToStorage(user);
         
+        // Clear old profile data for fresh registrations
+        await AsyncStorage.removeItem('user_profile_data');
+        
         // Clear availability data for new sitters
         if (user.userRole === 'Pet Sitter') {
           await this.clearAvailabilityDataForNewSitter(user.id);
         }
         
-        // Restore profile data if available
-        const userWithProfileData = await this.restoreProfileData(user);
-        return userWithProfileData;
+        // For fresh registrations, don't restore old profile data
+        // The backend data is the source of truth for new registrations
+        console.log('Registration completed successfully with fresh user data:', user);
+        return user;
       } else {
         console.error('Registration failed:', result.message);
         throw new Error(result.message || 'Registration failed');
@@ -436,6 +455,10 @@ class AuthService {
     // Check if we have a current user in memory (from current session)
     if (this.currentUser) {
       console.log('getCurrentUser: Returning current session user:', this.currentUser.email);
+      console.log('🔍 GET CURRENT USER DEBUG - Memory user name fields:');
+      console.log('  - this.currentUser.firstName:', JSON.stringify(this.currentUser.firstName));
+      console.log('  - this.currentUser.lastName:', JSON.stringify(this.currentUser.lastName));
+      console.log('  - this.currentUser.name:', JSON.stringify(this.currentUser.name));
       return this.currentUser;
     }
     
@@ -446,6 +469,10 @@ class AuthService {
         const user = JSON.parse(stored);
         this.currentUser = user;
         console.log('getCurrentUser: Restored user from storage:', user.email);
+        console.log('🔍 GET CURRENT USER DEBUG - Storage user name fields:');
+        console.log('  - user.firstName:', JSON.stringify(user.firstName));
+        console.log('  - user.lastName:', JSON.stringify(user.lastName));
+        console.log('  - user.name:', JSON.stringify(user.name));
         return user;
       }
     } catch (error) {
@@ -476,6 +503,7 @@ class AuthService {
           phone: user.phone || profileData.phone || '',
           age: user.age || profileData.age,
           gender: user.gender || profileData.gender || '',
+          // CRITICAL: For name fields, prioritize backend data (fresh registration) over stored data
           firstName: user.firstName || profileData.firstName || '',
           lastName: user.lastName || profileData.lastName || '',
           selectedPetTypes: user.selectedPetTypes || profileData.selectedPetTypes || [],
@@ -487,6 +515,15 @@ class AuthService {
         console.log('AuthService: Original user hourlyRate:', user.hourlyRate);
         console.log('AuthService: Stored profileData hourlyRate:', profileData.hourlyRate);
         console.log('AuthService: Restored user hourlyRate:', restoredUser.hourlyRate);
+        
+        // Enhanced debugging for name fields in restoreProfileData
+        console.log('🔍 RESTORE PROFILE DATA DEBUG:');
+        console.log('  - Original user firstName:', JSON.stringify(user.firstName));
+        console.log('  - Original user lastName:', JSON.stringify(user.lastName));
+        console.log('  - Stored profileData firstName:', JSON.stringify(profileData.firstName));
+        console.log('  - Stored profileData lastName:', JSON.stringify(profileData.lastName));
+        console.log('  - Restored user firstName:', JSON.stringify(restoredUser.firstName));
+        console.log('  - Restored user lastName:', JSON.stringify(restoredUser.lastName));
         console.log('AuthService: Original user profileImage:', user.profileImage);
         console.log('AuthService: Stored profileData profileImage:', profileData.profileImage);
         console.log('AuthService: Restored user profileImage:', restoredUser.profileImage);
@@ -594,32 +631,47 @@ class AuthService {
     console.log('AuthService: Preserved selectedPetTypes:', updatedUser.selectedPetTypes);
     console.log('AuthService: Preserved selectedBreeds:', updatedUser.selectedBreeds);
     
-    // Update the name field if firstName or lastName changed
-    if (profileData.firstName || profileData.lastName) {
-      const firstName = profileData.firstName || (this.currentUser.firstName || '');
-      const lastName = profileData.lastName || (this.currentUser.lastName || '');
+    // Update the name field if firstName, lastName, or name changed
+    if (profileData.firstName !== undefined || profileData.lastName !== undefined) {
+      // If firstName or lastName are being updated, reconstruct the full name
+      const firstName = profileData.firstName !== undefined ? profileData.firstName : (this.currentUser.firstName || '');
+      const lastName = profileData.lastName !== undefined ? profileData.lastName : (this.currentUser.lastName || '');
+      updatedUser.firstName = firstName;
+      updatedUser.lastName = lastName;
       updatedUser.name = `${firstName} ${lastName}`.trim();
+    } else if (profileData.name) {
+      // If name is provided directly, use it and try to split into firstName/lastName
+      updatedUser.name = profileData.name;
+      const nameParts = profileData.name.trim().split(' ');
+      if (nameParts.length >= 2) {
+        updatedUser.firstName = nameParts[0];
+        updatedUser.lastName = nameParts.slice(1).join(' ');
+      } else if (nameParts.length === 1) {
+        updatedUser.firstName = nameParts[0];
+        updatedUser.lastName = '';
+      }
     }
 
     this.currentUser = updatedUser;
     await this.saveUserToStorage(updatedUser);
     
-    // Update profile on backend
+    // Update profile on backend (single attempt for speed)
     try {
+      console.log('AuthService: Updating profile on backend...');
       await this.updateProfileOnBackend(updatedUser);
       console.log('AuthService: Profile updated on backend successfully');
-      
-      // Clear sitter cache to force refresh in find sitter map
-      try {
-        const { default: realtimeLocationService } = await import('./realtimeLocationService');
-        realtimeLocationService.clearSitterCache();
-        console.log('AuthService: Cleared sitter cache for profile update');
-      } catch (cacheError) {
-        console.error('AuthService: Error clearing sitter cache:', cacheError);
-      }
     } catch (error) {
-      console.error('AuthService: Failed to update profile on backend:', error);
-      // Don't throw error here - local update was successful
+      console.error('AuthService: Backend update failed:', error instanceof Error ? error.message : 'Unknown error');
+      console.warn('AuthService: Profile updated locally but backend sync failed - will retry on next app open');
+    }
+    
+    // Clear sitter cache to force refresh in find sitter map (regardless of backend success)
+    try {
+      const { default: realtimeLocationService } = await import('./realtimeLocationService');
+      realtimeLocationService.clearSitterCache();
+      console.log('AuthService: Cleared sitter cache for profile update');
+    } catch (cacheError) {
+      console.error('AuthService: Error clearing sitter cache:', cacheError);
     }
     
     // Also save profile data persistently
@@ -687,30 +739,44 @@ class AuthService {
       // Import network service for dynamic IP detection
       const { makeApiCall } = await import('./networkService');
       
+      // Only send changed fields to reduce payload size and improve speed
+      const updateData: any = {
+        id: user.id,
+        name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User',
+        email: user.email,
+        role: user.role || (user.userRole === 'Pet Sitter' ? 'pet_sitter' : 'pet_owner'),
+      };
+      
+      console.log('AuthService: Backend update data - name field:', updateData.name);
+      console.log('AuthService: Backend update data - firstName:', user.firstName);
+      console.log('AuthService: Backend update data - lastName:', user.lastName);
+      console.log('AuthService: Full backend update payload:', JSON.stringify(updateData, null, 2));
+      
+      // Always include name fields (even if empty) to ensure backend gets the full name
+      updateData.first_name = user.firstName || '';
+      updateData.last_name = user.lastName || '';
+      
+      // Ensure the main name field is always updated with the full name
+      updateData.name = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User';
+      if (user.phone) updateData.phone = user.phone;
+      if (user.age) updateData.age = user.age;
+      if (user.gender) updateData.gender = user.gender;
+      if (user.address) updateData.address = user.address;
+      if (user.experience) updateData.experience = user.experience;
+      if (user.hourlyRate) updateData.hourly_rate = user.hourlyRate;
+      if (user.aboutMe) updateData.bio = user.aboutMe;
+      if (user.specialties && user.specialties.length > 0) updateData.specialties = user.specialties;
+      if (user.selectedBreeds && user.selectedBreeds.length > 0) updateData.pet_breeds = user.selectedBreeds;
+      if (user.selectedPetTypes && user.selectedPetTypes.length > 0) updateData.selected_pet_types = user.selectedPetTypes;
+      if (user.profileImage) updateData.profile_image = user.profileImage;
+      
       const response = await makeApiCall('/api/profile/update', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          id: user.id,
-          name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User',
-          first_name: user.firstName || (user.name && typeof user.name === 'string' ? user.name.split(' ')[0] : null) || null,
-          last_name: user.lastName || (user.name && typeof user.name === 'string' ? user.name.split(' ').slice(1).join(' ') : null) || null,
-          email: user.email,
-          phone: user.phone || null,
-          age: user.age || null,
-          gender: user.gender || null,
-          address: user.address || null,
-          experience: user.experience || null,
-          hourly_rate: user.hourlyRate || null,
-          bio: user.aboutMe || null,
-          specialties: user.specialties || null,
-          pet_breeds: user.selectedBreeds || null,
-          selected_pet_types: user.selectedPetTypes || null,
-          profile_image: user.profileImage || null,
-          role: user.role || (user.userRole === 'Pet Sitter' ? 'pet_sitter' : 'pet_owner'),
-        }),
+        body: JSON.stringify(updateData),
       });
 
       if (!response.ok) {
@@ -718,7 +784,13 @@ class AuthService {
         console.error('Backend profile update failed:', response.status, errorText);
         console.error('Response URL:', response.url);
         console.error('Response headers:', response.headers);
-        throw new Error(`Backend update failed: ${response.status}`);
+        console.error('Request body sent:', JSON.stringify({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }, null, 2));
+        throw new Error(`Backend update failed: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
@@ -749,8 +821,15 @@ class AuthService {
     console.log('Backend user role type:', typeof backendUser.role);
     console.log('Backend user role === pet_sitter:', backendUser.role === 'pet_sitter');
     
-    // Clear logout flag when user logs in
+    // Enhanced debugging for backend user name fields
+    console.log('🔍 STORE USER FROM BACKEND DEBUG:');
+    console.log('  - backendUser.first_name:', JSON.stringify(backendUser.first_name));
+    console.log('  - backendUser.last_name:', JSON.stringify(backendUser.last_name));
+    console.log('  - backendUser.name:', JSON.stringify(backendUser.name));
+    
+    // Clear logout flag and old profile data when user registers
     await AsyncStorage.removeItem('user_logged_out');
+    await AsyncStorage.removeItem('user_profile_data'); // Clear old profile data to prevent override
     
     // Check if backendUser exists and has required fields
     if (!backendUser || !backendUser.id) {
@@ -788,16 +867,24 @@ class AuthService {
     console.log('User hourlyRate type:', typeof user.hourlyRate);
     console.log('User hourlyRate value:', JSON.stringify(user.hourlyRate));
     console.log('User role:', user.role);
+    
+    // Enhanced debugging for created user object in storeUserFromBackend
+    console.log('🔍 STORE USER FROM BACKEND - Created user object:');
+    console.log('  - user.firstName:', JSON.stringify(user.firstName));
+    console.log('  - user.lastName:', JSON.stringify(user.lastName));
+    console.log('  - user.name:', JSON.stringify(user.name));
 
     this.currentUser = user;
     await this.saveUserToStorage(user);
     
-    // Restore profile data if available (this will merge with backend data)
-    const userWithProfileData = await this.restoreProfileData(user);
-    console.log('User data stored from backend successfully:', userWithProfileData);
-    console.log('Final hourlyRate after merge:', userWithProfileData.hourlyRate);
-    console.log('Final profileImage after merge:', userWithProfileData.profileImage);
-    return userWithProfileData;
+    // For fresh registrations, don't restore old profile data to prevent override
+    // The backend data is the source of truth for new registrations
+    console.log('User data stored from backend successfully (fresh registration):', user);
+    console.log('Final hourlyRate:', user.hourlyRate);
+    console.log('Final profileImage:', user.profileImage);
+    console.log('Final firstName:', user.firstName);
+    console.log('Final lastName:', user.lastName);
+    return user;
   }
 
   async isAuthenticated(): Promise<boolean> {

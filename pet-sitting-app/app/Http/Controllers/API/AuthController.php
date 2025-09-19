@@ -460,12 +460,22 @@ class AuthController extends Controller
 
     private function buildUserProfile(User $user)
     {
+        // Ensure first_name and last_name are populated from name if they're empty
+        $firstName = $user->first_name;
+        $lastName = $user->last_name;
+        
+        if (empty($firstName) && empty($lastName) && !empty($user->name)) {
+            $nameParts = explode(' ', trim($user->name));
+            $firstName = $nameParts[0] ?? '';
+            $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
+        }
+        
         // Base profile fields for all users
         $profile = [
             'id' => $user->id,
             'name' => $user->name,
-            'first_name' => $user->first_name,
-            'last_name' => $user->last_name,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'email' => $user->email,
             'role' => $user->role,
             'status' => $user->status,

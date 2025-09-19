@@ -24,7 +24,8 @@ const PetOwnerProfileScreen = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageRetryCount, setImageRetryCount] = useState(0);
   const [profile, setProfile] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     address: '',
@@ -35,8 +36,13 @@ const PetOwnerProfileScreen = () => {
   useEffect(() => {
     if (user) {
       console.log('📱 PetOwnerProfileScreen: Updating profile data from user:', user);
+      // Use firstName and lastName if available, otherwise fallback to splitting name
+      const firstName = user.firstName || (user.name ? user.name.split(' ')[0] : '');
+      const lastName = user.lastName || (user.name ? user.name.split(' ').slice(1).join(' ') : '');
+
       setProfile({
-        name: user.name || '',
+        firstName,
+        lastName,
         email: user.email || '',
         phone: user.phone || '',
         address: user.address || '',
@@ -54,7 +60,8 @@ const PetOwnerProfileScreen = () => {
     try {
       // Update the user profile with the new data
       await updateUserProfile({
-        name: profile.name,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
         email: profile.email,
         phone: profile.phone,
         address: profile.address,
@@ -99,7 +106,7 @@ const PetOwnerProfileScreen = () => {
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/storage/')) return `http://192.168.100.184:8000${uri}`;
+    if (uri.startsWith('/storage/')) return `http://172.20.10.2:8000${uri}`;
     return uri;
   };
 
@@ -304,7 +311,9 @@ const PetOwnerProfileScreen = () => {
             </View>
           </TouchableOpacity>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile.name}</Text>
+            <Text style={styles.profileName}>
+              {`${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Enter Your Name'}
+            </Text>
             <Text style={styles.profileSubtitle}>Pet Owner</Text>
             <Text style={styles.locationText}>📍 {profile.address || 'No address set'}</Text>
           </View>
@@ -330,16 +339,29 @@ const PetOwnerProfileScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
+            <Text style={styles.inputLabel}>First Name</Text>
             {isEditing ? (
               <TextInput
                 style={styles.input}
-                value={profile.name}
-                onChangeText={(text) => setProfile({...profile, name: text})}
-                placeholder="Enter your full name"
+                value={profile.firstName}
+                onChangeText={(text) => setProfile({...profile, firstName: text})}
+                placeholder="Enter your first name"
               />
             ) : (
-              <Text style={[styles.input, styles.disabledInput]}>{profile.name}</Text>
+              <Text style={[styles.input, styles.disabledInput]}>{profile.firstName}</Text>
+            )}
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Last Name</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={profile.lastName}
+                onChangeText={(text) => setProfile({...profile, lastName: text})}
+                placeholder="Enter your last name"
+              />
+            ) : (
+              <Text style={[styles.input, styles.disabledInput]}>{profile.lastName}</Text>
             )}
           </View>
           <View style={styles.inputGroup}>

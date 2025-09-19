@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import PlatformMap from '../../components/PlatformMap';
+import PlatformMap, { PlatformMarker } from '../../components/PlatformMap';
 import SitterProfilePopup from '../../components/SitterProfilePopup';
 import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
@@ -116,6 +116,20 @@ const FindSitterMapScreen = () => {
     // TODO: Navigate to certificates view
   };
 
+  const handleRefreshSitters = async () => {
+    console.log('🔄 Manual refresh: Force clearing everything and fetching fresh data');
+    // Force clear everything and refresh from backend
+    if (currentLocation) {
+      await realtimeLocationService.forceClearAndRefresh(
+        currentLocation.coords.latitude,
+        currentLocation.coords.longitude,
+        50 // 50km radius
+      );
+    } else {
+      console.log('⚠️ No current location available for force refresh');
+    }
+  };
+
   // Helper function to get proper image source
   const getImageSource = (sitter: any) => {
     const imageSource = sitter.profileImage || sitter.imageSource || sitter.images?.[0];
@@ -131,7 +145,7 @@ const FindSitterMapScreen = () => {
     
     // If it's a relative URL (starts with /storage/), convert to full URL
     if (typeof imageSource === 'string' && imageSource.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.184:8000${imageSource}`;
+      const fullUrl = `http://172.20.10.2:8000${imageSource}`;
       return { uri: fullUrl };
     }
     
@@ -272,7 +286,7 @@ const FindSitterMapScreen = () => {
           const lonDiff = Math.abs(sitter.location.longitude - currentLocation.coords.longitude);
           const distance = Math.sqrt(latDiff * latDiff + lonDiff * lonDiff) * 111; // Rough km conversion
           
-          return distance <= 2; // 2km radius
+          return distance <= 50; // 50km radius
         });
         
         setSitters(nearbySitters);
@@ -282,6 +296,42 @@ const FindSitterMapScreen = () => {
 
     return () => unsubscribe();
   }, []); // Remove currentLocation dependency to prevent infinite loop
+
+  // Force refresh sitters when screen comes into focus (to ensure fresh data after logout)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 FindSitterMapScreen: Screen focused, forcing sitter refresh');
+      console.log('📍 Current location:', currentLocation);
+      console.log('📍 Location tracking status:', isLocationTracking);
+      // Force clear everything and refresh from backend
+      if (currentLocation) {
+        realtimeLocationService.forceClearAndRefresh(
+          currentLocation.coords.latitude,
+          currentLocation.coords.longitude,
+          50 // 50km radius
+        );
+      } else {
+        console.log('⚠️ No current location available for sitter fetch');
+      }
+    }, [currentLocation])
+  );
+
+  // Add periodic refresh to ensure fresh data across devices
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Periodic refresh: Checking for fresh sitter data');
+      if (currentLocation) {
+        // Force refresh from backend every 30 seconds
+        realtimeLocationService.forceClearAndRefresh(
+          currentLocation.coords.latitude,
+          currentLocation.coords.longitude,
+          50 // 50km radius
+        );
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [currentLocation]);
 
   // Filter sitters based on selected filter
   const filteredSitters = useMemo(() => {
@@ -383,7 +433,7 @@ const FindSitterMapScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Find Pet Sitters</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={() => loadSittersFromAPI(true)}>
+        <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshSitters}>
           <Ionicons name="refresh" size={24} color="#333" />
         </TouchableOpacity>
       </View>
@@ -401,68 +451,45 @@ const FindSitterMapScreen = () => {
               </Text>
             </View>
           </View>
-        ) : Platform.OS === 'web' ? (
+        ) : (
           <PlatformMap
             style={StyleSheet.absoluteFill}
             initialRegion={initialRegion}
             showsUserLocation
             showsPointsOfInterest={false}
             ref={mapRef}
-          />
-        ) : (() => {
-          const { MapView: NativeMapView, Marker: NativeMarker } = getMapComponents();
-          if (NativeMapView) {
-            return (
-              <NativeMapView
-                style={StyleSheet.absoluteFill}
-                initialRegion={initialRegion}
-                showsUserLocation
-                showsPointsOfInterest={false}
-                ref={mapRef}
+          >
+            {filteredSitters.map((sitter) => (
+              <PlatformMarker
+                key={sitter.id}
+                coordinate={sitter.location}
+                title={sitter.name}
+                description={`₱${sitter.hourlyRate}/hr • ${sitter.isOnline ? 'Available' : 'Offline'}`}
+                onPress={() => handleSitterPress(sitter.id)}
               >
-                {filteredSitters.map((sitter) => (
-                  <NativeMarker
-                    key={sitter.id}
-                    coordinate={sitter.location}
-                    title={sitter.name}
-                    description={`₱${sitter.hourlyRate}/hr • ${sitter.isOnline ? 'Available' : 'Offline'}`}
-                    onPress={() => handleSitterPress(sitter.id)}
-                  >
-                    <View style={styles.markerContainer}>
-                      <View style={[
-                        styles.markerProfileImage,
-                        { borderColor: sitter.isOnline ? '#10B981' : '#6B7280' }
-                      ]}>
-                        <Image 
-                          source={getImageSource(sitter)} 
-                          style={{
-                            width: 42,
-                            height: 42,
-                            borderRadius: 21,
-                          }}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      {sitter.isOnline && (
-                        <View style={styles.onlinePulse} />
-                      )}
-                    </View>
-                  </NativeMarker>
-                ))}
-              </NativeMapView>
-            );
-          } else {
-            return (
-              <PlatformMap
-                style={StyleSheet.absoluteFill}
-                initialRegion={initialRegion}
-                showsUserLocation
-                showsPointsOfInterest={false}
-                ref={mapRef}
-              />
-            );
-          }
-        })()}
+                <View style={styles.markerContainer}>
+                  <View style={[
+                    styles.markerProfileImage,
+                    { borderColor: sitter.isOnline ? '#10B981' : '#6B7280' }
+                  ]}>
+                    <Image 
+                      source={getImageSource(sitter)} 
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 21,
+                      }}
+                      resizeMode="cover"
+                    />
+                  </View>
+                  {sitter.isOnline && (
+                    <View style={styles.onlinePulse} />
+                  )}
+                </View>
+              </PlatformMarker>
+            ))}
+          </PlatformMap>
+        )}
       </View>
 
       {/* Recenter button */}

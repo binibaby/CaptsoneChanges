@@ -112,8 +112,9 @@ export default function Auth() {
           id: user.id,
           email: user.email,
           name: user.name,
-          firstName: user.first_name || '',  // Backend uses first_name
-          lastName: user.last_name || '',    // Backend uses last_name
+          // CRITICAL: Properly handle name fields with fallback logic
+          firstName: user.first_name || user.firstName || (user.name ? user.name.split(' ')[0] : ''),
+          lastName: user.last_name || user.lastName || (user.name ? user.name.split(' ').slice(1).join(' ') : ''),
           userRole: (user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter') as 'Pet Owner' | 'Pet Sitter',
           role: user.role,
           phone: user.phone || '',
@@ -131,6 +132,16 @@ export default function Auth() {
           profileImage: user.profileImage || user.profile_image || undefined,
           token: user.token, // Add the authentication token
         };
+        
+        // Enhanced debugging for name fields
+        console.log('🔍 onAuthSuccess - Name mapping debug:');
+        console.log('  - user.first_name:', JSON.stringify(user.first_name));
+        console.log('  - user.last_name:', JSON.stringify(user.last_name));
+        console.log('  - user.firstName:', JSON.stringify(user.firstName));
+        console.log('  - user.lastName:', JSON.stringify(user.lastName));
+        console.log('  - user.name:', JSON.stringify(user.name));
+        console.log('  - userForUpdate.firstName:', JSON.stringify(userForUpdate.firstName));
+        console.log('  - userForUpdate.lastName:', JSON.stringify(userForUpdate.lastName));
         
         console.log('User object structured for updateUserProfile:', userForUpdate);
         console.log('UserForUpdate hourlyRate:', userForUpdate.hourlyRate);
@@ -334,8 +345,9 @@ export default function Auth() {
           id: result.user.id,
           email: result.user.email,
           name: result.user.name,
-          firstName: result.user.first_name,
-          lastName: result.user.last_name,
+          // CRITICAL: Ensure name fields are properly mapped with fallbacks
+          firstName: result.user.first_name || userData.firstName || (result.user.name ? result.user.name.split(' ')[0] : ''),
+          lastName: result.user.last_name || userData.lastName || (result.user.name ? result.user.name.split(' ').slice(1).join(' ') : ''),
           userRole: result.user.role === 'pet_owner' ? 'Pet Owner' : 'Pet Sitter',
           role: result.user.role,
           phone: result.user.phone,
@@ -360,6 +372,15 @@ export default function Auth() {
         console.log('Complete user selectedBreeds:', completeUser.selectedBreeds);
         console.log('Complete user hourlyRate type:', typeof completeUser.hourlyRate);
         console.log('Complete user hourlyRate value:', JSON.stringify(completeUser.hourlyRate));
+        
+        // Enhanced debugging for name fields in registration complete
+        console.log('🔍 onRegistrationComplete - Name mapping debug:');
+        console.log('  - result.user.first_name:', JSON.stringify(result.user.first_name));
+        console.log('  - result.user.last_name:', JSON.stringify(result.user.last_name));
+        console.log('  - result.user.name:', JSON.stringify(result.user.name));
+        console.log('  - completeUser.firstName:', JSON.stringify(completeUser.firstName));
+        console.log('  - completeUser.lastName:', JSON.stringify(completeUser.lastName));
+        console.log('  - completeUser.name:', JSON.stringify(completeUser.name));
 
         // Store the complete user data in the auth context
         // Convert completeUser to backend format for storeUserFromBackend

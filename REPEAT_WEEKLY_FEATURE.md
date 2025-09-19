@@ -182,3 +182,5 @@ The Repeat Weekly Availability feature significantly improves the user experienc
 **Built with ❤️ for the PetSit community**
 
 *For technical support or feature requests, please create an issue in the GitHub repository.*
+
+

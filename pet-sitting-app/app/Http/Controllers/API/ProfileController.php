@@ -11,6 +11,32 @@ use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
+    public function getProfile(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            return response()->json([
+                'success' => true,
+                'user' => $this->buildUserProfile($user)
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Get profile error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get profile: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function updateProfile(Request $request)
     {
         try {
@@ -22,6 +48,15 @@ class ProfileController extends Controller
                     'message' => 'User not authenticated'
                 ], 401);
             }
+
+            // Log the incoming request data
+            Log::info('Profile update request received:', [
+                'user_id' => $user->id,
+                'request_data' => $request->all(),
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'name' => $request->name
+            ]);
 
             // Base validation rules for all users
             $validationRules = [
@@ -91,6 +126,15 @@ class ProfileController extends Controller
 
             $user->save();
 
+            // Log the saved user data
+            Log::info('Profile updated successfully:', [
+                'user_id' => $user->id,
+                'saved_first_name' => $user->first_name,
+                'saved_last_name' => $user->last_name,
+                'saved_name' => $user->name,
+                'saved_email' => $user->email
+            ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
@@ -108,12 +152,22 @@ class ProfileController extends Controller
 
     private function buildUserProfile(User $user)
     {
+        // Ensure first_name and last_name are populated from name if they're empty
+        $firstName = $user->first_name;
+        $lastName = $user->last_name;
+        
+        if (empty($firstName) && empty($lastName) && !empty($user->name)) {
+            $nameParts = explode(' ', trim($user->name));
+            $firstName = $nameParts[0] ?? '';
+            $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
+        }
+        
         // Base profile fields for all users
         $profile = [
             'id' => $user->id,
             'name' => $user->name,
-            'first_name' => $user->first_name,
-            'last_name' => $user->last_name,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'email' => $user->email,
             'role' => $user->role,
             'status' => $user->status,

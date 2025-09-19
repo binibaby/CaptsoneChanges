@@ -36,6 +36,11 @@ class DashboardController extends Controller
         return view('admin.reports.index', compact('stats'));
     }
 
+    public function announcements()
+    {
+        return view('admin.announcements');
+    }
+
     private function getDashboardStats()
     {
         $now = Carbon::now();

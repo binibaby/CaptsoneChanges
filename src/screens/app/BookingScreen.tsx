@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -39,74 +39,93 @@ const BookingScreen: React.FC = () => {
     sitterImage?: string;
   }>();
   const [availabilities, setAvailabilities] = useState<SitterAvailability[]>([]);
-  const [weeklyAvailabilities, setWeeklyAvailabilities] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange | null>(null);
-  const [selectedWeeklyAvailability, setSelectedWeeklyAvailability] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showWeekBooking, setShowWeekBooking] = useState(false);
-  const [weekStartDate, setWeekStartDate] = useState<string | null>(null);
-  const [weekEndDate, setWeekEndDate] = useState<string | null>(null);
-  const [weekTimeRange, setWeekTimeRange] = useState<TimeRange | null>(null);
-  const [hasWeekAvailability, setHasWeekAvailability] = useState(false);
+  const [sitterIsOnline, setSitterIsOnline] = useState<boolean>(true);
 
   useEffect(() => {
     if (sitterId) {
       loadSitterAvailability();
-      loadWeeklyAvailability();
+      checkSitterAvailabilityStatus();
     }
   }, [sitterId]);
 
+  // Set up periodic availability status checks for real-time updates
   useEffect(() => {
-    checkWeekAvailability();
-  }, [availabilities]);
-
-  const checkWeekAvailability = () => {
-    console.log('🔍 Checking week availability for:', availabilities.length, 'availabilities');
+    if (!sitterId) return;
     
-    // For demo purposes, always show week booking if we have any availabilities
-    if (availabilities.length > 0) {
-      console.log('✅ Week booking available - showing button');
-      setHasWeekAvailability(true);
-      return;
-    }
+    const interval = setInterval(() => {
+      checkSitterAvailabilityStatus();
+    }, 30000); // Check every 30 seconds (less frequent to avoid conflicts)
+    
+    return () => clearInterval(interval);
+  }, [sitterId]);
 
-    if (availabilities.length < 7) {
-      console.log('❌ Not enough availabilities for week booking:', availabilities.length);
-      setHasWeekAvailability(false);
-      return;
-    }
+  // Refresh data when screen comes into focus (to get latest data after deletions)
+  useFocusEffect(
+    useCallback(() => {
+      if (sitterId) {
+        console.log('🔄 BookingScreen focused, refreshing availability data');
+        loadSitterAvailability();
+        // Check for real-time availability updates
+        checkSitterAvailabilityStatus();
+      }
+    }, [sitterId])
+  );
 
-    // Sort availabilities by date
-    const sortedAvailabilities = [...availabilities].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
 
-    // Check for consecutive 7 days
-    for (let i = 0; i <= sortedAvailabilities.length - 7; i++) {
-      const weekStart = new Date(sortedAvailabilities[i].date);
-      let isConsecutive = true;
-
-      for (let j = 1; j < 7; j++) {
-        const expectedDate = new Date(weekStart);
-        expectedDate.setDate(weekStart.getDate() + j);
-        const actualDate = new Date(sortedAvailabilities[i + j].date);
-
-        if (expectedDate.toDateString() !== actualDate.toDateString()) {
-          isConsecutive = false;
-          break;
+  // Check sitter's availability status for real-time updates
+  const checkSitterAvailabilityStatus = async () => {
+    try {
+      if (!sitterId) return;
+      
+      console.log('📊 Checking sitter availability status for real-time updates...');
+      
+      // Get the sitter's current availability status from the backend
+      const token = await getAuthToken();
+      if (!token) return;
+      
+      // Try to get sitter's online status from the realtime location service
+      try {
+        const response = await makeApiCall(
+          `/api/sitters/${sitterId}/availability-status`,
+          {
+            method: 'GET',
+            headers: getAuthHeaders(token),
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const isAvailable = data.is_online || false;
+          
+          console.log('📊 Sitter availability status:', isAvailable ? 'ONLINE' : 'OFFLINE');
+          
+          // Update the online status state
+          setSitterIsOnline(isAvailable);
+          
+          // If sitter is online and we don't have availability data, reload it
+          if (isAvailable && availabilities.length === 0) {
+            console.log('📊 Sitter is online but no availability data, reloading...');
+            await loadSitterAvailability();
+          }
+        } else {
+          console.log('⚠️ Availability status endpoint not available, falling back to normal data loading');
+          // If the endpoint doesn't exist, just reload the availability data normally
+          setSitterIsOnline(true); // Assume online if we can't check
+          await loadSitterAvailability();
         }
+      } catch (apiError) {
+        console.log('⚠️ Availability status check failed, falling back to normal data loading:', apiError);
+        // If the endpoint doesn't exist or fails, just reload the availability data normally
+        await loadSitterAvailability();
       }
-
-      if (isConsecutive) {
-        console.log('✅ Found consecutive week starting:', weekStart);
-        setHasWeekAvailability(true);
-        return;
-      }
+    } catch (error) {
+      console.error('❌ Error checking sitter availability status:', error);
+      // Fallback to normal data loading
+      await loadSitterAvailability();
     }
-
-    console.log('❌ No consecutive week found');
-    setHasWeekAvailability(false);
   };
 
   // Helper function to validate time ranges
@@ -155,41 +174,6 @@ const BookingScreen: React.FC = () => {
     }
   };
 
-  const getAvailableWeeks = () => {
-    console.log('📅 Getting available weeks for:', availabilities.length, 'availabilities');
-    
-    // Always return demo weeks for better user experience
-    const demoWeeks = [];
-    const today = new Date();
-    
-    for (let i = 0; i < 4; i++) {
-      const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() + (i * 7));
-      
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      
-      demoWeeks.push({
-        startDate: weekStart.toISOString().split('T')[0],
-        endDate: weekEnd.toISOString().split('T')[0],
-        timeRanges: [
-          {
-            id: `demo-${i}-1`,
-            startTime: '9:00 AM',
-            endTime: '5:00 PM'
-          },
-          {
-            id: `demo-${i}-2`,
-            startTime: '10:00 AM',
-            endTime: '6:00 PM'
-          }
-        ]
-      });
-    }
-    
-    console.log('📅 Returning demo weeks:', demoWeeks.length);
-    return demoWeeks;
-  };
 
   useEffect(() => {
     console.log('📅 Availabilities updated:', availabilities.length, 'items');
@@ -215,7 +199,25 @@ const BookingScreen: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('📅 API Response data:', data);
-        setAvailabilities(data.availabilities || []);
+        
+        // Filter out past dates - only show today and future dates
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const futureAvailabilities = (data.availabilities || []).filter((availability: SitterAvailability) => {
+          const availabilityDate = new Date(availability.date);
+          availabilityDate.setHours(0, 0, 0, 0);
+          const isFutureOrToday = availabilityDate >= today;
+          
+          if (!isFutureOrToday) {
+            console.log('🗑️ Filtering out past date:', availability.date);
+          }
+          
+          return isFutureOrToday;
+        });
+        
+        console.log('📅 Filtered availabilities (future only):', futureAvailabilities.length);
+        setAvailabilities(futureAvailabilities);
       } else {
         console.log('⚠️ API failed, no availability data found for this sitter');
         // Don't fallback to local data - only show sitters with actual availability
@@ -256,36 +258,6 @@ const BookingScreen: React.FC = () => {
     }
   };
 
-  const loadWeeklyAvailability = async () => {
-    try {
-      console.log('🔄 Loading weekly availability data from backend...');
-      // Only load from backend API, not local storage
-      const token = await getAuthToken();
-      const response = await makeApiCall(
-        `/api/sitters/${sitterId}/weekly-availability`,
-        {
-          method: 'GET',
-          headers: getAuthHeaders(token || undefined),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const weeklyArray = data.availabilities || [];
-        console.log('📅 Weekly availability from backend:', weeklyArray);
-        setWeeklyAvailabilities(weeklyArray);
-        setHasWeekAvailability(weeklyArray.length > 0);
-      } else {
-        console.log('⚠️ No weekly availability data found for this sitter');
-        setWeeklyAvailabilities([]);
-        setHasWeekAvailability(false);
-      }
-    } catch (error) {
-      console.error('❌ Error loading weekly availability:', error);
-      setWeeklyAvailabilities([]);
-      setHasWeekAvailability(false);
-    }
-  };
 
   const getAuthToken = async (): Promise<string | null> => {
     try {
@@ -317,8 +289,6 @@ const BookingScreen: React.FC = () => {
     } else {
       setSelectedDate(date);
       setSelectedTimeRange(null);
-      // Deselect weekly availability when selecting daily
-      setSelectedWeeklyAvailability(null);
     }
   };
 
@@ -331,298 +301,9 @@ const BookingScreen: React.FC = () => {
     }
   };
 
-  const handleWeeklyAvailabilitySelect = (weeklyAvailability: any) => {
-    console.log('🔄 Weekly availability selected:', weeklyAvailability);
-    console.log('🔄 Current selected weekly:', selectedWeeklyAvailability);
-    console.log('🔄 Comparing startDate:', selectedWeeklyAvailability?.startDate, '===', weeklyAvailability.startDate);
-    
-    // Toggle selection - if already selected, deselect
-    // Use startDate as unique identifier since id might not be reliable
-    if (selectedWeeklyAvailability?.startDate === weeklyAvailability.startDate) {
-      console.log('🔄 Deselecting weekly availability');
-      setSelectedWeeklyAvailability(null);
-    } else {
-      console.log('🔄 Selecting weekly availability');
-      setSelectedWeeklyAvailability(weeklyAvailability);
-      setSelectedDate(null);
-      setSelectedTimeRange(null);
-    }
-  };
 
-  const calculateWeeklyTotal = (weeklyAvailability: any, hourlyRate: number) => {
-    console.log('🔄 Calculating weekly total for:', weeklyAvailability);
-    console.log('🔄 Hourly rate:', hourlyRate);
-    
-    try {
-      const startDate = new Date(weeklyAvailability.startDate);
-      const endDate = new Date(weeklyAvailability.endDate);
-      const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      
-      console.log('🔄 Days calculated:', days);
-      
-      // Get time range - check multiple possible field names
-      const startTime = weeklyAvailability.startTime || weeklyAvailability.timeRanges?.[0]?.startTime || '9:00 AM';
-      const endTime = weeklyAvailability.endTime || weeklyAvailability.timeRanges?.[0]?.endTime || '5:00 PM';
-      
-      console.log('🔄 Time range:', startTime, 'to', endTime);
-      
-      // Convert time to 24-hour format for calculation
-      const parseTime = (timeStr: string) => {
-        if (!timeStr) return '09:00';
-        
-        console.log('🔄 Parsing time string:', timeStr);
-        
-        // If already in 24-hour format (no AM/PM), return as is
-        if (!timeStr.includes('AM') && !timeStr.includes('PM')) {
-          console.log('🔄 Time already in 24-hour format:', timeStr);
-          return timeStr;
-        }
-        
-        // Split by space to separate time and period (handle both regular and non-breaking spaces)
-        const parts = timeStr.split(/\s+/);
-        if (parts.length !== 2) {
-          console.log('🔄 Invalid time format, using default. Parts:', parts);
-          return '09:00';
-        }
-        
-        const [time, period] = parts;
-        const timeParts = time.split(':');
-        if (timeParts.length !== 2) {
-          console.log('🔄 Invalid time format, using default');
-          return '09:00';
-        }
-        
-        const [hours, minutes] = timeParts;
-        let hour24 = parseInt(hours, 10);
-        
-        console.log('🔄 Parsed components:', { hours, minutes, period, hour24 });
-        
-        if (period === 'PM' && hour24 !== 12) {
-          hour24 += 12;
-        } else if (period === 'AM' && hour24 === 12) {
-          hour24 = 0;
-        }
-        
-        const result = `${hour24.toString().padStart(2, '0')}:${minutes}`;
-        console.log('🔄 Converted to 24-hour format:', result);
-        return result;
-      };
-      
-      const start24 = parseTime(startTime);
-      const end24 = parseTime(endTime);
-      
-      console.log('🔄 Parsed times:', start24, 'to', end24);
-      
-      // Calculate hours per day
-      const start = new Date(`2000-01-01T${start24}:00`);
-      const end = new Date(`2000-01-01T${end24}:00`);
-      
-      // Handle case where end time is next day (e.g., 11 PM to 2 AM)
-      if (end <= start) {
-        end.setDate(end.getDate() + 1);
-      }
-      
-      const hoursPerDay = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      console.log('🔄 Hours per day:', hoursPerDay);
-      
-      const totalHours = days * hoursPerDay;
-      const totalCost = totalHours * hourlyRate;
-      
-      console.log('🔄 Total calculation:', {
-        days,
-        hoursPerDay,
-        totalHours,
-        hourlyRate,
-        totalCost: Math.round(totalCost)
-      });
-      
-      return Math.round(totalCost);
-    } catch (error) {
-      console.error('❌ Error calculating weekly total:', error);
-      // Fallback calculation
-      const days = 7;
-      const hoursPerDay = 8; // Default 8 hours per day
-      const totalHours = days * hoursPerDay;
-      return Math.round(totalHours * hourlyRate);
-    }
-  };
 
-  const handleWeekBooking = async () => {
-    if (!weekStartDate || !weekEndDate || !weekTimeRange || !sitterId) {
-      Alert.alert('Error', 'Please select a week and time range');
-      return;
-    }
 
-    try {
-      const currentUser = await authService.getCurrentUser();
-      if (!currentUser) {
-        Alert.alert('Error', 'Please log in to make a booking');
-        return;
-      }
-
-      // Create bookings for each day of the week
-      const startDate = new Date(weekStartDate);
-      const endDate = new Date(weekEndDate);
-      const bookings = [];
-
-      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
-        
-        const booking = await bookingService.createBooking({
-          sitterId: sitterId,
-          sitterName: sitterName || 'Sitter',
-          petOwnerId: currentUser.id,
-          petOwnerName: currentUser.name || 'Pet Owner',
-          date: dateStr,
-          startTime: weekTimeRange.startTime,
-          endTime: weekTimeRange.endTime,
-          hourlyRate: parseFloat(sitterRate || '25'),
-          status: 'pending',
-        });
-
-        bookings.push(booking);
-
-        // Create notification for each day
-        await notificationService.createBookingNotification({
-          sitterId: sitterId,
-          sitterName: sitterName || 'Sitter',
-          petOwnerId: currentUser.id,
-          petOwnerName: currentUser.name || 'Pet Owner',
-          bookingId: booking.id,
-          date: dateStr,
-          startTime: weekTimeRange.startTime,
-          endTime: weekTimeRange.endTime,
-          hourlyRate: parseFloat(sitterRate || '25'),
-        });
-
-        // Create message for each day
-        await messagingService.createBookingRequestMessage({
-          sitterId: sitterId,
-          sitterName: sitterName || 'Sitter',
-          petOwnerId: currentUser.id,
-          petOwnerName: currentUser.name || 'Pet Owner',
-          bookingId: booking.id,
-          date: dateStr,
-          startTime: weekTimeRange.startTime,
-          endTime: weekTimeRange.endTime,
-          hourlyRate: parseFloat(sitterRate || '25'),
-        });
-      }
-
-      Alert.alert(
-        'Week Booking Request Sent!',
-        `Your booking request for ${bookings.length} days has been sent to ${sitterName}. You'll receive a notification when they respond.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowWeekBooking(false);
-              setWeekStartDate(null);
-              setWeekEndDate(null);
-              setWeekTimeRange(null);
-              router.back();
-            }
-          }
-        ]
-      );
-
-    } catch (error) {
-      console.error('Error creating week booking:', error);
-      Alert.alert('Error', 'Failed to create booking. Please try again.');
-    }
-  };
-
-  const handleWeeklyBookNow = async () => {
-    console.log('🔄 handleWeeklyBookNow called');
-    console.log('🔄 selectedWeeklyAvailability:', selectedWeeklyAvailability);
-    console.log('🔄 sitterId:', sitterId);
-    
-    if (!selectedWeeklyAvailability || !sitterId) {
-      Alert.alert('Error', 'Please select a weekly availability');
-      return;
-    }
-
-    try {
-      const currentUser = await authService.getCurrentUser();
-      if (!currentUser) {
-        Alert.alert('Error', 'Please log in to make a booking');
-        return;
-      }
-
-      console.log('🔄 Creating weekly booking with data:', selectedWeeklyAvailability);
-
-      // Get time range - check multiple possible field names
-      const startTime = selectedWeeklyAvailability.startTime || selectedWeeklyAvailability.timeRanges?.[0]?.startTime || '9:00 AM';
-      const endTime = selectedWeeklyAvailability.endTime || selectedWeeklyAvailability.timeRanges?.[0]?.endTime || '5:00 PM';
-
-      console.log('🔄 Using time range:', startTime, 'to', endTime);
-
-      // Create weekly booking
-      const weeklyBooking = await bookingService.createWeeklyBooking({
-        sitterId: sitterId,
-        sitterName: sitterName || 'Sitter',
-        petOwnerId: currentUser.id,
-        petOwnerName: currentUser.name || 'Pet Owner',
-        startDate: selectedWeeklyAvailability.startDate,
-        endDate: selectedWeeklyAvailability.endDate,
-        startTime: startTime,
-        endTime: endTime,
-        hourlyRate: parseFloat(sitterRate || '25'),
-        status: 'pending',
-        isWeekly: true
-      });
-
-      console.log('✅ Weekly booking created:', weeklyBooking);
-
-      // Create notification for the sitter
-      console.log('🔔 Creating weekly booking notification with data:', {
-        sitterId: sitterId,
-        sitterName: sitterName || 'Sitter',
-        petOwnerId: currentUser.id,
-        petOwnerName: currentUser.name || 'Pet Owner',
-        bookingId: weeklyBooking.id,
-        startDate: selectedWeeklyAvailability.startDate,
-        endDate: selectedWeeklyAvailability.endDate,
-        startTime: startTime,
-        endTime: endTime,
-        hourlyRate: parseFloat(sitterRate || '25'),
-        totalAmount: calculateWeeklyTotal(selectedWeeklyAvailability, parseFloat(sitterRate || '25'))
-      });
-
-      const notification = await notificationService.createWeeklyBookingNotification({
-        sitterId: sitterId,
-        sitterName: sitterName || 'Sitter',
-        petOwnerId: currentUser.id,
-        petOwnerName: currentUser.name || 'Pet Owner',
-        bookingId: weeklyBooking.id,
-        startDate: selectedWeeklyAvailability.startDate,
-        endDate: selectedWeeklyAvailability.endDate,
-        startTime: startTime,
-        endTime: endTime,
-        hourlyRate: parseFloat(sitterRate || '25'),
-        totalAmount: calculateWeeklyTotal(selectedWeeklyAvailability, parseFloat(sitterRate || '25'))
-      });
-
-      console.log('✅ Weekly booking notification created:', notification);
-
-      Alert.alert(
-        'Weekly Booking Request Sent!',
-        `Your weekly booking request has been sent to ${sitterName || 'the sitter'}. They will be notified and can confirm or decline your request.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setSelectedWeeklyAvailability(null);
-              router.back();
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('❌ Error creating weekly booking:', error);
-      Alert.alert('Error', 'Failed to create weekly booking. Please try again.');
-    }
-  };
 
   const handleBookNow = async () => {
     if (!selectedDate || !selectedTimeRange) {
@@ -644,6 +325,14 @@ const BookingScreen: React.FC = () => {
         endTime: selectedTimeRange.endTime,
         sitterRate
       });
+      
+      // Debug date format
+      console.log('📝 Date debugging:');
+      console.log('  - selectedDate type:', typeof selectedDate);
+      console.log('  - selectedDate value:', selectedDate);
+      console.log('  - new Date(selectedDate):', new Date(selectedDate!));
+      console.log('  - ISO string:', new Date(selectedDate!).toISOString().split('T')[0]);
+      console.log('  - Is valid date:', !isNaN(new Date(selectedDate!).getTime()));
       
       // Create booking using the service (which handles API call)
       const newBooking = await bookingService.createBooking({
@@ -734,7 +423,7 @@ const BookingScreen: React.FC = () => {
     
     // If it's a storage path (starts with /storage/), construct full URL
     if (typeof sitterImage === 'string' && sitterImage.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.184:8000${sitterImage}`;
+      const fullUrl = `http://172.20.10.2:8000${sitterImage}`;
       console.log('🖼️ BookingScreen - Using storage path, full URL:', fullUrl);
       return { uri: fullUrl };
     }
@@ -852,54 +541,22 @@ const BookingScreen: React.FC = () => {
           </View>
         ) : (
           <>
-            {/* Weekly Availability Cards */}
-            {weeklyAvailabilities.length > 0 && (
-              <View style={styles.availabilitySection}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="calendar-outline" size={24} color="#8B5CF6" />
-                  <Text style={styles.sectionTitle}>Weekly Availability</Text>
-                </View>
-                {weeklyAvailabilities.map((weeklyAvailability, index) => (
-                  <TouchableOpacity
-                    key={weeklyAvailability.id || weeklyAvailability.startDate || index}
-                    style={[
-                      styles.weeklyAvailabilityCard,
-                      selectedWeeklyAvailability?.startDate === weeklyAvailability.startDate && styles.selectedWeeklyCard
-                    ]}
-                    onPress={() => handleWeeklyAvailabilitySelect(weeklyAvailability)}
-                  >
-                    <View style={styles.weeklyCardHeader}>
-                      <View style={styles.weeklyDateContainer}>
-                        <Ionicons name="calendar" size={20} color="#fff" />
-                        <View style={styles.weeklyDateTextContainer}>
-                          <Text style={styles.weeklyDateText}>
-                            {new Date(weeklyAvailability.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(weeklyAvailability.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </Text>
-                          <Text style={styles.weeklyTimeText}>
-                            {weeklyAvailability.startTime || weeklyAvailability.timeRanges?.[0]?.startTime || '9:00 AM'} - {weeklyAvailability.endTime || weeklyAvailability.timeRanges?.[0]?.endTime || '5:00 PM'}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.weeklyBadge}>
-                        <Text style={styles.weeklyBadgeText}>WEEKLY</Text>
-                      </View>
-                    </View>
-                    <View style={styles.weeklyCardFooter}>
-                      <View style={styles.weeklyStats}>
-                        <Ionicons name="time" size={16} color="#fff" />
-                        <Text style={styles.weeklyStatsText}>Available all week</Text>
-                      </View>
-                      {selectedWeeklyAvailability?.startDate === weeklyAvailability.startDate && (
-                        <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
 
             {/* Daily Availability Cards */}
-            {availabilities.length > 0 && (
+            {!sitterIsOnline && (
+              <View style={styles.availabilitySection}>
+                <View style={styles.sitterOfflineMessage}>
+                  <Ionicons name="eye-off" size={24} color="#6B7280" />
+                  <Text style={styles.sitterOfflineText}>
+                    Schedules are hidden because this sitter is currently offline
+                  </Text>
+                  <Text style={styles.sitterOfflineSubtext}>
+                    Schedules will appear when the sitter comes back online
+                  </Text>
+                </View>
+              </View>
+            )}
+            {sitterIsOnline && availabilities.length > 0 && (
               <View style={styles.availabilitySection}>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="time-outline" size={24} color="#3B82F6" />
@@ -979,11 +636,10 @@ const BookingScreen: React.FC = () => {
 
         {/* Booking Summary */}
         {(() => {
-          const shouldShowSummary = (selectedDate && selectedTimeRange) || selectedWeeklyAvailability;
+          const shouldShowSummary = selectedDate && selectedTimeRange;
           console.log('🔄 Booking summary check:', {
             selectedDate,
             selectedTimeRange,
-            selectedWeeklyAvailability,
             shouldShowSummary
           });
           return shouldShowSummary;
@@ -1002,61 +658,29 @@ const BookingScreen: React.FC = () => {
                 <Text style={styles.summaryValue}>{sitterName || 'Sitter'}</Text>
               </View>
               
-              {selectedWeeklyAvailability ? (
-                <>
-                  <View style={styles.summaryRow}>
-                    <View style={styles.summaryIcon}>
-                      <Ionicons name="calendar" size={16} color="#8B5CF6" />
-                    </View>
-                    <Text style={styles.summaryLabel}>Period:</Text>
-                    <Text style={styles.summaryValue}>
-                      {new Date(selectedWeeklyAvailability.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(selectedWeeklyAvailability.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <View style={styles.summaryIcon}>
-                      <Ionicons name="time" size={16} color="#8B5CF6" />
-                    </View>
-                    <Text style={styles.summaryLabel}>Time:</Text>
-                    <Text style={styles.summaryValue}>
-                      {selectedWeeklyAvailability.startTime || selectedWeeklyAvailability.timeRanges?.[0]?.startTime || '9:00 AM'} - {selectedWeeklyAvailability.endTime || selectedWeeklyAvailability.timeRanges?.[0]?.endTime || '5:00 PM'}
-                    </Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <View style={styles.summaryIcon}>
-                      <Ionicons name="cash" size={16} color="#8B5CF6" />
-                    </View>
-                    <Text style={styles.summaryLabel}>Rate:</Text>
-                    <Text style={styles.summaryValue}>₱{sitterRate || '25'}/hour</Text>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <View style={styles.summaryRow}>
-                    <View style={styles.summaryIcon}>
-                      <Ionicons name="calendar" size={16} color="#3B82F6" />
-                    </View>
-                    <Text style={styles.summaryLabel}>Date:</Text>
-                    <Text style={styles.summaryValue}>{formatDate(selectedDate!)}</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <View style={styles.summaryIcon}>
-                      <Ionicons name="time" size={16} color="#3B82F6" />
-                    </View>
-                    <Text style={styles.summaryLabel}>Time:</Text>
-                    <Text style={styles.summaryValue}>
-                      {formatTime(selectedTimeRange!.startTime)} - {formatTime(selectedTimeRange!.endTime)}
-                    </Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <View style={styles.summaryIcon}>
-                      <Ionicons name="cash" size={16} color="#3B82F6" />
-                    </View>
-                    <Text style={styles.summaryLabel}>Rate:</Text>
-                    <Text style={styles.summaryValue}>₱{sitterRate || '25'}/hour</Text>
-                  </View>
-                </>
-              )}
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryIcon}>
+                  <Ionicons name="calendar" size={16} color="#3B82F6" />
+                </View>
+                <Text style={styles.summaryLabel}>Date:</Text>
+                <Text style={styles.summaryValue}>{formatDate(selectedDate!)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryIcon}>
+                  <Ionicons name="time" size={16} color="#3B82F6" />
+                </View>
+                <Text style={styles.summaryLabel}>Time:</Text>
+                <Text style={styles.summaryValue}>
+                  {formatTime(selectedTimeRange!.startTime)} - {formatTime(selectedTimeRange!.endTime)}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryIcon}>
+                  <Ionicons name="cash" size={16} color="#3B82F6" />
+                </View>
+                <Text style={styles.summaryLabel}>Rate:</Text>
+                <Text style={styles.summaryValue}>₱{sitterRate || '25'}/hour</Text>
+              </View>
             </View>
           </View>
         )}
@@ -1066,11 +690,10 @@ const BookingScreen: React.FC = () => {
       <View style={styles.bottomContainer}>
         {/* Book Now Button */}
         {(() => {
-          const shouldShowButton = (selectedDate && selectedTimeRange) || selectedWeeklyAvailability;
+          const shouldShowButton = selectedDate && selectedTimeRange;
           console.log('🔄 Book Now button check:', {
             selectedDate,
             selectedTimeRange,
-            selectedWeeklyAvailability,
             shouldShowButton
           });
           return shouldShowButton;
@@ -1078,12 +701,12 @@ const BookingScreen: React.FC = () => {
           <View style={styles.buttonShadow}>
             <TouchableOpacity
               style={styles.bookNowButton}
-              onPress={selectedWeeklyAvailability ? handleWeeklyBookNow : handleBookNow}
+              onPress={handleBookNow}
             >
               <View style={styles.buttonContent}>
                 <Ionicons name="calendar" size={24} color="#fff" />
                 <Text style={styles.bookNowButtonText}>
-                  {selectedWeeklyAvailability ? 'Book Weekly' : 'Book Now'}
+                  Book Now
                 </Text>
                 <Ionicons name="arrow-forward" size={20} color="#fff" />
               </View>
@@ -1092,267 +715,6 @@ const BookingScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Week Booking Modal */}
-      {showWeekBooking && (
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => {
-              setShowWeekBooking(false);
-              setWeekStartDate(null);
-              setWeekEndDate(null);
-              setWeekTimeRange(null);
-            }}
-          />
-          <TouchableOpacity 
-            style={styles.weekBookingModal}
-            activeOpacity={1}
-            onPress={(e) => {
-              // Prevent modal from closing when clicking on modal content
-              e.stopPropagation();
-            }}
-          >
-            <Text style={styles.modalTitle}>Book Whole Week</Text>
-            <Text style={styles.modalSubtitle}>Select your preferred week and time range</Text>
-        
-            {/* Week Selection */}
-            <View style={styles.weekSelectionContainer}>
-              <Text style={styles.sectionLabel}>Select Week</Text>
-              <View style={styles.weekButtonsContainer}>
-                {getAvailableWeeks().map((week, index) => {
-                  const startDate = new Date(week.startDate);
-                  const endDate = new Date(week.endDate);
-                  
-                  return (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.weekButton,
-                        weekStartDate === week.startDate && styles.weekButtonSelected
-                      ]}
-                      onPress={() => {
-                        setWeekStartDate(week.startDate);
-                        setWeekEndDate(week.endDate);
-                        // Reset time range selection when changing weeks
-                        setWeekTimeRange(null);
-                        // Use the first available time range for the week
-                        if (week.timeRanges.length > 0) {
-                          setWeekTimeRange(week.timeRanges[0]);
-                        }
-                      }}
-                    >
-                      <Text style={[
-                        styles.weekButtonText,
-                        weekStartDate === week.startDate && styles.weekButtonTextSelected
-                      ]}>
-                        {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Time Range Selection */}
-            {weekStartDate && (
-              <View style={styles.timeSelectionContainer}>
-                <Text style={styles.sectionLabel}>Select Time Range</Text>
-                <View style={styles.timeRangesContainer}>
-                  {(() => {
-                    const selectedWeek = getAvailableWeeks().find(week => week.startDate === weekStartDate);
-                    console.log('🔍 Selected week:', selectedWeek);
-                    console.log('🔍 Time ranges:', selectedWeek?.timeRanges);
-                    
-                    if (!selectedWeek || !selectedWeek.timeRanges || selectedWeek.timeRanges.length === 0) {
-                      return (
-                        <View style={styles.noTimeRangesContainer}>
-                          <Text style={styles.noTimeRangesText}>No time ranges available for this week</Text>
-                        </View>
-                      );
-                    }
-                    
-                    return selectedWeek.timeRanges.map((timeRange, index) => {
-                      console.log('🔍 Time range:', timeRange);
-                      
-                      // Ensure time range has proper structure
-                      const validTimeRange = {
-                        id: timeRange.id || `time-${index}`,
-                        startTime: timeRange.startTime || '9:00 AM',
-                        endTime: timeRange.endTime || '5:00 PM'
-                      };
-                      
-                      // Check if this time range is valid
-                      const isValid = isValidTimeRange(validTimeRange);
-                      
-                      return (
-                        <TouchableOpacity
-                          key={validTimeRange.id}
-                          style={[
-                            styles.timeRangeButton,
-                            weekTimeRange?.id === validTimeRange.id && styles.timeRangeButtonSelected,
-                            !isValid && styles.timeRangeButtonDisabled
-                          ]}
-                          onPress={() => {
-                            if (isValid) {
-                              console.log('🔍 Selecting time range:', validTimeRange);
-                              setWeekTimeRange(validTimeRange);
-                            } else {
-                              console.log('⚠️ Invalid time range, cannot select:', validTimeRange);
-                            }
-                          }}
-                          disabled={!isValid}
-                        >
-                          <Text style={[
-                            styles.timeRangeButtonText,
-                            weekTimeRange?.id === validTimeRange.id && styles.timeRangeButtonTextSelected,
-                            !isValid && styles.timeRangeButtonTextDisabled
-                          ]}>
-                            {validTimeRange.startTime} - {validTimeRange.endTime}
-                            {!isValid && ' (Invalid)'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    });
-                  })()}
-                </View>
-              </View>
-            )}
-
-            {/* Pricing Summary */}
-            {weekStartDate && weekEndDate && weekTimeRange && (
-              <View style={styles.pricingContainer}>
-                <Text style={styles.pricingTitle}>Pricing Summary</Text>
-                <View style={styles.pricingRow}>
-                  <Text style={styles.pricingLabel}>Daily Rate:</Text>
-                  <Text style={styles.pricingValue}>₱{sitterRate}/hour</Text>
-                </View>
-                <View style={styles.pricingRow}>
-                  <Text style={styles.pricingLabel}>Duration:</Text>
-                  <Text style={styles.pricingValue}>7 days</Text>
-                </View>
-                <View style={styles.pricingRow}>
-                  <Text style={styles.pricingLabel}>Hours per day:</Text>
-                  <Text style={styles.pricingValue}>
-                    {(() => {
-                      const startTime = weekTimeRange.startTime;
-                      const endTime = weekTimeRange.endTime;
-                      
-                      // Handle time format conversion
-                      const parseTime = (timeStr: string) => {
-                        // If time already has AM/PM, convert to 24-hour format first
-                        if (timeStr.includes('AM') || timeStr.includes('PM')) {
-                          const [time, period] = timeStr.split(' ');
-                          const [hours, minutes] = time.split(':');
-                          let hour24 = parseInt(hours, 10);
-                          
-                          if (period === 'PM' && hour24 !== 12) {
-                            hour24 += 12;
-                          } else if (period === 'AM' && hour24 === 12) {
-                            hour24 = 0;
-                          }
-                          
-                          return `${hour24.toString().padStart(2, '0')}:${minutes}`;
-                        }
-                        return timeStr;
-                      };
-                      
-                      const start24 = parseTime(startTime);
-                      const end24 = parseTime(endTime);
-                      
-                      const start = new Date(`2000-01-01T${start24}:00`);
-                      const end = new Date(`2000-01-01T${end24}:00`);
-                      
-                      // Handle case where end time is next day (e.g., 11 PM to 2 AM)
-                      if (end <= start) {
-                        end.setDate(end.getDate() + 1);
-                      }
-                      
-                      const diffMs = end.getTime() - start.getTime();
-                      const diffHours = Math.round(diffMs / (1000 * 60 * 60) * 10) / 10; // Round to 1 decimal place
-                      
-                      return `${diffHours} hours`;
-                    })()}
-                  </Text>
-                </View>
-                <View style={[styles.pricingRow, styles.totalRow]}>
-                  <Text style={styles.totalLabel}>Total (7 days):</Text>
-                  <Text style={styles.totalValue}>
-                    {(() => {
-                      const startTime = weekTimeRange.startTime;
-                      const endTime = weekTimeRange.endTime;
-                      
-                      // Handle time format conversion
-                      const parseTime = (timeStr: string) => {
-                        // If time already has AM/PM, convert to 24-hour format first
-                        if (timeStr.includes('AM') || timeStr.includes('PM')) {
-                          const [time, period] = timeStr.split(' ');
-                          const [hours, minutes] = time.split(':');
-                          let hour24 = parseInt(hours, 10);
-                          
-                          if (period === 'PM' && hour24 !== 12) {
-                            hour24 += 12;
-                          } else if (period === 'AM' && hour24 === 12) {
-                            hour24 = 0;
-                          }
-                          
-                          return `${hour24.toString().padStart(2, '0')}:${minutes}`;
-                        }
-                        return timeStr;
-                      };
-                      
-                      const start24 = parseTime(startTime);
-                      const end24 = parseTime(endTime);
-                      
-                      const start = new Date(`2000-01-01T${start24}:00`);
-                      const end = new Date(`2000-01-01T${end24}:00`);
-                      
-                      // Handle case where end time is next day (e.g., 11 PM to 2 AM)
-                      if (end <= start) {
-                        end.setDate(end.getDate() + 1);
-                      }
-                      
-                      const diffMs = end.getTime() - start.getTime();
-                      const diffHours = diffMs / (1000 * 60 * 60);
-                      const totalCost = parseFloat(sitterRate || '25') * diffHours * 7;
-                      
-                      return `₱${Math.round(totalCost)}`;
-                    })()}
-                  </Text>
-                </View>
-                <View style={styles.discountRow}>
-                  <Text style={styles.discountText}>💡 Week booking includes 10% discount!</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Action Buttons */}
-              <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setShowWeekBooking(false);
-                  setWeekStartDate(null);
-                  setWeekEndDate(null);
-                  setWeekTimeRange(null);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.confirmButton,
-                  (!weekStartDate || !weekTimeRange) && styles.confirmButtonDisabled
-                ]}
-                onPress={handleWeekBooking}
-                disabled={!weekStartDate || !weekTimeRange}
-              >
-                <Text style={styles.confirmButtonText}>Book Week</Text>
-              </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 };
@@ -2050,6 +1412,31 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
   },
+  sitterOfflineMessage: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 20,
+    margin: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  sitterOfflineText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  sitterOfflineSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });
 
 export default BookingScreen;
+

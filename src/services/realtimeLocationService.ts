@@ -35,7 +35,9 @@ class RealtimeLocationService {
   private sitters: Map<string, RealtimeSitter> = new Map();
   private listeners: Set<(sitters: RealtimeSitter[]) => void> = new Set();
   private lastApiCallTime: number = 0;
-  private apiCallDebounceMs: number = 3000; // 3 second debounce for API calls
+  private apiCallDebounceMs: number = 1000; // 1 second debounce for API calls
+  private cacheTimestamp: number = 0;
+  private cacheValidityMs: number = 15000; // Cache valid for 15 seconds
 
   constructor() {
     // Real-time sitters will be loaded from API
@@ -180,8 +182,14 @@ class RealtimeLocationService {
       this.sitters.clear();
     }
     
-    // Debounce API calls to prevent infinite loops (unless force refresh is requested)
+    // Check if cache is still valid (unless force refresh is requested)
     const now = Date.now();
+    if (!forceRefresh && this.cacheTimestamp > 0 && (now - this.cacheTimestamp) < this.cacheValidityMs) {
+      console.log('🚫 Using cached data (cache still valid)');
+      return Array.from(this.sitters.values());
+    }
+    
+    // Debounce API calls to prevent infinite loops (unless force refresh is requested)
     if (!forceRefresh && now - this.lastApiCallTime < this.apiCallDebounceMs) {
       console.log('🚫 Skipping API call due to debounce, using cached data');
       return Array.from(this.sitters.values());
@@ -225,6 +233,8 @@ class RealtimeLocationService {
             selectedPetTypes: sitter.selected_pet_types,
             selectedBreeds: sitter.selectedBreeds,
             petBreeds: sitter.pet_breeds,
+            isOnline: sitter.isOnline,
+            lastSeen: sitter.lastSeen,
             allKeys: Object.keys(sitter)
           });
           console.log(`👤 Raw sitter data from API:`, JSON.stringify(sitter, null, 2));
@@ -246,10 +256,24 @@ class RealtimeLocationService {
           return mappedSitter;
         });
         
-        // Deduplicate sitters by ID before updating cache
-        const uniqueSitters = apiSitters.filter((sitter, index, self) => 
+        // Filter out offline sitters and deduplicate
+        const onlineSitters = apiSitters.filter(sitter => {
+          // Only show sitters who are online and have recent activity (within last 5 minutes)
+          const lastSeen = new Date(sitter.lastSeen);
+          const now = new Date();
+          const timeDiff = now.getTime() - lastSeen.getTime();
+          const isRecent = timeDiff < 5 * 60 * 1000; // 5 minutes in milliseconds
+          
+          console.log(`👤 Sitter ${sitter.name} (${sitter.id}): isOnline=${sitter.isOnline}, lastSeen=${sitter.lastSeen}, isRecent=${isRecent}, timeDiff=${timeDiff}ms`);
+          
+          return sitter.isOnline && isRecent;
+        });
+        
+        const uniqueSitters = onlineSitters.filter((sitter, index, self) => 
           index === self.findIndex(s => s.id === sitter.id)
         );
+        
+        console.log(`👥 Filtered sitters: ${apiSitters.length} total, ${onlineSitters.length} online, ${uniqueSitters.length} unique online`);
         
         console.log(`👥 Deduplicated sitters: ${apiSitters.length} -> ${uniqueSitters.length}`);
         
@@ -259,6 +283,7 @@ class RealtimeLocationService {
         });
         
         this.notifyListeners();
+        this.cacheTimestamp = now; // Update cache timestamp
         return uniqueSitters;
       } else {
         console.error('❌ Failed to get nearby sitters:', data.message);
@@ -329,6 +354,43 @@ class RealtimeLocationService {
 
   private deg2rad(deg: number): number {
     return deg * (Math.PI / 180);
+  }
+
+  // Get current user's availability status
+  async getCurrentUserAvailabilityStatus(): Promise<boolean> {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user || user.role !== 'pet_sitter') {
+        return false;
+      }
+
+      // Check if the current user is in our sitters cache
+      const currentSitter = this.sitters.get(user.id);
+      if (currentSitter) {
+        return currentSitter.isOnline;
+      }
+
+      // If not in cache, try to get from backend
+      const token = await this.getAuthToken();
+      if (!token) {
+        return false;
+      }
+
+      const response = await makeApiCall('/api/location/status', {
+        method: 'GET',
+        headers: getAuthHeaders(token),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.is_online || false;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error getting current user availability status:', error);
+      return false;
+    }
   }
 
   // Set sitter as online/offline via backend API
@@ -453,8 +515,17 @@ class RealtimeLocationService {
   // Clear all sitters
   clearAllSitters() {
     this.sitters.clear();
+    this.cacheTimestamp = 0; // Reset cache timestamp
+    this.lastApiCallTime = 0; // Reset API call time to allow immediate refresh
     this.notifyListeners();
-    console.log('🧹 Cleared all sitters');
+    console.log('🧹 Cleared all sitters, cache timestamp, and API call time');
+  }
+
+  // Force clear everything and refresh
+  async forceClearAndRefresh(latitude: number, longitude: number, radiusKm: number = 50) {
+    console.log('🔄 Force clearing everything and refreshing...');
+    this.clearAllSitters();
+    return await this.getSittersNearby(latitude, longitude, radiusKm, true);
   }
 }
 

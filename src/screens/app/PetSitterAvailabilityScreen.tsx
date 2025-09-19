@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+    Alert,
     Platform,
     SafeAreaView,
     ScrollView,
@@ -18,6 +19,7 @@ import Modal from 'react-native-modal';
 import { getAuthHeaders } from '../../constants/config';
 import authService from '../../services/authService';
 import { makeApiCall } from '../../services/networkService';
+import realtimeLocationService from '../../services/realtimeLocationService';
 
 interface TimeRange {
   id: string;
@@ -60,22 +62,33 @@ const PetSitterAvailabilityScreen = () => {
     return markedDates[date]?.selectedColor === '#8B5CF6';
   };
   
-  // Week availability popup state
-  const [showWeekPopup, setShowWeekPopup] = useState(false);
-  const [weekStartDate, setWeekStartDate] = useState(new Date());
-  const [weekEndDate, setWeekEndDate] = useState(new Date());
-  const [weekStartTime, setWeekStartTime] = useState(new Date());
-  const [weekEndTime, setWeekEndTime] = useState(new Date());
-  const [showWeekStartDatePicker, setShowWeekStartDatePicker] = useState(false);
-  const [showWeekEndDatePicker, setShowWeekEndDatePicker] = useState(false);
-  const [showWeekStartTimePicker, setShowWeekStartTimePicker] = useState(false);
-  const [showWeekEndTimePicker, setShowWeekEndTimePicker] = useState(false);
-  
-  // Weekly availability state
+  // Weekly availability state (for repeat weekly feature only)
   const [weeklyAvailabilities, setWeeklyAvailabilities] = useState<{[key: string]: any}>({});
+  
+  // Availability status state
+  const [isAvailabilityEnabled, setIsAvailabilityEnabled] = useState<boolean>(true);
+
+  // Check availability status
+  const checkAvailabilityStatus = async () => {
+    try {
+      const isAvailable = await realtimeLocationService.getCurrentUserAvailabilityStatus();
+      const wasEnabled = isAvailabilityEnabled;
+      setIsAvailabilityEnabled(isAvailable);
+      console.log('📊 Availability status checked:', isAvailable ? 'ON' : 'OFF');
+      
+      // If availability was just turned on, refresh availability data
+      if (isAvailable && !wasEnabled) {
+        console.log('🔄 Availability turned ON - refreshing availability data...');
+        await loadAvailabilityData();
+      }
+    } catch (error) {
+      console.error('❌ Error checking availability status:', error);
+      setIsAvailabilityEnabled(false);
+    }
+  };
 
   // Save availability data to AsyncStorage and backend
-  const saveAvailabilityData = async (data: { [date: string]: TimeRange[] }) => {
+  const saveAvailabilityData = async (data: { [date: string]: TimeRange[] }, forceSave: boolean = false) => {
     try {
       const user = await authService.getCurrentUser();
       if (!user || user.role !== 'pet_sitter') {
@@ -87,15 +100,15 @@ const PetSitterAvailabilityScreen = () => {
       await AsyncStorage.setItem(`petSitterAvailabilities_${user.id}`, JSON.stringify(data));
       console.log('✅ Availability data saved to local storage for user:', user.id);
 
-      // Save to backend
-      await saveAvailabilityToBackend(data);
+      // Save to backend (allow empty data if forceSave is true)
+      await saveAvailabilityToBackend(data, forceSave);
     } catch (error) {
       console.error('❌ Error saving availability data:', error);
     }
   };
 
   // Save weekly availability data
-  const saveWeeklyAvailabilityData = async (weeklyData: any) => {
+  const saveWeeklyAvailabilityData = async (weeklyData: any, forceSave: boolean = false) => {
     try {
       const user = await authService.getCurrentUser();
       if (!user || user.role !== 'pet_sitter') {
@@ -107,15 +120,15 @@ const PetSitterAvailabilityScreen = () => {
       await AsyncStorage.setItem(`petSitterWeeklyAvailabilities_${user.id}`, JSON.stringify(weeklyData));
       console.log('✅ Weekly availability data saved to local storage for user:', user.id);
 
-      // Save to backend
-      await saveWeeklyAvailabilityToBackend(weeklyData);
+      // Save to backend (allow empty data if forceSave is true)
+      await saveWeeklyAvailabilityToBackend(weeklyData, forceSave);
     } catch (error) {
       console.error('❌ Error saving weekly availability data:', error);
     }
   };
 
   // Save availability to backend
-  const saveAvailabilityToBackend = async (data: { [date: string]: TimeRange[] }) => {
+  const saveAvailabilityToBackend = async (data: { [date: string]: TimeRange[] }, forceSave: boolean = false) => {
     try {
       const user = await authService.getCurrentUser();
       if (!user || user.role !== 'pet_sitter') {
@@ -134,8 +147,13 @@ const PetSitterAvailabilityScreen = () => {
 
       // Check if we have any availability data
       if (availabilities.length === 0) {
-        console.log('⚠️ No availability data to save');
-        return;
+        if (forceSave) {
+          console.log('🧹 Clearing daily availability data - skipping backend call since no data to save');
+          return;
+        } else {
+          console.log('⚠️ No availability data to save');
+          return;
+        }
       }
 
       // Validate that each availability has the required fields
@@ -184,6 +202,10 @@ const PetSitterAvailabilityScreen = () => {
       if (response.ok) {
         const responseData = await response.json();
         console.log('✅ Availability data saved to backend successfully:', responseData);
+        
+        // Also save to local storage for persistence when sitter goes offline/online
+        await AsyncStorage.setItem(`petSitterAvailabilities_${user.id}`, JSON.stringify(data));
+        console.log('✅ Availability data also saved to local storage for persistence');
       } else {
         console.error('❌ Failed to save availability to backend:', response.status);
         const errorText = await response.text();
@@ -203,7 +225,7 @@ const PetSitterAvailabilityScreen = () => {
   };
 
   // Save weekly availability to backend
-  const saveWeeklyAvailabilityToBackend = async (weeklyData: any) => {
+  const saveWeeklyAvailabilityToBackend = async (weeklyData: any, forceSave: boolean = false) => {
     try {
       const user = await authService.getCurrentUser();
       if (!user || user.role !== 'pet_sitter') {
@@ -225,8 +247,13 @@ const PetSitterAvailabilityScreen = () => {
       console.log('🔄 Weekly availability data:', availabilities);
 
       if (availabilities.length === 0) {
-        console.log('⚠️ No weekly availability data to save');
-        return;
+        if (forceSave) {
+          console.log('🧹 Clearing weekly availability data - skipping backend call since feature is removed');
+          return;
+        } else {
+          console.log('⚠️ No weekly availability data to save');
+          return;
+        }
       }
 
       const token = user.token;
@@ -270,7 +297,7 @@ const PetSitterAvailabilityScreen = () => {
     }
   };
 
-  // Generate marked dates combining daily and weekly availability
+  // Generate marked dates for daily availability
   const generateMarkedDates = () => {
     const markedDatesData: any = {};
     
@@ -288,58 +315,6 @@ const PetSitterAvailabilityScreen = () => {
             selectedDotColor: '#10B981'
           }]
         };
-      }
-    });
-    
-    // Add weekly availability ranges with straight line design
-    Object.values(weeklyAvailabilities).forEach((weekData: any) => {
-      const startDate = new Date(weekData.startDate);
-      const endDate = new Date(weekData.endDate);
-      
-      console.log('🔄 Processing weekly availability:', {
-        startDate: weekData.startDate,
-        endDate: weekData.endDate,
-        startDateObj: startDate,
-        endDateObj: endDate
-      });
-      
-      // Generate all dates in the range
-      const currentDate = new Date(startDate);
-      while (currentDate <= endDate) {
-        const dateString = currentDate.toISOString().split('T')[0];
-        
-        // Determine if this is the start, middle, or end of the week
-        const isStart = currentDate.getTime() === startDate.getTime();
-        const isEnd = currentDate.getTime() === endDate.getTime();
-        
-        console.log('📅 Processing date:', {
-          dateString,
-          isStart,
-          isEnd,
-          currentDate: currentDate.toISOString()
-        });
-        
-        // Create dots array for weekly availability
-        const weeklyDots = [{
-          key: 'weekly',
-          color: '#8B5CF6',
-          selectedDotColor: '#8B5CF6'
-        }];
-        
-        // If this date also has daily availability, add both dots
-        if (markedDatesData[dateString] && markedDatesData[dateString].dots) {
-          markedDatesData[dateString].dots.push(weeklyDots[0]);
-        } else {
-          markedDatesData[dateString] = {
-            selected: true,
-            marked: true,
-            selectedColor: '#8B5CF6',
-            selectedTextColor: '#fff',
-            dots: weeklyDots
-          };
-        }
-        
-        currentDate.setDate(currentDate.getDate() + 1);
       }
     });
     
@@ -418,104 +393,7 @@ const PetSitterAvailabilityScreen = () => {
     }
   };
 
-  // Load weekly availability data from backend and local storage
-  const loadWeeklyAvailabilityData = async () => {
-    try {
-      const user = await authService.getCurrentUser();
-      if (!user || user.role !== 'pet_sitter') {
-        console.log('⚠️ User is not a pet sitter, skipping weekly availability load');
-        return;
-      }
 
-      console.log('🔄 Starting weekly availability load for user:', user.id);
-
-      // First try to load from local storage as immediate fallback
-      const savedData = await AsyncStorage.getItem(`petSitterWeeklyAvailabilities_${user.id}`);
-      if (savedData) {
-        const parsedData = JSON.parse(savedData);
-        setWeeklyAvailabilities(parsedData);
-        console.log('✅ Local weekly availability data loaded immediately:', parsedData);
-      }
-      
-      // Then try to load from backend and update if successful
-      await loadWeeklyAvailabilityFromBackend(user.id);
-      
-    } catch (error) {
-      console.error('❌ Error loading weekly availability data:', error);
-    }
-  };
-
-  // Load weekly availability data from backend
-  const loadWeeklyAvailabilityFromBackend = async (userId: string) => {
-    try {
-      const user = await authService.getCurrentUser();
-      if (!user || !user.token) {
-        console.log('⚠️ No user or token available for weekly backend load');
-        return;
-      }
-
-      console.log('🔄 Loading weekly availability from backend for user:', userId);
-      console.log('🔄 Using token:', user.token ? 'Present' : 'Missing');
-      
-      const response = await makeApiCall(
-        `/api/sitters/${userId}/weekly-availability`,
-        {
-          method: 'GET',
-          headers: {
-            ...getAuthHeaders(user.token),
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      console.log('🔄 Weekly availability response status:', response.status);
-      console.log('🔄 Weekly availability response ok:', response.ok);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Backend weekly availability data loaded:', data);
-        console.log('✅ Weekly availability data type:', typeof data);
-        console.log('✅ Weekly availability data keys:', Object.keys(data));
-        
-        if (data.availabilities && data.availabilities.length > 0) {
-          console.log('✅ Found weekly availabilities:', data.availabilities.length);
-          
-          // Convert backend format to local format
-          const weeklyData: { [key: string]: any } = {};
-          data.availabilities.forEach((availability: any, index: number) => {
-            console.log(`📅 Processing weekly availability ${index}:`, availability);
-            
-            // Handle different backend data formats
-            const weekId = availability.weekId || availability.id || `week_${availability.startDate}_${availability.endDate}`;
-            
-            weeklyData[weekId] = {
-              id: weekId,
-              startDate: availability.startDate,
-              endDate: availability.endDate,
-              startTime: availability.startTime,
-              endTime: availability.endTime,
-              isWeekly: availability.isWeekly !== undefined ? availability.isWeekly : true,
-              createdAt: availability.createdAt || new Date().toISOString()
-            };
-          });
-          
-          console.log('✅ Converted weekly data:', weeklyData);
-          setWeeklyAvailabilities(weeklyData);
-          
-          // Save to local storage for offline access
-          await AsyncStorage.setItem(`petSitterWeeklyAvailabilities_${userId}`, JSON.stringify(weeklyData));
-          console.log('✅ Weekly availability data synced to local storage');
-        } else {
-          console.log('⚠️ No weekly availabilities found in response');
-        }
-      } else {
-        const errorText = await response.text();
-        console.log('⚠️ Weekly availability API error:', response.status, errorText);
-      }
-    } catch (error) {
-      console.error('❌ Error loading weekly availability from backend:', error);
-    }
-  };
 
   // Clear availability data for new sitters and implement auto-cleanup
   const clearAvailabilityDataForNewSitter = async () => {
@@ -547,6 +425,13 @@ const PetSitterAvailabilityScreen = () => {
       } else {
         // For existing sitters, clean up expired availability data
         await cleanupExpiredAvailabilityData(user.id);
+        
+        // Clear all existing weekly schedules (since we removed the weekly feature)
+        console.log('🧹 Clearing all existing weekly schedules for existing sitter');
+        setWeeklyAvailabilities({});
+        await AsyncStorage.removeItem(`petSitterWeeklyAvailabilities_${user.id}`);
+        await saveWeeklyAvailabilityData({}, true); // Clear from backend
+        console.log('✅ All weekly schedules cleared for existing sitter');
       }
     } catch (error) {
       console.error('❌ Error clearing availability data for new sitter:', error);
@@ -608,15 +493,23 @@ const PetSitterAvailabilityScreen = () => {
   useEffect(() => {
     clearAvailabilityDataForNewSitter();
     loadAvailabilityData();
-    loadWeeklyAvailabilityData();
+    checkAvailabilityStatus();
   }, []);
+
+  // Refresh data when screen comes into focus (to get latest data after changes)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 PetSitterAvailabilityScreen focused, refreshing data');
+      loadAvailabilityData();
+      checkAvailabilityStatus();
+    }, [])
+  );
 
   // Refresh data when screen comes into focus
   useEffect(() => {
     const handleFocus = () => {
       console.log('🔄 Screen focused, refreshing availability data...');
       loadAvailabilityData();
-      loadWeeklyAvailabilityData();
     };
 
     // Call immediately and set up interval for periodic refresh
@@ -628,15 +521,14 @@ const PetSitterAvailabilityScreen = () => {
     };
   }, []);
 
-  // Update marked dates when availabilities or weekly availabilities change
+  // Update marked dates when availabilities change
   useEffect(() => {
     console.log('🔄 Updating marked dates...');
     console.log('📅 Current availabilities:', availabilities);
-    console.log('📅 Current weekly availabilities:', weeklyAvailabilities);
     
     const newMarkedDates = generateMarkedDates();
     setMarkedDates(newMarkedDates);
-  }, [availabilities, weeklyAvailabilities]);
+  }, [availabilities]);
 
   const handleDayPress = (day: any) => {
     setSelectedDate(day.dateString);
@@ -780,44 +672,71 @@ const PetSitterAvailabilityScreen = () => {
     setEditingDate(null);
   };
 
-  const handleDeleteAvailability = (date: string) => {
-    const isRecurring = isRecurringAvailability(date);
-    
-    if (isRecurring) {
-      // For recurring availability, show a confirmation dialog
-      // For now, we'll just delete this instance
-      console.log('🗑️ Deleting recurring availability instance for:', date);
+  const handleDeleteAvailability = async (date: string) => {
+    try {
+      console.log('🗑️ Deleting availability for date:', date);
+      console.log('🗑️ Current availabilities before deletion:', Object.keys(availabilities));
+      console.log('🗑️ Current markedDates before deletion:', Object.keys(markedDates));
+      
+      // Show confirmation dialog
+      Alert.alert(
+        'Delete Availability',
+        `Are you sure you want to delete the availability for ${new Date(date).toLocaleDateString()}?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const isRecurring = isRecurringAvailability(date);
+                
+                if (isRecurring) {
+                  // For recurring availability, show a confirmation dialog
+                  // For now, we'll just delete this instance
+                  console.log('🗑️ Deleting recurring availability instance for:', date);
+                }
+                
+                const newAvailabilities = { ...availabilities };
+                delete newAvailabilities[date];
+                
+                // Update local state immediately for better UX
+                setAvailabilities(newAvailabilities);
+                
+                const newMarkedDates = { ...markedDates };
+                delete newMarkedDates[date];
+                setMarkedDates(newMarkedDates);
+                
+                console.log('🗑️ New availabilities after deletion:', Object.keys(newAvailabilities));
+                console.log('🗑️ New markedDates after deletion:', Object.keys(newMarkedDates));
+                
+                // Save to backend and local storage
+                await saveAvailabilityData(newAvailabilities);
+                
+                console.log('✅ Availability deleted successfully for:', date);
+              } catch (error) {
+                console.error('❌ Error deleting availability:', error);
+                console.error('❌ Error details:', error);
+                // Revert local state if backend save failed
+                setAvailabilities(availabilities);
+                setMarkedDates(markedDates);
+                Alert.alert('Error', 'Failed to delete availability. Please try again.');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('❌ Error in handleDeleteAvailability:', error);
     }
-    
-    const newAvailabilities = { ...availabilities };
-    delete newAvailabilities[date];
-    setAvailabilities(newAvailabilities);
-    saveAvailabilityData(newAvailabilities);
-    
-    const newMarkedDates = { ...markedDates };
-    delete newMarkedDates[date];
-    setMarkedDates(newMarkedDates);
-    
-    console.log('✅ Availability deleted for:', date);
   };
 
-  const handleEditWeeklyAvailability = (weekId: string) => {
-    const weekData = weeklyAvailabilities[weekId];
-    if (weekData) {
-      setWeekStartDate(new Date(weekData.startDate));
-      setWeekEndDate(new Date(weekData.endDate));
-      setWeekStartTime(new Date(`2000-01-01T${weekData.startTime}`));
-      setWeekEndTime(new Date(`2000-01-01T${weekData.endTime}`));
-      setShowWeekPopup(true);
-    }
-  };
 
-  const handleDeleteWeeklyAvailability = (weekId: string) => {
-    const newWeeklyAvailabilities = { ...weeklyAvailabilities };
-    delete newWeeklyAvailabilities[weekId];
-    setWeeklyAvailabilities(newWeeklyAvailabilities);
-    saveWeeklyAvailabilityData(newWeeklyAvailabilities);
-  };
+
+
 
   const handleAddCustomTimeRange = () => {
     setCustomTimeError('');
@@ -863,13 +782,50 @@ const PetSitterAvailabilityScreen = () => {
       [targetDate]: [newRange]
     };
     setAvailabilities(newAvailabilities);
-    saveAvailabilityData(newAvailabilities);
     
     // Mark the date as selected with green color
     setMarkedDates({
       ...markedDates,
       [targetDate]: { selected: true, marked: true, selectedColor: '#10B981' }
     });
+
+    // Handle repeat weekly logic for custom times
+    if (repeatWeekly) {
+      console.log('🔄 Setting up weekly recurring availability for custom time:', targetDate);
+      const baseDate = new Date(targetDate);
+      const timeRanges = [newRange]; // Use the custom time range
+      
+      // Generate recurring availability for the next 12 weeks
+      const recurringAvailabilities = { ...newAvailabilities };
+      const recurringMarkedDates = { ...markedDates };
+      
+      for (let week = 1; week <= 12; week++) {
+        const recurringDate = new Date(baseDate);
+        recurringDate.setDate(baseDate.getDate() + (week * 7));
+        const dateString = recurringDate.toISOString().split('T')[0];
+        
+        // Add the same custom time range for this recurring date
+        recurringAvailabilities[dateString] = [...timeRanges];
+        
+        // Mark the date on the calendar with purple color for recurring
+        recurringMarkedDates[dateString] = { 
+          selected: true, 
+          marked: true, 
+          selectedColor: '#8B5CF6' // Purple color for recurring availability
+        };
+      }
+      
+      setAvailabilities(recurringAvailabilities);
+      setMarkedDates(recurringMarkedDates);
+      
+      // Save the updated availability data with recurring times
+      saveAvailabilityData(recurringAvailabilities);
+      
+      console.log('✅ Weekly recurring availability set for custom time for 12 weeks');
+    } else {
+      // Save normally if not repeating weekly
+      saveAvailabilityData(newAvailabilities);
+    }
     
     setCustomStartTime('');
     setCustomEndTime('');
@@ -888,6 +844,8 @@ const PetSitterAvailabilityScreen = () => {
     setTempStartTime(new Date());
     setTempEndTime(new Date());
     setOpenedFromEdit(false);
+    // Reset repeat weekly state for custom time modal
+    setRepeatWeekly(false);
     // Close both main and edit modals first
     setShowModal(false);
     setShowEditModal(false);
@@ -907,6 +865,8 @@ const PetSitterAvailabilityScreen = () => {
     setTempStartTime(new Date());
     setTempEndTime(new Date());
     setOpenedFromEdit(true);
+    // Reset repeat weekly state for custom time modal
+    setRepeatWeekly(false);
     // Close edit modal and open custom time modal
     setShowEditModal(false);
     setTimeout(() => {
@@ -1062,7 +1022,6 @@ const PetSitterAvailabilityScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Set Availability</Text>
-        <View style={styles.headerSpacer} />
       </View>
       <ScrollView style={styles.content}>
         <View style={{ margin: 16, borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff', elevation: 2 }}>
@@ -1092,45 +1051,29 @@ const PetSitterAvailabilityScreen = () => {
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
-              <Text style={styles.legendText}>Weekly Availability</Text>
+              <Text style={styles.legendText}>Repeat Weekly</Text>
             </View>
           </View>
         </View>
 
-        {/* Set for a Week Button */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#8B5CF6',
-            borderRadius: 20,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            margin: 16,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            elevation: 3,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
-          }}
-          onPress={() => {
-            console.log('Set for a Week button pressed');
-            setShowWeekPopup(true);
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="calendar" size={20} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Set for a Week</Text>
-        </TouchableOpacity>
 
         {/* Show selected availabilities */}
         <View style={styles.availabilitiesSection}>
-          {Object.keys(availabilities).length > 0 && (
+          {Object.keys(availabilities).length > 0 && isAvailabilityEnabled && (
             <Text style={styles.availabilitiesTitle}>Single Day Availabilities</Text>
           )}
-          {Object.entries(availabilities).map(([date, timeRanges], index) => {
+          {!isAvailabilityEnabled && Object.keys(availabilities).length > 0 && (
+            <View style={styles.availabilityDisabledMessage}>
+              <Ionicons name="eye-off" size={24} color="#6B7280" />
+              <Text style={styles.availabilityDisabledText}>
+                Schedules are hidden because availability is turned OFF
+              </Text>
+              <Text style={styles.availabilityDisabledSubtext}>
+                Turn ON availability in the dashboard to view your schedules
+              </Text>
+            </View>
+          )}
+          {isAvailabilityEnabled && Object.entries(availabilities).map(([date, timeRanges], index) => {
             // Check if this is a recurring availability
             const isRecurring = isRecurringAvailability(date);
             
@@ -1200,52 +1143,6 @@ const PetSitterAvailabilityScreen = () => {
           })}
         </View>
 
-        {/* Show weekly availabilities */}
-        <View style={styles.availabilitiesSection}>
-          {Object.keys(weeklyAvailabilities).length > 0 && (
-            <Text style={styles.availabilitiesTitle}>Weekly Availabilities</Text>
-          )}
-          {Object.entries(weeklyAvailabilities).map(([weekId, weekData], index) => (
-            <View key={weekId} style={[styles.weeklyAvailabilityCard, { backgroundColor: '#8B5CF6' }]}>
-              <View style={styles.weeklyCardHeader}>
-                <View style={styles.weeklyDateContainer}>
-                  <Ionicons name="calendar" size={20} color="#fff" />
-                  <View style={styles.weeklyDateTextContainer}>
-                    <Text style={styles.weeklyDateText}>
-                      {new Date(weekData.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(weekData.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </Text>
-                    <Text style={styles.weeklyTimeText}>{weekData.startTime} - {weekData.endTime}</Text>
-                  </View>
-                </View>
-                <View style={styles.weeklyBadge}>
-                  <Text style={styles.weeklyBadgeText}>WEEKLY</Text>
-                </View>
-              </View>
-              <View style={styles.weeklyCardFooter}>
-                <View style={styles.weeklyStats}>
-                  <Ionicons name="time" size={16} color="#fff" />
-                  <Text style={styles.weeklyStatsText}>Available all week</Text>
-                </View>
-                <View style={styles.cardActions}>
-                  <TouchableOpacity 
-                    style={[styles.editButton, { backgroundColor: 'rgba(255, 255, 255, 0.9)' }]}
-                    onPress={() => handleEditWeeklyAvailability(weekId)}
-                  >
-                    <Ionicons name="pencil" size={16} color="#8B5CF6" />
-                    <Text style={[styles.editButtonText, { color: '#8B5CF6' }]}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.deleteButton, { backgroundColor: 'rgba(255, 255, 255, 0.9)' }]}
-                    onPress={() => handleDeleteWeeklyAvailability(weekId)}
-                  >
-                    <Ionicons name="trash" size={16} color="#EF4444" />
-                    <Text style={[styles.deleteButtonText, { color: '#EF4444' }]}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
       </ScrollView>
       {/* Modal for time picker */}
       <Modal isVisible={showModal} onBackdropPress={() => setShowModal(false)}>
@@ -1560,6 +1457,50 @@ const PetSitterAvailabilityScreen = () => {
               ) : null}
             </View>
 
+            {/* Repeat Weekly Checkbox for Custom Times */}
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginBottom: 16,
+              width: '100%'
+            }}>
+              <TouchableOpacity
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: repeatWeekly ? '#8B5CF6' : '#D1D5DB',
+                  backgroundColor: repeatWeekly ? '#8B5CF6' : 'transparent',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12,
+                }}
+                onPress={() => setRepeatWeekly(!repeatWeekly)}
+              >
+                {repeatWeekly && (
+                  <Ionicons name="checkmark" size={16} color="#fff" />
+                )}
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={{ 
+                  fontSize: 16, 
+                  fontWeight: '600', 
+                  color: '#374151',
+                  marginBottom: 2
+                }}>
+                  Repeat Weekly
+                </Text>
+                <Text style={{ 
+                  fontSize: 12, 
+                  color: '#6B7280',
+                  lineHeight: 16
+                }}>
+                  This custom time will repeat every {(editingDate || selectedDate) ? new Date(editingDate || selectedDate || '').toLocaleDateString('en-US', { weekday: 'long' }) : 'week'} at the same time
+                </Text>
+              </View>
+            </View>
+
             <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
               <TouchableOpacity
                 style={{ 
@@ -1597,177 +1538,6 @@ const PetSitterAvailabilityScreen = () => {
         </View>
       )}
 
-      {/* Week Availability Popup */}
-      {showWeekPopup && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-        }}>
-          <View style={{ 
-            backgroundColor: '#fff', 
-            borderRadius: 16, 
-            padding: 24, 
-            alignItems: 'center',
-            width: '90%',
-            maxWidth: 400,
-          }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 16 }}>Set Availability for a Week</Text>
-            
-            {/* Start Date */}
-            <View style={{ width: '100%', marginBottom: 16 }}>
-              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>Start Date</Text>
-              <TouchableOpacity
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#E0E0E0',
-                  borderRadius: 8,
-                  padding: 12,
-                  backgroundColor: '#F8F9FA',
-                }}
-                onPress={() => setShowWeekStartDatePicker(true)}
-              >
-                <Text style={{ fontSize: 16, color: '#333' }}>
-                  {weekStartDate.toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* End Date */}
-            <View style={{ width: '100%', marginBottom: 16 }}>
-              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>End Date</Text>
-              <TouchableOpacity
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#E0E0E0',
-                  borderRadius: 8,
-                  padding: 12,
-                  backgroundColor: '#F8F9FA',
-                }}
-                onPress={() => setShowWeekEndDatePicker(true)}
-              >
-                <Text style={{ fontSize: 16, color: '#333' }}>
-                  {weekEndDate.toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Start Time */}
-            <View style={{ width: '100%', marginBottom: 16 }}>
-              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>Start Time</Text>
-              <TouchableOpacity
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#E0E0E0',
-                  borderRadius: 8,
-                  padding: 12,
-                  backgroundColor: '#F8F9FA',
-                }}
-                onPress={() => setShowWeekStartTimePicker(true)}
-              >
-                <Text style={{ fontSize: 16, color: '#333' }}>
-                  {weekStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* End Time */}
-            <View style={{ width: '100%', marginBottom: 20 }}>
-              <Text style={{ fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' }}>End Time</Text>
-              <TouchableOpacity
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#E0E0E0',
-                  borderRadius: 8,
-                  padding: 12,
-                  backgroundColor: '#F8F9FA',
-                }}
-                onPress={() => setShowWeekEndTimePicker(true)}
-              >
-                <Text style={{ fontSize: 16, color: '#333' }}>
-                  {weekEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Buttons */}
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              <TouchableOpacity
-                style={{ 
-                  backgroundColor: '#EF4444', 
-                  borderRadius: 8, 
-                  padding: 12, 
-                  flex: 1, 
-                  alignItems: 'center' 
-                }}
-                onPress={() => {
-                  setShowWeekPopup(false);
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ 
-                  backgroundColor: '#10B981', 
-                  borderRadius: 8, 
-                  padding: 12, 
-                  flex: 1, 
-                  alignItems: 'center' 
-                }}
-                onPress={() => {
-                  // Validate that end time is after start time
-                  const startTimeStr = weekStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  const endTimeStr = weekEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  
-                  // Convert to 24-hour format for comparison
-                  const startTime24 = weekStartTime.getHours() * 60 + weekStartTime.getMinutes();
-                  const endTime24 = weekEndTime.getHours() * 60 + weekEndTime.getMinutes();
-                  
-                  if (endTime24 <= startTime24) {
-                    alert('End time must be after start time. Please adjust your times.');
-                    return;
-                  }
-                  
-                  // Save week availability as a single weekly card
-                  const startDate = new Date(weekStartDate);
-                  const endDate = new Date(weekEndDate);
-                  
-                  // Create a unique week ID
-                  const weekId = `week_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`;
-                  
-                  // Create weekly availability data
-                  const weeklyData = {
-                    ...weeklyAvailabilities,
-                    [weekId]: {
-                      id: weekId,
-                      startDate: startDate.toISOString().split('T')[0],
-                      endDate: endDate.toISOString().split('T')[0],
-                      startTime: startTimeStr,
-                      endTime: endTimeStr,
-                      isWeekly: true,
-                      createdAt: new Date().toISOString()
-                    }
-                  };
-
-                  setWeeklyAvailabilities(weeklyData);
-                  saveWeeklyAvailabilityData(weeklyData);
-                  
-                  setShowWeekPopup(false);
-                  console.log('Weekly availability saved:', weeklyData);
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
 
       {/* Time Pickers - Positioned on top of everything */}
       {showStartTimePicker && (
@@ -1816,142 +1586,7 @@ const PetSitterAvailabilityScreen = () => {
         </View>
       )}
 
-      {/* Week Date and Time Pickers */}
-      {showWeekStartDatePicker && (
-        <View style={styles.timePickerOverlay}>
-          <View style={styles.timePickerContainer}>
-            <Text style={styles.timePickerTitle}>Select Start Date</Text>
-            <DateTimePicker
-              value={weekStartDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'compact' : 'default'}
-              onChange={(event, selectedDate) => {
-                console.log('Date picker event:', event.type, selectedDate);
-                if (selectedDate) {
-                  setWeekStartDate(selectedDate);
-                }
-                setShowWeekStartDatePicker(false);
-              }}
-            />
-            <View style={styles.timePickerButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => setShowWeekStartDatePicker(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.timePickerSaveButton} 
-                onPress={() => setShowWeekStartDatePicker(false)}
-              >
-                <Text style={styles.timePickerSaveButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
 
-      {showWeekEndDatePicker && (
-        <View style={styles.timePickerOverlay}>
-          <View style={styles.timePickerContainer}>
-            <Text style={styles.timePickerTitle}>Select End Date</Text>
-            <DateTimePicker
-              value={weekEndDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'compact' : 'default'}
-              onChange={(event, selectedDate) => {
-                console.log('End date picker event:', event.type, selectedDate);
-                if (selectedDate) {
-                  setWeekEndDate(selectedDate);
-                }
-                setShowWeekEndDatePicker(false);
-              }}
-            />
-            <View style={styles.timePickerButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => setShowWeekEndDatePicker(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.timePickerSaveButton} 
-                onPress={() => setShowWeekEndDatePicker(false)}
-              >
-                <Text style={styles.timePickerSaveButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {showWeekStartTimePicker && (
-        <View style={styles.timePickerOverlay}>
-          <View style={styles.timePickerContainer}>
-            <Text style={styles.timePickerTitle}>Select Start Time</Text>
-            <DateTimePicker
-              value={weekStartTime}
-              mode="time"
-              is24Hour={false}
-              display="default"
-              onChange={(event, selectedTime) => {
-                if (selectedTime) {
-                  setWeekStartTime(selectedTime);
-                }
-                setShowWeekStartTimePicker(false);
-              }}
-            />
-            <View style={styles.timePickerButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => setShowWeekStartTimePicker(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.timePickerSaveButton} 
-                onPress={() => setShowWeekStartTimePicker(false)}
-              >
-                <Text style={styles.timePickerSaveButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {showWeekEndTimePicker && (
-        <View style={styles.timePickerOverlay}>
-          <View style={styles.timePickerContainer}>
-            <Text style={styles.timePickerTitle}>Select End Time</Text>
-            <DateTimePicker
-              value={weekEndTime}
-              mode="time"
-              is24Hour={false}
-              display="default"
-              onChange={(event, selectedTime) => {
-                if (selectedTime) {
-                  setWeekEndTime(selectedTime);
-                }
-                setShowWeekEndTimePicker(false);
-              }}
-            />
-            <View style={styles.timePickerButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => setShowWeekEndTimePicker(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.timePickerSaveButton} 
-                onPress={() => setShowWeekEndTimePicker(false)}
-              >
-                <Text style={styles.timePickerSaveButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 };
@@ -2385,6 +2020,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  availabilityDisabledMessage: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 20,
+    margin: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  availabilityDisabledText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  availabilityDisabledSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 

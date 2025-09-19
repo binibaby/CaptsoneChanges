@@ -113,6 +113,11 @@ Route::get('/admin-users', function () {
     ]);
 })->name('admin.users.simple');
 
+// Admin Announcements Page
+Route::get('/admin-announcements', function () {
+    return view('admin.announcements');
+})->name('admin.announcements.simple');
+
 // Admin Verifications Page
 Route::get('/admin-verifications', function () {
     return view('admin.verifications.index', [

@@ -61,9 +61,9 @@ export class NetworkService {
   public async detectWorkingIP(): Promise<string> {
     console.log('🔍 Detecting working IP address...');
 
-    // Try the most likely IPs first (prioritize current network)
+    // Try the most likely IPs first (prioritize mobile data)
     const priorityIPs = [
-      '192.168.100.184',  // Current WiFi IP (most likely)
+      '172.20.10.2',      // Current mobile data IP (most likely)
       'localhost',         // Local development
       '127.0.0.1',        // Local development
     ];
@@ -104,8 +104,8 @@ export class NetworkService {
       }
     }
 
-    // If all fail, use the current IP as default but mark as disconnected
-    this.currentBaseUrl = `http://192.168.100.184:8000`;
+    // If all fail, use the current mobile data IP as default but mark as disconnected
+    this.currentBaseUrl = `http://172.20.10.2:8000`;
     this.isConnected = false;
     console.log(`⚠️ All IPs failed. Using default IP: ${this.currentBaseUrl}`);
     console.log(`⚠️ Please ensure your server is running and accessible`);

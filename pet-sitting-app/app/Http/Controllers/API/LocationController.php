@@ -294,6 +294,9 @@ class LocationController extends Controller
             if ($isOnline) {
                 // If going online, add/update in active sitters list
                 $activeSitters[$user->id] = $locationData;
+                
+                // When sitter comes online, restore their availability data from database/local storage
+                $this->restoreSitterAvailabilityData($user->id);
             } else {
                 // If going offline, remove from active sitters list entirely
                 unset($activeSitters[$user->id]);
@@ -772,6 +775,219 @@ class LocationController extends Controller
                 'success' => false,
                 'message' => 'Failed to save weekly availability: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Get sitter's availability status (online/offline)
+     */
+    public function getSitterAvailabilityStatus($sitterId)
+    {
+        try {
+            // Add CORS headers
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Methods: GET, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+            header('Access-Control-Allow-Credentials: true');
+            
+            // Handle preflight OPTIONS request
+            if (request()->isMethod('OPTIONS')) {
+                return response()->json(['success' => true], 200);
+            }
+
+            // Check if sitter exists
+            $sitter = User::where('id', $sitterId)
+                ->where('role', 'pet_sitter')
+                ->first();
+
+            if (!$sitter) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sitter not found'
+                ], 404);
+            }
+
+            // Check if sitter is online by looking at the cache
+            $cacheKey = "sitter_location_{$sitterId}";
+            $locationData = Cache::get($cacheKey);
+
+            $isOnline = false;
+            if ($locationData) {
+                // Check if the location data is recent (within last 5 minutes)
+                $lastUpdate = $locationData['updated_at'] ?? null;
+                if ($lastUpdate) {
+                    $lastUpdateTime = \Carbon\Carbon::parse($lastUpdate);
+                    $isOnline = $lastUpdateTime->isAfter(now()->subMinutes(5));
+                }
+            }
+
+            Log::info('📊 Sitter availability status checked', [
+                'sitter_id' => $sitterId,
+                'is_online' => $isOnline,
+                'has_location_data' => !is_null($locationData)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'is_online' => $isOnline,
+                'sitter_id' => $sitterId,
+                'checked_at' => now()->toISOString()
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting sitter availability status: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get sitter availability status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restore availability data endpoint (called by frontend)
+     */
+    public function restoreAvailabilityData(Request $request)
+    {
+        // Set CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        $user = $request->user();
+        
+        if (!$user || $user->role !== 'pet_sitter') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pet sitters can restore availability data'
+            ], 403);
+        }
+
+        $request->validate([
+            'availabilities' => 'nullable|array',
+            'availabilities.*.date' => 'required|date',
+            'availabilities.*.timeRanges' => 'required|array',
+            'availabilities.*.timeRanges.*.startTime' => 'required|string',
+            'availabilities.*.timeRanges.*.endTime' => 'required|string',
+        ]);
+
+        try {
+            $availabilities = $request->input('availabilities', []);
+            
+            // Convert array format to key-value format for storage
+            $availabilityData = [];
+            foreach ($availabilities as $availability) {
+                $availabilityData[$availability['date']] = $availability['timeRanges'];
+            }
+
+            // Store in cache
+            $availabilityKey = "sitter_availability_{$user->id}";
+            Cache::put($availabilityKey, $availabilityData, 86400 * 30); // Store for 30 days
+
+            Log::info('📅 Availability data restored for sitter', [
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'availability_count' => count($availabilityData)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Availability data restored successfully',
+                'availabilities' => $availabilities
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error restoring availability data', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to restore availability data'
+            ], 500);
+        }
+    }
+
+    /**
+     * Restore sitter availability data when they come online
+     */
+    private function restoreSitterAvailabilityData($sitterId)
+    {
+        try {
+            Log::info('🔄 Restoring availability data for online sitter', [
+                'sitter_id' => $sitterId
+            ]);
+
+            // Try to restore from weekly availability database first (more persistent)
+            $weeklyAvailabilities = WeeklyAvailability::where('sitter_id', $sitterId)
+                ->orderBy('start_date', 'asc')
+                ->get();
+
+            if ($weeklyAvailabilities->count() > 0) {
+                // Convert weekly availability to daily availability format
+                $availabilityData = [];
+                
+                foreach ($weeklyAvailabilities as $weekly) {
+                    // Generate daily availability for each day in the weekly range
+                    $startDate = \Carbon\Carbon::parse($weekly->start_date);
+                    $endDate = \Carbon\Carbon::parse($weekly->end_date);
+                    
+                    $currentDate = $startDate->copy();
+                    while ($currentDate->lte($endDate)) {
+                        $dateString = $currentDate->format('Y-m-d');
+                        
+                        // Only add future dates (not past dates)
+                        if ($currentDate->isFuture() || $currentDate->isToday()) {
+                            $availabilityData[$dateString] = [
+                                [
+                                    'id' => "weekly-{$weekly->id}-{$dateString}",
+                                    'startTime' => $weekly->start_time->format('g:i A'),
+                                    'endTime' => $weekly->end_time->format('g:i A')
+                                ]
+                            ];
+                        }
+                        
+                        $currentDate->addDay();
+                    }
+                }
+                
+                // Store in cache
+                $availabilityKey = "sitter_availability_{$sitterId}";
+                Cache::put($availabilityKey, $availabilityData, 86400 * 30); // Store for 30 days
+                
+                Log::info('✅ Restored weekly availability data for sitter', [
+                    'sitter_id' => $sitterId,
+                    'availability_count' => count($availabilityData)
+                ]);
+            } else {
+                // If no weekly availability, try to restore from any existing cache
+                // This handles cases where availability was set but not saved to database
+                $availabilityKey = "sitter_availability_{$sitterId}";
+                $existingData = Cache::get($availabilityKey, []);
+                
+                if (empty($existingData)) {
+                    Log::info('ℹ️ No availability data to restore for sitter', [
+                        'sitter_id' => $sitterId
+                    ]);
+                } else {
+                    Log::info('✅ Restored existing availability data for sitter', [
+                        'sitter_id' => $sitterId,
+                        'availability_count' => count($existingData)
+                    ]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error restoring sitter availability data', [
+                'sitter_id' => $sitterId,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }

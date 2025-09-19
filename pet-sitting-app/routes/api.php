@@ -49,6 +49,7 @@ Route::post('/resend-verification-code', [AuthController::class, 'resendVerifica
 
 // Profile routes
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user/profile', [App\Http\Controllers\API\ProfileController::class, 'getProfile']);
     Route::post('/profile/update', [App\Http\Controllers\API\ProfileController::class, 'updateProfile']);
     Route::post('/profile/upload-image', [App\Http\Controllers\API\ProfileController::class, 'uploadProfileImage']);
 });
@@ -128,6 +129,8 @@ Route::post('/location/nearby-sitters', [LocationController::class, 'getNearbySi
 
 // Sitter availability routes
 Route::get('/sitters/{sitterId}/availability', [LocationController::class, 'getSitterAvailability']);
+Route::get('/sitters/{sitterId}/availability-status', [LocationController::class, 'getSitterAvailabilityStatus']);
 Route::post('/sitters/availability', [LocationController::class, 'saveSitterAvailability'])->middleware('auth:sanctum');
+Route::post('/sitters/restore-availability', [LocationController::class, 'restoreAvailabilityData'])->middleware('auth:sanctum');
 Route::get('/sitters/{sitterId}/weekly-availability', [LocationController::class, 'getWeeklyAvailability']);
 Route::post('/sitters/weekly-availability', [LocationController::class, 'saveWeeklyAvailability'])->middleware('auth:sanctum'); 

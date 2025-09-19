@@ -303,7 +303,7 @@ const WeekBookingScreen: React.FC = () => {
     }
     
     if (typeof sitterImage === 'string' && sitterImage.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.184:8000${sitterImage}`;
+      const fullUrl = `http://172.20.10.2:8000${sitterImage}`;
       return { uri: fullUrl };
     }
     

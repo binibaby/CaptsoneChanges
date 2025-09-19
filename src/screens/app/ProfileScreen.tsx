@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -23,17 +24,29 @@ const ProfileScreen = () => {
   console.log('ProfileScreen: User details:', {
     id: user?.id,
     name: user?.name,
+    firstName: user?.firstName,
+    lastName: user?.lastName,
     email: user?.email,
     role: user?.userRole,
     phone: user?.phone,
     address: user?.address
   });
   
+  // Enhanced debugging for name display issue
+  console.log('🔍 NAME DEBUG - User object keys:', user ? Object.keys(user) : 'No user');
+  console.log('🔍 NAME DEBUG - User firstName type:', typeof user?.firstName);
+  console.log('🔍 NAME DEBUG - User lastName type:', typeof user?.lastName);
+  console.log('🔍 NAME DEBUG - User name type:', typeof user?.name);
+  console.log('🔍 NAME DEBUG - User firstName value:', JSON.stringify(user?.firstName));
+  console.log('🔍 NAME DEBUG - User lastName value:', JSON.stringify(user?.lastName));
+  console.log('🔍 NAME DEBUG - User name value:', JSON.stringify(user?.name));
+  
   const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
   const [imageError, setImageError] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageRetryCount, setImageRetryCount] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [newSpecialty, setNewSpecialty] = useState('');
   const [profileData, setProfileData] = useState<{
     firstName: string;
@@ -61,6 +74,53 @@ const ProfileScreen = () => {
   });
 
   console.log('ProfileScreen: Current profileData:', profileData);
+  console.log('ProfileScreen: Current user firstName:', user?.firstName);
+  console.log('ProfileScreen: Current user lastName:', user?.lastName);
+  console.log('ProfileScreen: Current user name:', user?.name);
+  
+  // Debug AsyncStorage data
+  React.useEffect(() => {
+    const debugAsyncStorage = async () => {
+      try {
+        console.log('🔍 DEBUGGING ASYNC STORAGE FROM PROFILE SCREEN...');
+        
+        // Check user data
+        const userData = await AsyncStorage.getItem('user');
+        console.log('📱 User data from AsyncStorage:', userData);
+        
+        if (userData) {
+          const user = JSON.parse(userData);
+          console.log('📱 Parsed user object:', user);
+          console.log('📱 User firstName:', user.firstName);
+          console.log('📱 User lastName:', user.lastName);
+          console.log('📱 User name:', user.name);
+          console.log('📱 User email:', user.email);
+        }
+        
+        // Check profile data
+        const profileData = await AsyncStorage.getItem('user_profile_data');
+        console.log('📱 Profile data from AsyncStorage:', profileData);
+        
+        if (profileData) {
+          const profile = JSON.parse(profileData);
+          console.log('📱 Parsed profile object:', profile);
+          console.log('📱 Profile firstName:', profile.firstName);
+          console.log('📱 Profile lastName:', profile.lastName);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error debugging AsyncStorage:', error);
+      }
+    };
+    
+    debugAsyncStorage();
+    
+    // Force refresh user data if user is null or has empty name
+    if (!user || (!user.name && !user.firstName && !user.lastName)) {
+      console.log('🔍 FORCING USER DATA REFRESH...');
+      refresh();
+    }
+  }, [user, refresh]);
 
   // Helper function to validate image URI
   const isValidImageUri = (uri: string | null): boolean => {
@@ -74,7 +134,7 @@ const ProfileScreen = () => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
     if (uri.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.184:8000${uri}`;
+      const fullUrl = `http://172.20.10.2:8000${uri}`;
       console.log('🔗 ProfileScreen: Generated full URL:', fullUrl);
       return fullUrl;
     }
@@ -171,13 +231,58 @@ const ProfileScreen = () => {
       // Profile image is handled by the separate useEffect above
       console.log('📱 ProfileScreen: Profile image will be handled by sync useEffect');
       
-      // Safely extract name parts with proper fallbacks
-      const userName = user.name || '';
-      const nameParts = userName ? userName.split(' ') : [];
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      // Use firstName and lastName if available, otherwise fallback to splitting name
+      let firstName = user.firstName || '';
+      let lastName = user.lastName || '';
       
-      console.log('Profile screen: User name parts:', { userName, nameParts, firstName, lastName });
+      // If firstName and lastName are empty but name exists, split the name
+      if (!firstName && !lastName && user.name && user.name.trim()) {
+        const nameParts = user.name.trim().split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
+      
+      // If still empty, try to get from AsyncStorage directly
+      if (!firstName && !lastName) {
+        try {
+          const userData = await AsyncStorage.getItem('user');
+          if (userData) {
+            const storedUser = JSON.parse(userData);
+            firstName = storedUser.firstName || '';
+            lastName = storedUser.lastName || '';
+            
+            // If still empty, split the name from storage
+            if (!firstName && !lastName && storedUser.name && storedUser.name.trim()) {
+              const nameParts = storedUser.name.trim().split(' ');
+              firstName = nameParts[0] || '';
+              lastName = nameParts.slice(1).join(' ') || '';
+            }
+          }
+        } catch (error) {
+          console.error('Error getting user data from AsyncStorage:', error);
+        }
+      }
+      
+      console.log('Profile screen: User name parts:', { 
+        userName: user.name, 
+        userFirstName: user.firstName, 
+        userLastName: user.lastName,
+        extractedFirstName: firstName, 
+        extractedLastName: lastName,
+        firstNameExists: !!user.firstName,
+        lastNameExists: !!user.lastName,
+        nameExists: !!user.name
+      });
+      
+      // Enhanced debugging for name extraction
+      console.log('🔍 NAME EXTRACTION DEBUG:');
+      console.log('  - user.firstName:', JSON.stringify(user.firstName));
+      console.log('  - user.lastName:', JSON.stringify(user.lastName));
+      console.log('  - user.name:', JSON.stringify(user.name));
+      console.log('  - firstName result:', JSON.stringify(firstName));
+      console.log('  - lastName result:', JSON.stringify(lastName));
+      console.log('  - firstName length:', firstName?.length);
+      console.log('  - lastName length:', lastName?.length);
       
       const newProfileData = {
         firstName,
@@ -198,6 +303,11 @@ const ProfileScreen = () => {
       };
       
       console.log('Profile screen: Setting new profile data:', newProfileData);
+      console.log('🔍 PROFILE DATA DEBUG:');
+      console.log('  - newProfileData.firstName:', JSON.stringify(newProfileData.firstName));
+      console.log('  - newProfileData.lastName:', JSON.stringify(newProfileData.lastName));
+      console.log('  - newProfileData.firstName length:', newProfileData.firstName?.length);
+      console.log('  - newProfileData.lastName length:', newProfileData.lastName?.length);
       setProfileData(newProfileData);
     } else {
       console.log('Profile screen: No user data, starting fresh');
@@ -413,7 +523,11 @@ const ProfileScreen = () => {
   };
 
   const handleSaveProfile = async () => {
+    if (isSaving) return; // Prevent multiple saves
+    
     try {
+      setIsSaving(true);
+      
       // Validate profileData exists and has required fields
       if (!profileData) {
         console.error('ProfileScreen: profileData is null or undefined');
@@ -447,11 +561,16 @@ const ProfileScreen = () => {
         specialties: profileData.specialties || [],
       });
       
+      // Refresh user data to ensure we have the latest from backend
+      await refresh();
+      
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
       console.error('Error saving profile:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -550,10 +669,34 @@ const ProfileScreen = () => {
           </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>
-              {(profileData.firstName || profileData.lastName)
-                ? `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim()
-                : 'Enter Your Name'
-              }
+              {(() => {
+                // Try multiple sources for the name
+                let displayName = '';
+                
+                // First try profileData
+                if (profileData.firstName || profileData.lastName) {
+                  displayName = `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim();
+                }
+                
+                // If still empty, try user object
+                if (!displayName && user) {
+                  if (user.firstName || user.lastName) {
+                    displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+                  } else if (user.name && user.name.trim()) {
+                    displayName = user.name.trim();
+                  }
+                }
+                
+                console.log('🔍 NAME DISPLAY DEBUG:');
+                console.log('  - profileData.firstName:', JSON.stringify(profileData.firstName));
+                console.log('  - profileData.lastName:', JSON.stringify(profileData.lastName));
+                console.log('  - user.firstName:', JSON.stringify(user?.firstName));
+                console.log('  - user.lastName:', JSON.stringify(user?.lastName));
+                console.log('  - user.name:', JSON.stringify(user?.name));
+                console.log('  - displayName:', JSON.stringify(displayName));
+                
+                return displayName || 'Enter Your Name';
+              })()}
             </Text>
           </View>
         </View>
@@ -631,20 +774,24 @@ const ProfileScreen = () => {
           <Text style={styles.sectionTitle}>Personal Information</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
+            <Text style={styles.inputLabel}>First Name</Text>
             <TextInput
               style={[styles.input, !isEditing && styles.disabledInput]}
-              value={`${profileData.firstName || ''} ${profileData.lastName || ''}`.trim()}
-              onChangeText={(text) => {
-                const names = text.split(' ');
-                setProfileData({
-                  ...profileData,
-                  firstName: names[0] || '',
-                  lastName: names.slice(1).join(' ') || ''
-                });
-              }}
+              value={profileData.firstName}
+              onChangeText={(text) => setProfileData({...profileData, firstName: text})}
               editable={isEditing}
-              placeholder="Enter your full name"
+              placeholder="Enter your first name"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Last Name</Text>
+            <TextInput
+              style={[styles.input, !isEditing && styles.disabledInput]}
+              value={profileData.lastName}
+              onChangeText={(text) => setProfileData({...profileData, lastName: text})}
+              editable={isEditing}
+              placeholder="Enter your last name"
             />
           </View>
 
@@ -827,10 +974,13 @@ const ProfileScreen = () => {
         {isEditing && (
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={styles.saveButton} 
+              style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} 
               onPress={handleSaveProfile}
+              disabled={isSaving}
             >
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.cancelButton} 
@@ -1117,6 +1267,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 6,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#A0A0A0',
+    opacity: 0.6,
   },
   saveButtonText: {
     color: '#fff',

@@ -55,3 +55,6 @@ async function clearCurrentUserData() {
 
 // Run the function
 clearCurrentUserData();
+
+
+

@@ -25,6 +25,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/export-stats', [DashboardController::class, 'exportStats'])->name('export.stats');
 
+    // Announcements
+    Route::get('/announcements', [DashboardController::class, 'announcements'])->name('announcements');
+
     // User Management
     Route::prefix('users')->name('users.')->group(function () {
         Route::get('/', [UserController::class, 'index'])->name('index');
