@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
   Modal,
@@ -30,10 +30,19 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
 }) => {
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const currentImageSource = useRef<any>(null);
   
   // Reset image error state when sitter changes
   useEffect(() => {
     setImageError(false);
+    setImageLoading(true);
+    
+    // Set a timeout to prevent loading state from staying true indefinitely
+    const timeout = setTimeout(() => {
+      setImageLoading(false);
+    }, 3000); // 3 second timeout
+    
     if (sitter) {
       console.log('🖼️ Popup - Sitter data received:', {
         id: sitter.id,
@@ -46,55 +55,72 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
         allKeys: Object.keys(sitter)
       });
       console.log('🖼️ Popup - Raw sitter object:', JSON.stringify(sitter, null, 2));
+      
+      // Additional debugging for image fields
+      console.log('🖼️ Popup - Image field analysis:', {
+        'sitter.profileImage': sitter.profileImage,
+        'sitter.imageSource': sitter.imageSource,
+        'sitter.images': sitter.images,
+        'sitter.images?.[0]': sitter.images?.[0],
+        'typeof profileImage': typeof sitter.profileImage,
+        'typeof imageSource': typeof sitter.imageSource,
+        'profileImage starts with http': sitter.profileImage?.startsWith('http'),
+        'imageSource starts with http': sitter.imageSource?.startsWith('http'),
+      });
     }
-  }, [sitter?.id]);
+    
+    return () => clearTimeout(timeout);
+  }, [sitter?.id, sitter?.profileImage, sitter?.imageSource, sitter?.images]);
+
+  // Stable image source calculation to prevent flickering
+  const getImageSource = () => {
+    if (!sitter) {
+      currentImageSource.current = require('../assets/images/default-avatar.png');
+      return currentImageSource.current;
+    }
+    
+    // Priority order: profileImage > imageSource > images[0]
+    const source = sitter.profileImage || sitter.imageSource || sitter.images?.[0];
+    
+    if (!source || source === null || source === undefined || source === '') {
+      currentImageSource.current = require('../assets/images/default-avatar.png');
+      return currentImageSource.current;
+    }
+    
+    // If it's a URL (starts with http), use it directly
+    if (typeof source === 'string' && (source.startsWith('http') || source.startsWith('https'))) {
+      currentImageSource.current = { uri: source };
+      return currentImageSource.current;
+    }
+    
+    // If it's a relative URL (starts with /storage/), convert to full URL
+    if (typeof source === 'string' && source.startsWith('/storage/')) {
+      const { networkService } = require('../services/networkService');
+      const fullUrl = networkService.getImageUrl(source);
+      currentImageSource.current = { uri: fullUrl };
+      return currentImageSource.current;
+    }
+    
+    // If it's already a require() object, use it directly
+    if (typeof source === 'object' && source.uri !== undefined) {
+      currentImageSource.current = source;
+      return currentImageSource.current;
+    }
+    
+    // For any other string (local paths), treat as URI
+    if (typeof source === 'string') {
+      currentImageSource.current = { uri: source };
+      return currentImageSource.current;
+    }
+    
+    // Fallback to default avatar
+    currentImageSource.current = require('../assets/images/default-avatar.png');
+    return currentImageSource.current;
+  };
   
   if (!sitter) {
     return null;
   }
-
-  // Helper function to get proper image source (same as in FindSitterMapScreen)
-  const getImageSource = (sitter: any) => {
-    const imageSource = sitter.profileImage || sitter.imageSource || sitter.images?.[0];
-    
-    console.log('🖼️ Popup - getImageSource called for sitter:', sitter.name);
-    console.log('🖼️ Popup - imageSource:', imageSource);
-    console.log('🖼️ Popup - sitter keys:', Object.keys(sitter));
-    
-    if (!imageSource) {
-      console.log('🖼️ Popup - No image source, using default avatar');
-      return require('../assets/images/default-avatar.png');
-    }
-    
-    // If it's a URL (starts with http), use it directly
-    if (typeof imageSource === 'string' && (imageSource.startsWith('http') || imageSource.startsWith('https'))) {
-      console.log('🖼️ Popup - Using HTTP URL:', imageSource);
-      return { uri: imageSource };
-    }
-    
-    // If it's a relative URL (starts with /storage/), convert to full URL
-    if (typeof imageSource === 'string' && imageSource.startsWith('/storage/')) {
-      const fullUrl = `http://172.20.10.2:8000${imageSource}`;
-      console.log('🖼️ Popup - Converting storage URL to full URL:', fullUrl);
-      return { uri: fullUrl };
-    }
-    
-    // If it's already a require() object, use it directly
-    if (typeof imageSource === 'object' && imageSource.uri !== undefined) {
-      console.log('🖼️ Popup - Using object with URI:', imageSource);
-      return imageSource;
-    }
-    
-    // For any other string (local paths), treat as URI
-    if (typeof imageSource === 'string') {
-      console.log('🖼️ Popup - Using string as URI:', imageSource);
-      return { uri: imageSource };
-    }
-    
-    // If it's already a require() object, use it directly
-    console.log('🖼️ Popup - Using require object:', imageSource);
-    return imageSource;
-  };
 
   const formatSpecialties = (specialties: string[]) => {
     if (!specialties || specialties.length === 0) return 'General Pet Care';
@@ -162,24 +188,28 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
             <View style={styles.userInfoSection}>
               <View style={styles.avatarContainer}>
                 <Image
-                  source={imageError ? require('../assets/images/default-avatar.png') : getImageSource(sitter)}
+                  key={`popup-avatar-${sitter?.id}-${sitter?.profileImage || 'default'}`}
+                  source={imageError || imageLoading ? require('../assets/images/default-avatar.png') : (currentImageSource.current || getImageSource())}
                   style={styles.avatar}
                   onError={(error) => {
                     console.log('❌ Popup - Image failed to load:', error.nativeEvent.error);
-                    console.log('❌ Popup - Image source was:', getImageSource(sitter));
+                    console.log('❌ Popup - Failed image source:', currentImageSource.current);
                     setImageError(true);
+                    setImageLoading(false);
                   }}
                   onLoad={() => {
                     console.log('✅ Popup - Image loaded successfully');
                     setImageError(false);
+                    setImageLoading(false);
                   }}
                   defaultSource={require('../assets/images/default-avatar.png')}
                   resizeMode="cover"
+                  fadeDuration={0}
                 />
               </View>
               <View style={styles.userDetails}>
                 <Text style={styles.userName}>
-                  {sitter.name || 'Enter Your Name'}
+                  {sitter?.name || 'Loading...'}
                 </Text>
                 <Text style={styles.userLocation}>
                   📍 {sitter.location?.address || `${sitter.location?.latitude?.toFixed(4)}, ${sitter.location?.longitude?.toFixed(4)}`}
@@ -196,6 +226,7 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               <TouchableOpacity 
                 style={styles.credentialButton}
                 onPress={() => onViewBadges(sitter.id)}
+                activeOpacity={0.7}
               >
                 <Ionicons name="ribbon" size={20} color="#fff" />
                 <Text style={styles.credentialText}>View Badges</Text>
@@ -203,6 +234,7 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               <TouchableOpacity 
                 style={styles.credentialButton}
                 onPress={() => onViewCertificates(sitter.id)}
+                activeOpacity={0.7}
               >
                 <Ionicons name="medal" size={20} color="#fff" />
                 <Text style={styles.credentialText}>View Certificates</Text>
@@ -212,7 +244,19 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
             {/* Bottom Section - Action Buttons */}
             <View style={styles.actionsSection}>
               <TouchableOpacity 
-                style={styles.actionButton}
+                style={styles.credentialButton}
+                onPress={() => {
+                  onClose();
+                  onMessage(sitter.id);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chatbubble-outline" size={20} color="#fff" />
+                <Text style={styles.credentialText}>Message</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.credentialButton}
                 onPress={() => {
                   onClose();
                   router.push({
@@ -225,9 +269,10 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                     }
                   });
                 }}
+                activeOpacity={0.7}
               >
                 <Ionicons name="calendar" size={20} color="#fff" />
-                <Text style={styles.actionText}>Book Now</Text>
+                <Text style={styles.credentialText}>Book Now</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -407,16 +452,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 15,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.3)',
+    gap: 12,
   },
   credentialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 25,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    minWidth: 120,
+    justifyContent: 'center',
   },
   credentialText: {
     fontSize: 14,
@@ -428,22 +484,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 15,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 6,
+    gap: 12,
   },
   infoCard: {
     backgroundColor: '#fff',
