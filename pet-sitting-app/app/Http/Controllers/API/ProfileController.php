@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -113,6 +114,11 @@ class ProfileController extends Controller
                 $user->last_name = $request->last_name;
             }
             
+            // Update the name field if first_name or last_name changed
+            if ($request->has('first_name') || $request->has('last_name')) {
+                $user->name = trim($user->first_name . ' ' . $user->last_name);
+            }
+            
             if ($request->has('email')) {
                 $user->email = $request->email;
             }
@@ -171,6 +177,58 @@ class ProfileController extends Controller
             }
 
             $user->save();
+
+            // Clear location cache to ensure updated data is reflected
+            if ($user->role === 'pet_sitter') {
+                $cacheKey = "sitter_location_{$user->id}";
+                $locationData = Cache::get($cacheKey);
+                
+                if ($locationData) {
+                    // Update the cached location data with the new name
+                    $locationData['name'] = $user->name;
+                    $locationData['first_name'] = $user->first_name;
+                    $locationData['last_name'] = $user->last_name;
+                    $locationData['email'] = $user->email;
+                    $locationData['bio'] = $user->bio;
+                    $locationData['hourly_rate'] = $user->hourly_rate;
+                    $locationData['experience'] = $user->experience;
+                    $locationData['specialties'] = $user->specialties;
+                    $locationData['selected_pet_types'] = $user->selected_pet_types;
+                    $locationData['pet_breeds'] = $user->pet_breeds;
+                    $locationData['profile_image'] = $user->profile_image;
+                    $locationData['certificates'] = $user->certificates;
+                    
+                    // Update the cache with the new data
+                    Cache::put($cacheKey, $locationData, 300); // 5 minutes
+                    
+                    // Also update the active sitters cache
+                    $activeSitters = Cache::get('active_sitters', []);
+                    foreach ($activeSitters as &$sitter) {
+                        if ($sitter['user_id'] == $user->id) {
+                            $sitter['name'] = $user->name;
+                            $sitter['first_name'] = $user->first_name;
+                            $sitter['last_name'] = $user->last_name;
+                            $sitter['email'] = $user->email;
+                            $sitter['bio'] = $user->bio;
+                            $sitter['hourly_rate'] = $user->hourly_rate;
+                            $sitter['experience'] = $user->experience;
+                            $sitter['specialties'] = $user->specialties;
+                            $sitter['selected_pet_types'] = $user->selected_pet_types;
+                            $sitter['pet_breeds'] = $user->pet_breeds;
+                            $sitter['profile_image'] = $user->profile_image;
+                            $sitter['certificates'] = $user->certificates;
+                            break;
+                        }
+                    }
+                    Cache::put('active_sitters', $activeSitters, 300); // 5 minutes
+                    
+                    \Log::info('🔄 Updated sitter cache with new profile data', [
+                        'user_id' => $user->id,
+                        'old_name' => $locationData['name'] ?? 'N/A',
+                        'new_name' => $user->name
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -255,6 +313,112 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to upload image',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Save certificates for a sitter
+     */
+    public function saveCertificates(Request $request)
+    {
+        $user = Auth::user();
+        
+        $validator = Validator::make($request->all(), [
+            'certificates' => 'required|array',
+            'certificates.*.name' => 'required|string|max:255',
+            'certificates.*.image' => 'required|string',
+            'certificates.*.date' => 'required|string',
+            'certificates.*.issuer' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Update user certificates
+            $user->certificates = json_encode($request->certificates);
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Certificates saved successfully',
+                'certificates' => $request->certificates
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save certificates',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get certificates for a sitter
+     */
+    public function getCertificates(Request $request)
+    {
+        $user = Auth::user();
+        
+        try {
+            $certificates = $user->certificates ? json_decode($user->certificates, true) : [];
+
+            return response()->json([
+                'success' => true,
+                'certificates' => $certificates
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get certificates',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload certificate image to server
+     */
+    public function uploadCertificateImage(Request $request)
+    {
+        $user = Auth::user();
+        
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Store certificate image
+            $imagePath = $request->file('image')->store('certificate_images', 'public');
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Certificate image uploaded successfully',
+                'image_path' => $imagePath,
+                'full_url' => asset('storage/' . $imagePath)
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload certificate image',
                 'error' => $e->getMessage()
             ], 500);
         }

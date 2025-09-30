@@ -88,6 +88,13 @@ const PetSitterProfileScreen = () => {
     }
   }, [user, currentLocation, startLocationTracking]);
 
+  // Load certificates from API when component mounts
+  useEffect(() => {
+    if (user) {
+      loadCertificatesFromAPI();
+    }
+  }, [user]);
+
   // Update profile data when user changes
   useEffect(() => {
     if (user) {
@@ -194,18 +201,92 @@ const PetSitterProfileScreen = () => {
     setIsEditing(true);
   };
 
-  const handleAddCertificate = (certificate: any) => {
-    const newCertificate = {
-      ...certificate,
-      id: Date.now().toString(),
-    };
-    setCertificates([...certificates, newCertificate]);
-    Alert.alert('Success', 'Certificate added successfully!');
+  const handleAddCertificate = async (certificate: any) => {
+    try {
+      const newCertificate = {
+        ...certificate,
+        id: Date.now().toString(),
+      };
+      const updatedCertificates = [...certificates, newCertificate];
+      setCertificates(updatedCertificates);
+      
+      // Save to API
+      await saveCertificatesToAPI(updatedCertificates);
+      
+      Alert.alert('Success', 'Certificate added successfully!');
+    } catch (error) {
+      console.error('Error adding certificate:', error);
+      Alert.alert('Error', 'Failed to add certificate. Please try again.');
+    }
   };
 
-  const handleDeleteCertificate = (id: string) => {
-    setCertificates(certificates.filter(cert => cert.id !== id));
-    Alert.alert('Success', 'Certificate deleted successfully!');
+  const handleDeleteCertificate = async (id: string) => {
+    try {
+      const updatedCertificates = certificates.filter(cert => cert.id !== id);
+      setCertificates(updatedCertificates);
+      
+      // Save to API
+      await saveCertificatesToAPI(updatedCertificates);
+      
+      Alert.alert('Success', 'Certificate deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting certificate:', error);
+      Alert.alert('Error', 'Failed to delete certificate. Please try again.');
+    }
+  };
+
+  const saveCertificatesToAPI = async (certificatesToSave: any[]) => {
+    try {
+      const { makeApiCall } = await import('../../services/networkService');
+      
+      const response = await makeApiCall('/api/profile/save-certificates', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user?.token || ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ certificates: certificatesToSave }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Certificates saved successfully:', result);
+    } catch (error) {
+      console.error('Error saving certificates to API:', error);
+      throw error;
+    }
+  };
+
+  const loadCertificatesFromAPI = async () => {
+    try {
+      const { makeApiCall } = await import('../../services/networkService');
+      
+      const response = await makeApiCall('/api/profile/certificates', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user?.token || ''}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      if (result.success && result.certificates) {
+        setCertificates(result.certificates);
+        console.log('Certificates loaded successfully:', result.certificates);
+      }
+    } catch (error) {
+      console.error('Error loading certificates from API:', error);
+      // Don't show error to user as this is a background operation
+    }
   };
 
   const handleCancel = () => {

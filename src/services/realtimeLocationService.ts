@@ -28,6 +28,13 @@ export interface RealtimeSitter {
   imageSource?: string;
   followers?: number;
   following?: number;
+  certificates?: {
+    id: string;
+    name: string;
+    image: string;
+    date: string;
+    issuer: string;
+  }[];
 }
 
 class RealtimeLocationService {
@@ -540,6 +547,13 @@ class RealtimeLocationService {
       this.sitters.set(sitterId, updatedSitter);
       this.notifyListeners();
       console.log(`🔄 Updated sitter ${sitterId} data:`, updatedData);
+    } else {
+      // If sitter is not in cache, we still need to ensure the data is updated
+      // This can happen if the sitter is offline or not currently visible
+      console.log(`🔄 Sitter ${sitterId} not in cache, but profile update will be reflected in next API call`);
+      
+      // Clear the cache to force a fresh fetch on next API call
+      this.lastApiCallTime = 0;
     }
   }
 

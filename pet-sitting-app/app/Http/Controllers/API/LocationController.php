@@ -210,6 +210,7 @@ class LocationController extends Controller
                             : asset('storage/' . $user->profile_image)
                     ) : null,
                     'images' => $user->profile_image ? [$user->profile_image] : null,
+                    'certificates' => $user->certificates ? json_decode($user->certificates, true) : [],
                     'followers' => $user->followers ?? 0,
                     'following' => $user->following ?? 0
                 ] : [
@@ -235,6 +236,7 @@ class LocationController extends Controller
                     'distance' => round($distance, 1) . ' km',
                     'profile_image' => null,
                     'images' => null,
+                    'certificates' => [],
                     'followers' => 0,
                     'following' => 0
                 ];

@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  Dimensions,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 interface Certificate {
@@ -50,8 +50,45 @@ const CertificateViewer: React.FC<CertificateViewerProps> = ({
 
   const currentCertificate = certificates[currentIndex];
 
-  if (!visible || certificates.length === 0) {
+  if (!visible) {
     return null;
+  }
+
+  if (certificates.length === 0) {
+    return (
+      <Modal visible={visible} animationType="fade" presentationStyle="fullScreen">
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.headerInfo}>
+              <Text style={styles.sitterName}>{sitterName}'s Certificates</Text>
+              <Text style={styles.certificateCount}>No certificates available</Text>
+            </View>
+            <View style={styles.placeholder} />
+          </View>
+
+          {/* Empty State */}
+          <View style={styles.emptyContainer}>
+            <Ionicons name="medal-outline" size={80} color="#ccc" />
+            <Text style={styles.emptyTitle}>No Certificates</Text>
+            <Text style={styles.emptyMessage}>
+              This sitter hasn't uploaded any certificates yet.
+            </Text>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionContainer}>
+            <TouchableOpacity style={styles.actionButton} onPress={onClose}>
+              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Text style={styles.actionButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
   }
 
   return (
@@ -293,6 +330,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     marginLeft: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#000',
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  emptyMessage: {
+    fontSize: 16,
+    color: '#ccc',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
 

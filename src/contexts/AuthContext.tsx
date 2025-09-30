@@ -385,80 +385,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Update sitter data in real-time
           try {
-            console.log('AuthContext: realtimeLocationService type:', typeof realtimeLocationService);
-            console.log('AuthContext: realtimeLocationService constructor:', realtimeLocationService.constructor.name);
-            console.log('AuthContext: Checking realtimeLocationService methods:', Object.getOwnPropertyNames(realtimeLocationService));
-            console.log('AuthContext: updateSitterData method exists:', typeof realtimeLocationService.updateSitterData);
+            console.log('AuthContext: Updating sitter data in real-time service');
+            console.log('AuthContext: Updated sitter name:', updatedUser.name);
+            console.log('AuthContext: Updated sitter profile image:', updatedUser.profileImage);
             
-            // Try to call the method directly
-            if (realtimeLocationService && typeof realtimeLocationService.updateSitterData === 'function') {
-              realtimeLocationService.updateSitterData(updatedUser.id, updatedSitterData);
-              console.log('AuthContext: Updated sitter data in real-time with profile image:', updatedUser.profileImage);
-            } else {
-              console.error('AuthContext: updateSitterData method is not available, using updateSitterLocation as fallback');
-              console.error('AuthContext: Available methods:', Object.getOwnPropertyNames(realtimeLocationService));
-              console.error('AuthContext: Service prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(realtimeLocationService)));
-              
-              // Fallback: Use updateSitterLocation with the updated data
-              const sitterData = {
-                id: updatedUser.id,
-                userId: updatedUser.id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                location: {
-                  latitude: 0, // Will be updated by the location service
-                  longitude: 0,
-                  address: 'Location not available'
-                },
-                specialties: updatedUser.specialties || ['General Pet Care'],
-                experience: updatedUser.experience || '1 year',
-                petTypes: updatedUser.selectedPetTypes || ['dogs', 'cats'],
-                selectedBreeds: updatedUser.selectedBreeds || ['All breeds welcome'],
-                hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
-                rating: 4.5,
-                reviews: 0,
-                bio: updatedUser.aboutMe || 'Professional pet sitter ready to help!',
-                isOnline: true,
-                lastSeen: new Date(),
-                profileImage: updatedUser.profileImage,
-                imageSource: updatedUser.profileImage,
-                images: updatedUser.profileImage ? [updatedUser.profileImage] : undefined,
-              };
-              
-              await realtimeLocationService.updateSitterLocation(sitterData);
-              console.log('AuthContext: Updated sitter data via updateSitterLocation fallback');
-            }
-          } catch (error) {
-            console.error('AuthContext: Error updating sitter data:', error);
-          }
-          
-          // Also update the sitter's location data
-          await realtimeLocationService.updateSitterLocation({
-            id: updatedUser.id,
-            userId: updatedUser.id,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            location: {
+            // Use the proper location data if available
+            const sitterLocation = {
               latitude: currentLocation?.coords.latitude || 0,
               longitude: currentLocation?.coords.longitude || 0,
-              address: userAddress || '',
-            },
-            specialties: updatedUser.specialties || ['General Pet Care'],
-            experience: updatedUser.experience || '1 year',
-            petTypes: updatedUser.selectedPetTypes || ['dogs', 'cats'],
-            selectedBreeds: updatedUser.selectedBreeds || ['All breeds welcome'],
-            hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
-            rating: 4.5,
-            reviews: 0,
-            bio: updatedUser.aboutMe || 'Professional pet sitter ready to help!',
-            isOnline: true,
-            lastSeen: new Date(),
-            profileImage: updatedUser.profileImage,
-            imageSource: updatedUser.profileImage,
-            images: updatedUser.profileImage ? [updatedUser.profileImage] : undefined,
-            followers: 0,
-            following: 0,
-          });
+              address: userAddress || 'Location not available'
+            };
+            
+            // Create complete sitter data with proper location
+            const completeSitterData = {
+              id: updatedUser.id,
+              userId: updatedUser.id,
+              name: updatedUser.name,
+              email: updatedUser.email,
+              location: sitterLocation,
+              specialties: updatedUser.specialties || ['General Pet Care'],
+              experience: updatedUser.experience || '1 year',
+              petTypes: updatedUser.selectedPetTypes || ['dogs', 'cats'],
+              selectedBreeds: updatedUser.selectedBreeds || ['All breeds welcome'],
+              hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
+              rating: 4.5,
+              reviews: 0,
+              bio: updatedUser.aboutMe || 'Professional pet sitter ready to help!',
+              isOnline: true,
+              lastSeen: new Date(),
+              profileImage: updatedUser.profileImage,
+              imageSource: updatedUser.profileImage,
+              images: updatedUser.profileImage ? [updatedUser.profileImage] : undefined,
+              certificates: updatedUser.certificates || [],
+              followers: 0,
+              following: 0,
+            };
+            
+            // Try to update sitter data using the updateSitterData method
+            if (realtimeLocationService && typeof realtimeLocationService.updateSitterData === 'function') {
+              realtimeLocationService.updateSitterData(updatedUser.id, updatedSitterData);
+              console.log('AuthContext: Updated sitter data using updateSitterData method');
+            }
+            
+            // Also update the sitter location to ensure the data is properly synced
+            await realtimeLocationService.updateSitterLocation(completeSitterData);
+            console.log('AuthContext: Updated sitter location with complete data');
+            
+          } catch (error) {
+            console.error('AuthContext: Error updating sitter data in real-time:', error);
+          }
           
           // Trigger another refresh after realtime updates are complete
           setProfileUpdateTrigger(prev => prev + 1);

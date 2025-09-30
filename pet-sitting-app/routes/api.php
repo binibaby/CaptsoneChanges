@@ -73,6 +73,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::post('/profile/update', [ProfileController::class, 'update']);
     Route::post('/profile/upload-image', [ProfileController::class, 'uploadImage']);
+    Route::post('/profile/upload-certificate-image', [ProfileController::class, 'uploadCertificateImage']);
+    Route::post('/profile/save-certificates', [ProfileController::class, 'saveCertificates']);
+    Route::get('/profile/certificates', [ProfileController::class, 'getCertificates']);
 });
 
 // Location routes

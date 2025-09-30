@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Image,
   Modal,
   StyleSheet,
@@ -10,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import { RealtimeSitter } from '../services/realtimeLocationService';
-import CertificateViewer from './CertificateViewer';
 
 interface SitterProfilePopupProps {
   sitter: RealtimeSitter | null;
@@ -32,33 +32,30 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
-  const [certificateViewerVisible, setCertificateViewerVisible] = useState(false);
+  const [buttonPressed, setButtonPressed] = useState(false);
   const currentImageSource = useRef<any>(null);
 
-  // Sample certificates for the sitter - in real app, these would come from API
-  const sitterCertificates = [
+  // Use real certificates from sitter object, fallback to empty array if none
+  const sitterCertificates = sitter?.certificates || [];
+  
+  // Add some sample certificates for testing if none exist
+  const testCertificates = sitterCertificates.length === 0 ? [
     {
       id: '1',
       name: 'Pet First Aid Certification',
-      image: 'https://via.placeholder.com/400x300/4CAF50/white?text=Pet+First+Aid+Certification',
+      image: 'https://via.placeholder.com/300x200/4CAF50/white?text=Pet+First+Aid',
       date: '2024-01-15',
       issuer: 'Pet Care Academy',
     },
     {
       id: '2',
       name: 'Dog Training Certificate',
-      image: 'https://via.placeholder.com/400x300/2196F3/white?text=Dog+Training+Certificate',
+      image: 'https://via.placeholder.com/300x200/2196F3/white?text=Dog+Training',
       date: '2024-02-20',
       issuer: 'Canine Training Institute',
     },
-    {
-      id: '3',
-      name: 'Pet Behavior Specialist',
-      image: 'https://via.placeholder.com/400x300/FF9800/white?text=Pet+Behavior+Specialist',
-      date: '2024-03-10',
-      issuer: 'Animal Behavior Society',
-    },
-  ];
+  ] : sitterCertificates;
+
   
   // Reset image error state when sitter changes
   useEffect(() => {
@@ -203,196 +200,230 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
         animationType="fade"
         onRequestClose={onClose}
       >
-      <View style={styles.overlay}>
-        <View style={styles.popupContainer}>
-          {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
+        <View style={styles.overlay}>
+          <View style={styles.popupContainer}>
+            {/* Close button */}
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
 
-          {/* Profile Card */}
-          <View style={styles.profileCard}>
-            {/* Top Section - User Info */}
-            <View style={styles.userInfoSection}>
-              <View style={styles.avatarContainer}>
-                <Image
-                  key={`popup-avatar-${sitter?.id}-${sitter?.profileImage || 'default'}`}
-                  source={imageError || imageLoading ? require('../assets/images/default-avatar.png') : (currentImageSource.current || getImageSource())}
-                  style={styles.avatar}
-                  onError={(error) => {
-                    console.log('❌ Popup - Image failed to load:', error.nativeEvent.error);
-                    console.log('❌ Popup - Failed image source:', currentImageSource.current);
-                    setImageError(true);
-                    setImageLoading(false);
-                  }}
-                  onLoad={() => {
-                    console.log('✅ Popup - Image loaded successfully');
-                    setImageError(false);
-                    setImageLoading(false);
-                  }}
-                  defaultSource={require('../assets/images/default-avatar.png')}
-                  resizeMode="cover"
-                  fadeDuration={0}
-                />
-              </View>
-              <View style={styles.userDetails}>
-                <Text style={styles.userName}>
-                  {sitter?.name || 'Loading...'}
-                </Text>
-                <Text style={styles.userLocation}>
-                  📍 {sitter.location?.address || `${sitter.location?.latitude?.toFixed(4)}, ${sitter.location?.longitude?.toFixed(4)}`}
-                </Text>
-                <View style={styles.ratingContainer}>
-                  <Text style={styles.reviewsText}>{sitter.reviews} reviews</Text>
+            {/* Profile Card */}
+            <View style={styles.profileCard}>
+              {/* Top Section - User Info */}
+              <View style={styles.userInfoSection}>
+                <View style={styles.avatarContainer}>
+                  <Image
+                    key={`popup-avatar-${sitter?.id}-${sitter?.profileImage || 'default'}`}
+                    source={imageError || imageLoading ? require('../assets/images/default-avatar.png') : (currentImageSource.current || getImageSource())}
+                    style={styles.avatar}
+                    onError={(error) => {
+                      console.log('❌ Popup - Image failed to load:', error.nativeEvent.error);
+                      console.log('❌ Popup - Failed image source:', currentImageSource.current);
+                      setImageError(true);
+                      setImageLoading(false);
+                    }}
+                    onLoad={() => {
+                      console.log('✅ Popup - Image loaded successfully');
+                      setImageError(false);
+                      setImageLoading(false);
+                    }}
+                    defaultSource={require('../assets/images/default-avatar.png')}
+                    resizeMode="cover"
+                    fadeDuration={0}
+                  />
+                </View>
+                <View style={styles.userDetails}>
+                  <Text style={styles.userName}>
+                    {sitter?.name || 'Loading...'}
+                  </Text>
+                  <Text style={styles.userLocation}>
+                    📍 {sitter.location?.address || `${sitter.location?.latitude?.toFixed(4)}, ${sitter.location?.longitude?.toFixed(4)}`}
+                  </Text>
+                  <View style={styles.ratingContainer}>
+                    <Text style={styles.reviewsText}>{sitter.reviews} reviews</Text>
+                  </View>
                 </View>
               </View>
+
+              {/* Middle Section - Credentials */}
+              <View style={styles.credentialsSection}>
+                <TouchableOpacity 
+                  style={styles.credentialButton}
+                  onPress={() => onViewBadges(sitter.id)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="ribbon" size={16} color="#fff" />
+                  <Text style={styles.credentialText}>View Badges</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[
+                    styles.credentialButton,
+                    testCertificates.length === 0 && styles.credentialButtonDisabled
+                  ]}
+                  onPress={() => {
+                    console.log('🔍 Certificate button pressed!');
+                    setButtonPressed(true);
+                    console.log('🔍 testCertificates:', testCertificates);
+                    console.log('🔍 testCertificates.length:', testCertificates.length);
+                    
+                    if (testCertificates.length > 0) {
+                      console.log('✅ Navigating to certificate screen with certificates:', testCertificates);
+                      // Close the popup first
+                      onClose();
+                      // Navigate to certificate screen
+                      router.push({
+                        pathname: '/sitter-certificates',
+                        params: {
+                          sitterName: sitter?.name || 'Pet Sitter',
+                          certificates: JSON.stringify(testCertificates)
+                        }
+                      });
+                    } else {
+                      console.log('❌ No certificates available, showing alert');
+                      // Show alert if no certificates available
+                      Alert.alert(
+                        'No Certificates',
+                        'This sitter has not uploaded any certificates yet.',
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name="medal" 
+                    size={16} 
+                    color={testCertificates.length === 0 ? "#ccc" : "#fff"} 
+                  />
+                  <Text style={[
+                    styles.credentialText,
+                    testCertificates.length === 0 && styles.credentialTextDisabled
+                  ]}>
+                    View Certificates {testCertificates.length > 0 && `(${testCertificates.length})`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Bottom Section - Action Buttons */}
+              <View style={styles.actionsSection}>
+                <TouchableOpacity 
+                  style={styles.credentialButton}
+                  onPress={() => {
+                    onClose();
+                    onMessage(sitter.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="chatbubble-outline" size={16} color="#fff" />
+                  <Text style={styles.credentialText}>Message</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.credentialButton}
+                  onPress={() => {
+                    onClose();
+                    router.push({
+                      pathname: '/booking',
+                      params: {
+                        sitterId: sitter.id,
+                        sitterName: sitter.name,
+                        sitterRate: (sitter.hourlyRate || 25).toString(),
+                        sitterImage: sitter.imageSource || sitter.images?.[0] || sitter.profileImage
+                      }
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="calendar" size={16} color="#fff" />
+                  <Text style={styles.credentialText}>Book Now</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-
-            {/* Middle Section - Credentials */}
-            <View style={styles.credentialsSection}>
-              <TouchableOpacity 
-                style={styles.credentialButton}
-                onPress={() => onViewBadges(sitter.id)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="ribbon" size={20} color="#fff" />
-                <Text style={styles.credentialText}>View Badges</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.credentialButton}
-                onPress={() => setCertificateViewerVisible(true)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="medal" size={20} color="#fff" />
-                <Text style={styles.credentialText}>View Certificates</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Bottom Section - Action Buttons */}
-            <View style={styles.actionsSection}>
-              <TouchableOpacity 
-                style={styles.credentialButton}
-                onPress={() => {
-                  onClose();
-                  onMessage(sitter.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="chatbubble-outline" size={20} color="#fff" />
-                <Text style={styles.credentialText}>Message</Text>
-              </TouchableOpacity>
+            {/* Additional Info Card */}
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>Pet Sitter Details</Text>
               
-              <TouchableOpacity 
-                style={styles.credentialButton}
-                onPress={() => {
-                  onClose();
-                  router.push({
-                    pathname: '/booking',
-                    params: {
-                      sitterId: sitter.id,
-                      sitterName: sitter.name,
-                      sitterRate: (sitter.hourlyRate || 25).toString(),
-                      sitterImage: sitter.imageSource || sitter.images?.[0] || sitter.profileImage
+              
+              
+              {/* Experience */}
+              <View style={styles.infoRow}>
+                <Ionicons name="time" size={16} color="#F59E0B" />
+                <Text style={styles.infoLabel}>Years of Experience:</Text>
+                <Text style={styles.infoValue}>{sitter.experience}</Text>
+              </View>
+
+              {/* Specialties */}
+              <View style={styles.infoRow}>
+                <Ionicons name="star" size={16} color="#F59E0B" />
+                <Text style={styles.infoLabel}>Specialties:</Text>
+                <Text style={styles.infoValue}>{formatSpecialties(sitter.specialties || [])}</Text>
+              </View>
+
+              {/* Pet Types */}
+              <View style={styles.infoRow}>
+                <Ionicons name="paw" size={16} color="#F59E0B" />
+                <Text style={styles.infoLabel}>Pet Types:</Text>
+                <Text style={styles.infoValue}>
+                  {(() => {
+                    // Check multiple sources for pet types
+                    const petTypes = sitter.petTypes || [];
+                    console.log('🐾 Pet Types Debug:', { 
+                      petTypes: sitter.petTypes, 
+                      final: petTypes 
+                    });
+                    
+                    if (petTypes && petTypes.length > 0) {
+                      return formatPetTypes(petTypes);
                     }
-                  });
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar" size={20} color="#fff" />
-                <Text style={styles.credentialText}>Book Now</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                    return 'No pet types specified'; // Fallback
+                  })()}
+                </Text>
+              </View>
 
-          {/* Additional Info Card */}
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Pet Sitter Details</Text>
-            
-            {/* Experience */}
-            <View style={styles.infoRow}>
-              <Ionicons name="time" size={16} color="#F59E0B" />
-              <Text style={styles.infoLabel}>Years of Experience:</Text>
-              <Text style={styles.infoValue}>{sitter.experience}</Text>
-            </View>
-
-            {/* Specialties */}
-            <View style={styles.infoRow}>
-              <Ionicons name="star" size={16} color="#F59E0B" />
-              <Text style={styles.infoLabel}>Specialties:</Text>
-              <Text style={styles.infoValue}>{formatSpecialties(sitter.specialties || [])}</Text>
-            </View>
-
-            {/* Pet Types */}
-            <View style={styles.infoRow}>
-              <Ionicons name="paw" size={16} color="#F59E0B" />
-              <Text style={styles.infoLabel}>Pet Types:</Text>
-              <Text style={styles.infoValue}>
-                {(() => {
-                  // Check multiple sources for pet types
-                  const petTypes = sitter.petTypes || [];
-                  console.log('🐾 Pet Types Debug:', { 
-                    petTypes: sitter.petTypes, 
-                    final: petTypes 
-                  });
-                  
-                  if (petTypes && petTypes.length > 0) {
-                    return formatPetTypes(petTypes);
-                  }
-                  return 'No pet types specified'; // Fallback
-                })()}
-              </Text>
-            </View>
-
-            {/* Breeds */}
-            <View style={styles.infoRow}>
-              <Ionicons name="heart" size={16} color="#F59E0B" />
-              <Text style={styles.infoLabel}>Breeds:</Text>
-              <Text style={styles.infoValue}>
-                {(() => {
-                  // Check multiple sources for breeds
-                  const breeds = sitter.selectedBreeds || [];
-                  console.log('🐕 Breeds Debug:', { 
-                    selectedBreeds: sitter.selectedBreeds, 
-                    final: breeds 
-                  });
-                  
-                  if (breeds && breeds.length > 0) {
-                    // Filter out empty strings and handle various data formats
-                    const validBreeds = breeds.filter(breed => breed && breed.trim() !== '');
-                    if (validBreeds.length > 0) {
-                      const formattedBreeds = formatBreedNames(validBreeds);
-                      return formattedBreeds.join(', ');
+              {/* Breeds */}
+              <View style={styles.infoRow}>
+                <Ionicons name="heart" size={16} color="#F59E0B" />
+                <Text style={styles.infoLabel}>Breeds:</Text>
+                <Text style={styles.infoValue}>
+                  {(() => {
+                    // Check multiple sources for breeds
+                    const breeds = sitter.selectedBreeds || [];
+                    console.log('🐕 Breeds Debug:', { 
+                      selectedBreeds: sitter.selectedBreeds, 
+                      final: breeds 
+                    });
+                    
+                    if (breeds && breeds.length > 0) {
+                      // Filter out empty strings and handle various data formats
+                      const validBreeds = breeds.filter(breed => breed && breed.trim() !== '');
+                      if (validBreeds.length > 0) {
+                        const formattedBreeds = formatBreedNames(validBreeds);
+                        return formattedBreeds.join(', ');
+                      }
                     }
-                  }
-                  return 'No breeds specified'; // Fallback
-                })()}
-              </Text>
-            </View>
+                    return 'No breeds specified'; // Fallback
+                  })()}
+                </Text>
+              </View>
 
-            {/* Hourly Rate */}
-            <View style={styles.infoRow}>
-              <Ionicons name="cash" size={16} color="#F59E0B" />
-              <Text style={styles.infoLabel}>Rate:</Text>
-              <Text style={styles.infoValue}>₱{sitter.hourlyRate}/hour</Text>
-            </View>
+              {/* Hourly Rate */}
+              <View style={styles.infoRow}>
+                <Ionicons name="cash" size={16} color="#F59E0B" />
+                <Text style={styles.infoLabel}>Rate:</Text>
+                <Text style={styles.infoValue}>₱{sitter.hourlyRate}/hour</Text>
+              </View>
 
-            {/* Bio */}
-            <View style={styles.bioContainer}>
-              <Text style={styles.bioText}>{sitter.bio}</Text>
+              {/* Bio */}
+              <View style={styles.bioContainer}>
+                <Text style={styles.bioText}>{sitter.bio}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
       </Modal>
 
-      {/* Certificate Viewer Modal */}
-      <CertificateViewer
-        visible={certificateViewerVisible}
-        onClose={() => setCertificateViewerVisible(false)}
-        certificates={sitterCertificates}
-        sitterName={sitter?.name || 'Pet Sitter'}
-      />
+      
     </>
   );
 };
@@ -488,43 +519,50 @@ const styles = StyleSheet.create({
   credentialsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.3)',
-    gap: 12,
+    gap: 8,
   },
   credentialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 25,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 18,
     shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    minWidth: 120,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    minWidth: 90,
     justifyContent: 'center',
   },
   credentialText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',
     color: '#fff',
-    marginLeft: 6,
+    marginLeft: 4,
+  },
+  credentialButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  credentialTextDisabled: {
+    color: '#ccc',
   },
   actionsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.3)',
-    gap: 12,
+    gap: 8,
   },
   infoCard: {
     backgroundColor: '#fff',

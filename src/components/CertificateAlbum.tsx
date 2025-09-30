@@ -2,15 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Certificate {
   id: string;
@@ -36,6 +37,7 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
   onDeleteCertificate,
 }) => {
   const [isAdding, setIsAdding] = useState(false);
+  const { user } = useAuth();
 
   const pickImage = async () => {
     try {
@@ -103,7 +105,7 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
     }
   };
 
-  const handleImageSelected = (imageUri: string) => {
+  const handleImageSelected = async (imageUri: string) => {
     Alert.prompt(
       'Certificate Name',
       'Enter the name of this certificate',
@@ -114,15 +116,23 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
         },
         {
           text: 'Add',
-          onPress: (name) => {
+          onPress: async (name) => {
             if (name && name.trim()) {
-              const newCertificate: Omit<Certificate, 'id'> = {
-                name: name.trim(),
-                image: imageUri,
-                date: new Date().toLocaleDateString(),
-                issuer: 'Self-Added',
-              };
-              onAddCertificate(newCertificate);
+              try {
+                // Upload image to server first
+                const serverImageUrl = await uploadImageToServer(imageUri);
+                
+                const newCertificate: Omit<Certificate, 'id'> = {
+                  name: name.trim(),
+                  image: serverImageUrl,
+                  date: new Date().toLocaleDateString(),
+                  issuer: 'Self-Added',
+                };
+                onAddCertificate(newCertificate);
+              } catch (error) {
+                console.error('Error uploading certificate image:', error);
+                Alert.alert('Error', 'Failed to upload certificate image. Please try again.');
+              }
             }
           },
         },
@@ -130,6 +140,48 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
       'plain-text',
       ''
     );
+  };
+
+  const uploadImageToServer = async (imageUri: string): Promise<string> => {
+    try {
+      const formData = new FormData();
+      formData.append('image', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'certificate_image.jpg',
+      } as any);
+
+      if (!user?.token) {
+        throw new Error('No authentication token available');
+      }
+
+      const { makeApiCall } = await import('../services/networkService');
+      const response = await makeApiCall('/api/profile/upload-certificate-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Certificate image uploaded successfully:', result.full_url);
+        return result.full_url;
+      } else {
+        throw new Error(result.message || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('❌ Error uploading certificate image:', error);
+      throw error;
+    }
   };
 
   const renderCertificate = ({ item }: { item: Certificate }) => (

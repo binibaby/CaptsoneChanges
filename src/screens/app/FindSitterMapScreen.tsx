@@ -173,15 +173,60 @@ const FindSitterMapScreen = () => {
 
   const handleRefreshSitters = async () => {
     console.log('🔄 Manual refresh: Force clearing everything and fetching fresh data');
-    // Force clear everything and refresh from backend
-    if (currentLocation) {
+    
+    // Check if location is available
+    if (!currentLocation) {
+      console.log('⚠️ No current location available for force refresh');
+      
+      // Check if location tracking is active
+      if (!isLocationTracking) {
+        console.log('📍 Location tracking is not active, starting location tracking...');
+        try {
+          await startLocationTracking(1000);
+          // Wait a moment for location to be acquired
+          setTimeout(() => {
+            if (currentLocation) {
+              realtimeLocationService.forceClearAndRefresh(
+                currentLocation.coords.latitude,
+                currentLocation.coords.longitude,
+                50
+              );
+            }
+          }, 2000);
+        } catch (error) {
+          console.error('❌ Failed to start location tracking:', error);
+          Alert.alert(
+            'Location Required',
+            'Please enable location services to find nearby pet sitters. You can enable location in your device settings.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        console.log('📍 Location tracking is active but no location yet, please wait...');
+        Alert.alert(
+          'Getting Your Location',
+          'We\'re still getting your location. Please wait a moment and try again.',
+          [{ text: 'OK' }]
+        );
+      }
+      return;
+    }
+    
+    // Location is available, proceed with refresh
+    try {
       await realtimeLocationService.forceClearAndRefresh(
         currentLocation.coords.latitude,
         currentLocation.coords.longitude,
         50 // 50km radius
       );
-    } else {
-      console.log('⚠️ No current location available for force refresh');
+      console.log('✅ Successfully refreshed sitters with current location');
+    } catch (error) {
+      console.error('❌ Error refreshing sitters:', error);
+      Alert.alert(
+        'Refresh Failed',
+        'Unable to refresh sitters. Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -272,6 +317,15 @@ const FindSitterMapScreen = () => {
       if (nearbySitters && nearbySitters.length > 0) {
         setSitters(nearbySitters);
         console.log('📍 Found nearby sitters from API:', nearbySitters.length);
+        
+        // Update selectedSitter if it exists and we have updated data
+        if (selectedSitter) {
+          const updatedSitter = nearbySitters.find(s => s.id === selectedSitter.id);
+          if (updatedSitter) {
+            console.log('🔄 Updating selectedSitter with fresh data:', updatedSitter.name);
+            setSelectedSitter(updatedSitter);
+          }
+        }
         
         nearbySitters.forEach((sitter, index) => {
           console.log(`🗺️ Sitter ${index + 1} (${sitter.name}):`, {
@@ -394,6 +448,7 @@ const FindSitterMapScreen = () => {
       console.log('🔄 FindSitterMapScreen: Screen focused, forcing sitter refresh');
       console.log('📍 Current location:', currentLocation);
       console.log('📍 Location tracking status:', isLocationTracking);
+      
       // Force clear everything and refresh from backend
       if (currentLocation) {
         realtimeLocationService.forceClearAndRefresh(
@@ -402,7 +457,9 @@ const FindSitterMapScreen = () => {
           50 // 50km radius
         );
       } else {
-        console.log('⚠️ No current location available for sitter fetch');
+        console.log('📍 Screen focused: No current location available, will show empty state');
+        // Show empty state when no location is available
+        setSitters([]);
       }
     }, [currentLocation])
   );
@@ -426,6 +483,8 @@ const FindSitterMapScreen = () => {
           currentLocation.coords.longitude,
           50 // 50km radius
         );
+      } else {
+        console.log('📍 Periodic refresh: No location available, skipping refresh');
       }
     }, 30000); // Refresh every 30 seconds
 

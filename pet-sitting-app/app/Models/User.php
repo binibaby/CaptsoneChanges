@@ -37,6 +37,7 @@ class User extends Authenticatable
         'selected_pet_types',
         'bio',
         'profile_image',
+        'certificates',
         'rating',
         'is_admin',
         'admin_role',
