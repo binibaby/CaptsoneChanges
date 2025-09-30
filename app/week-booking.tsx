@@ -50,12 +50,26 @@ const WeekBookingScreen: React.FC = () => {
   const [selectedWeek, setSelectedWeek] = useState<WeekOption | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imageSource, setImageSource] = useState<any>(null);
 
   useEffect(() => {
     if (sitterId) {
       loadSitterAvailability();
     }
   }, [sitterId]);
+
+  useEffect(() => {
+    const loadImageSource = async () => {
+      const source = await getImageSource();
+      setImageSource(source);
+    };
+    
+    if (sitterImage) {
+      loadImageSource();
+    } else {
+      setImageSource(require('../src/assets/images/default-avatar.png'));
+    }
+  }, [sitterImage]);
 
   useEffect(() => {
     generateAvailableWeeks();
@@ -293,7 +307,7 @@ const WeekBookingScreen: React.FC = () => {
     return Math.round(totalCost);
   };
 
-  const getImageSource = () => {
+  const getImageSource = async () => {
     if (!sitterImage) {
       return require('../src/assets/images/default-avatar.png');
     }
@@ -303,7 +317,8 @@ const WeekBookingScreen: React.FC = () => {
     }
     
     if (typeof sitterImage === 'string' && sitterImage.startsWith('/storage/')) {
-      const fullUrl = `http://172.20.10.2:8000${sitterImage}`;
+      const { networkService } = await import('../src/services/networkService');
+      const fullUrl = networkService.getImageUrl(sitterImage);
       return { uri: fullUrl };
     }
     
@@ -352,7 +367,7 @@ const WeekBookingScreen: React.FC = () => {
           <View style={styles.sitterInfoHeader}>
             <View style={styles.sitterAvatar}>
               <Image 
-                source={getImageSource()} 
+                source={imageSource || require('../src/assets/images/default-avatar.png')} 
                 style={styles.avatarImage}
                 defaultSource={require('../src/assets/images/default-avatar.png')}
                 resizeMode="cover"

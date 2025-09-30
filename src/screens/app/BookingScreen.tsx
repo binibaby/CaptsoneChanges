@@ -423,7 +423,8 @@ const BookingScreen: React.FC = () => {
     
     // If it's a storage path (starts with /storage/), construct full URL
     if (typeof sitterImage === 'string' && sitterImage.startsWith('/storage/')) {
-      const fullUrl = `http://172.20.10.2:8000${sitterImage}`;
+      const { networkService } = require('../../services/networkService');
+      const fullUrl = networkService.getImageUrl(sitterImage);
       console.log('🖼️ BookingScreen - Using storage path, full URL:', fullUrl);
       return { uri: fullUrl };
     }

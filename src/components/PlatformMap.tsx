@@ -50,6 +50,9 @@ const WebMapComponent = ({ initialRegion, showsUserLocation, children, style, ..
     <View style={[StyleSheet.absoluteFill, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
       <Text style={{ fontSize: 18, color: '#666' }}>🗺️ Interactive Map</Text>
       <Text style={{ fontSize: 14, color: '#999', marginTop: 8 }}>Map will be displayed here</Text>
+      {props.mapType === 'hybrid' && (
+        <Text style={{ fontSize: 12, color: '#3B82F6', marginTop: 4, fontWeight: '600' }}>📐 3D Mode Enabled</Text>
+      )}
       <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>Tap on sitters below to view profiles</Text>
     </View>
   );
@@ -62,7 +65,17 @@ const NativeMapComponent = ({ children, style, ...props }: any) => {
     const MapView = Maps.default || Maps.MapView;
 
     return (
-      <MapView style={style} {...props}>
+      <MapView 
+        style={style} 
+        {...props}
+        // 3D properties
+        pitchEnabled={props.pitchEnabled || false}
+        rotateEnabled={props.rotateEnabled || false}
+        tiltEnabled={props.tiltEnabled || false}
+        mapType={props.mapType || 'standard'}
+        scrollEnabled={props.scrollEnabled !== false}
+        zoomEnabled={props.zoomEnabled !== false}
+      >
         {children}
       </MapView>
     );

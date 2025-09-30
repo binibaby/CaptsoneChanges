@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
     FlatList,
     Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
     SafeAreaView,
     StyleSheet,
     Text,
@@ -12,6 +15,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { ReverbConversation, ReverbMessage, reverbMessagingService } from '../../services/reverbMessagingService';
 
 interface Message {
   id: string;
@@ -40,49 +44,174 @@ interface SupportMessage {
 
 const PetOwnerMessagesScreen = () => {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([
-    // New users start with no messages
-  ]);
-
-  const [selectedChat, setSelectedChat] = useState<Message | null>(null);
+  const params = useLocalSearchParams();
+  const [conversations, setConversations] = useState<ReverbConversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<ReverbConversation | null>(null);
+  const [messages, setMessages] = useState<ReverbMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showSupportChat, setShowSupportChat] = useState(false);
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
   const [supportTicketId, setSupportTicketId] = useState<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    // New users start with no chat messages
-  ]);
-  const [newMessage, setNewMessage] = useState('');
+  const [hasAutoOpenedConversation, setHasAutoOpenedConversation] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Load conversations
+  const loadConversations = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('💬 Loading conversations...');
+      const data = await reverbMessagingService.getConversations();
+      console.log('💬 Conversations loaded:', data.length);
+      setConversations(data);
+    } catch (error) {
+      console.error('❌ Error loading conversations:', error);
+      // Don't show alert - let the service handle fallback
+      console.log('⚠️ Conversations will use fallback data');
+      setConversations([]); // This will trigger the fallback in the service
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load messages for a conversation
+  const loadMessages = useCallback(async (conversationId: string) => {
+    try {
+      const data = await reverbMessagingService.getMessages(conversationId);
+      setMessages(data);
+    } catch (error) {
+      console.error('❌ Error loading messages:', error);
+      Alert.alert('Error', 'Failed to load messages');
+    }
+  }, []);
+
+  // Refresh conversations
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadConversations();
+    setRefreshing(false);
+  }, [loadConversations]);
+
+  // Send message
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation) return;
+
+    try {
+      const otherUserId = selectedConversation.other_user.id;
+      await reverbMessagingService.sendMessage(otherUserId, newMessage.trim());
+      
+      // Clear input
+      setNewMessage('');
+      
+      // Reload messages to show the new message
+      await loadMessages(selectedConversation.conversation_id);
+      
+      // Refresh conversations to update last message
+      loadConversations();
+    } catch (error) {
+      console.error('❌ Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message');
+    }
+  };
 
   const handleBack = () => {
-    if (selectedChat) {
-      setSelectedChat(null);
+    if (selectedConversation) {
+      setSelectedConversation(null);
+      setMessages([]);
     } else {
       router.back();
     }
   };
 
-  const handleChatPress = (message: Message) => {
-    setSelectedChat(message);
-    // Mark messages as read
-    setMessages(prev => 
-      prev.map(m => 
-        m.id === message.id ? { ...m, unreadCount: 0 } : m
-      )
-    );
+  const handleChatPress = async (conversation: ReverbConversation) => {
+    setSelectedConversation(conversation);
+    await loadMessages(conversation.conversation_id);
+    await reverbMessagingService.markAsRead(conversation.conversation_id);
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const message: ChatMessage = {
-        id: Date.now().toString(),
-        text: newMessage,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isFromMe: true,
-      };
-      setChatMessages(prev => [...prev, message]);
-      setNewMessage('');
+  // Load current user ID
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const { default: authService } = await import('../../services/authService');
+        const user = await authService.getCurrentUser();
+        console.log('🔍 Loaded user for owner:', user);
+        if (user && user.id) {
+          const userId = user.id.toString();
+          setCurrentUserId(userId);
+          console.log('🔍 Set currentUserId for owner:', userId);
+        }
+      } catch (error) {
+        console.error('Error loading current user:', error);
+      }
+    };
+    loadCurrentUser();
+  }, []);
+
+  // Initialize messaging
+  useEffect(() => {
+    console.log('💬 Initializing messaging in PetOwnerMessagesScreen');
+    
+    // Load initial data
+    loadConversations();
+    
+    // Set up real-time event listeners
+    reverbMessagingService.onMessage((message: ReverbMessage) => {
+      console.log('💬 Real-time message received:', message);
+      // Reload messages if it's for the current conversation
+      if (selectedConversation && message.conversation_id === selectedConversation.conversation_id) {
+        loadMessages(selectedConversation.conversation_id);
+      }
+      // Reload conversations to update last message
+      loadConversations();
+    });
+
+    reverbMessagingService.onConversationUpdated((conversationId: string) => {
+      console.log('💬 Conversation updated:', conversationId);
+      loadConversations();
+    });
+
+    // Connect to Reverb if not already connected
+    if (!reverbMessagingService.isWebSocketConnected()) {
+      reverbMessagingService.connect();
     }
-  };
+  }, [loadConversations]); // Removed selectedConversation from dependencies
+
+  // Handle opening specific conversation when conversations are loaded
+  useEffect(() => {
+    if (params.conversationId && !hasAutoOpenedConversation && conversations.length > 0) {
+      console.log('💬 Auto-opening conversation with ID:', params.conversationId);
+      console.log('💬 Available conversations:', conversations.map(c => c.conversation_id));
+      
+      const conversation = conversations.find(c => c.conversation_id === params.conversationId);
+      if (conversation) {
+        console.log('💬 Found existing conversation, opening chat:', conversation.other_user.name);
+        handleChatPress(conversation);
+        setHasAutoOpenedConversation(true);
+      } else {
+        console.log('💬 Conversation not found in list, creating new one');
+        // If conversation doesn't exist, create it and open it
+        const otherUserId = params.otherUserId;
+        if (otherUserId) {
+          const newConversation: ReverbConversation = {
+            conversation_id: params.conversationId,
+            other_user: {
+              id: otherUserId,
+              name: params.otherUserName || `Sitter ${otherUserId}`,
+              profile_image: params.otherUserImage || null
+            },
+            last_message: null,
+            unread_count: 0,
+            updated_at: new Date().toISOString()
+          };
+          console.log('💬 Created new conversation:', newConversation);
+          handleChatPress(newConversation);
+          setHasAutoOpenedConversation(true);
+        }
+      }
+    }
+  }, [conversations, params.conversationId, params.otherUserId, params.otherUserName, params.otherUserImage, hasAutoOpenedConversation]);
 
   const handleSupportChat = async () => {
     setShowSupportChat(true);
@@ -180,25 +309,40 @@ const PetOwnerMessagesScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderChatMessage = ({ item }: { item: ChatMessage }) => (
-    <View style={[
-      styles.chatMessage,
-      item.isFromMe ? styles.myMessage : styles.theirMessage
-    ]}>
-      <Text style={[
-        styles.messageText,
-        item.isFromMe ? styles.myMessageText : styles.theirMessageText
+  const renderChatMessage = ({ item }: { item: ReverbMessage }) => {
+    // For owner screen: current user is "me", others are "them"
+    const isFromMe = currentUserId ? item.sender_id.toString() === currentUserId.toString() : false;
+    const messageTime = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    // Debug logging
+    console.log('🔍 Message debug:', {
+      messageId: item.id,
+      senderId: item.sender_id,
+      currentUserId: currentUserId,
+      isFromMe: isFromMe,
+      message: item.message.substring(0, 20) + '...'
+    });
+    
+    return (
+      <View style={[
+        styles.chatMessage,
+        isFromMe ? styles.myMessage : styles.theirMessage
       ]}>
-        {item.text}
-      </Text>
-      <Text style={[
-        styles.messageTime,
-        item.isFromMe ? styles.myMessageTime : styles.theirMessageTime
-      ]}>
-        {item.time}
-      </Text>
-    </View>
-  );
+        <Text style={[
+          styles.messageText,
+          isFromMe ? styles.myMessageText : styles.theirMessageText
+        ]}>
+          {item.message}
+        </Text>
+        <Text style={[
+          styles.messageTime,
+          isFromMe ? styles.myMessageTime : styles.theirMessageTime
+        ]}>
+          {messageTime}
+        </Text>
+      </View>
+    );
+  };
 
   const renderSupportMessage = ({ item }: { item: SupportMessage }) => (
     <View style={[
@@ -220,60 +364,133 @@ const PetOwnerMessagesScreen = () => {
     </View>
   );
 
-  if (selectedChat) {
+  const renderConversationItem = ({ item }: { item: ReverbConversation }) => {
+    // Debug profile image
+    console.log('🔍 Profile image debug:', {
+      conversationId: item.conversation_id,
+      otherUserName: item.other_user.name,
+      profileImage: item.other_user.profile_image,
+      hasProfileImage: !!item.other_user.profile_image
+    });
+    
     return (
-      <SafeAreaView style={styles.container}>
-        {/* Chat Header */}
-        <View style={styles.chatHeader}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          
-          <View style={styles.chatHeaderInfo}>
-            <Image source={selectedChat.avatar} style={styles.chatAvatar} />
-            <View style={styles.chatHeaderText}>
-              <Text style={styles.chatHeaderName}>{selectedChat.senderName}</Text>
-              <Text style={styles.chatHeaderStatus}>
-                {selectedChat.isOnline ? 'Online' : 'Offline'}
+      <TouchableOpacity 
+        style={styles.conversationItem} 
+        onPress={() => handleChatPress(item)}
+      >
+        <View style={styles.avatarContainer}>
+          {item.other_user.profile_image ? (
+            <Image 
+              source={{ uri: item.other_user.profile_image }} 
+              style={styles.avatar}
+              onError={(error) => {
+                console.log('❌ Image load error for', item.other_user.name, ':', error.nativeEvent.error);
+                console.log('❌ Failed URL:', item.other_user.profile_image);
+              }}
+              onLoad={() => {
+                console.log('✅ Image loaded successfully for:', item.other_user.name);
+                console.log('✅ Image URL:', item.other_user.profile_image);
+              }}
+            />
+          ) : (
+            <View style={[styles.avatar, styles.placeholderAvatar]}>
+              <Text style={styles.placeholderText}>
+                {item.other_user.name.charAt(0).toUpperCase()}
               </Text>
             </View>
+          )}
+          <View style={styles.onlineIndicator} />
+        </View>
+      
+        <View style={styles.conversationContent}>
+          <View style={styles.conversationHeader}>
+            <Text style={styles.conversationName}>{item.other_user.name}</Text>
+            <Text style={styles.conversationTime}>
+              {item.last_message ? new Date(item.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+            </Text>
           </View>
           
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#333" />
-          </TouchableOpacity>
+          <Text style={styles.conversationLastMessage} numberOfLines={2}>
+            {item.last_message ? item.last_message.message : 'Send a message to start chatting'}
+          </Text>
         </View>
+        
+        {item.unread_count > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadCount}>{item.unread_count}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
-        {/* Chat Messages */}
-        <FlatList
-          data={chatMessages}
-          renderItem={renderChatMessage}
-          keyExtractor={(item) => item.id}
-          style={styles.chatMessages}
-          showsVerticalScrollIndicator={false}
-        />
+  if (selectedConversation) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          {/* Chat Header */}
+          <View style={styles.chatHeader}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            
+            <View style={styles.chatHeaderInfo}>
+              <Image source={{ uri: selectedConversation.other_user.profile_image || 'https://via.placeholder.com/50' }} style={styles.chatAvatar} />
+              <View style={styles.chatHeaderText}>
+                <Text style={styles.chatHeaderName}>{selectedConversation.other_user.name}</Text>
+                <Text style={styles.chatHeaderStatus}>
+                  Online
+                </Text>
+              </View>
+            </View>
+            
+            <TouchableOpacity style={styles.moreButton}>
+              <Ionicons name="ellipsis-vertical" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
 
-        {/* Message Input */}
-        <View style={styles.messageInput}>
-          <TextInput
-            style={styles.input}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            placeholder="Type a message..."
-            multiline
+          {/* Chat Messages */}
+          <FlatList
+            data={messages}
+            renderItem={renderChatMessage}
+            keyExtractor={(item) => item.id}
+            style={styles.chatMessages}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyChatContainer}>
+                <Ionicons name="chatbubble-outline" size={48} color="#ccc" />
+                <Text style={styles.emptyChatTitle}>Start the conversation</Text>
+                <Text style={styles.emptyChatSubtitle}>Send a message to the sitter to begin chatting</Text>
+              </View>
+            }
           />
-          <TouchableOpacity 
-            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
-            onPress={handleSendMessage}
-            disabled={!newMessage.trim()}
-          >
-            <Ionicons 
-              name="send" 
-              size={20} 
-              color={newMessage.trim() ? '#fff' : '#ccc'} 
+
+          {/* Message Input */}
+          <View style={styles.messageInput}>
+            <TextInput
+              style={styles.input}
+              value={newMessage}
+              onChangeText={setNewMessage}
+              placeholder="Type a message..."
+              multiline
             />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity 
+              style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
+              onPress={handleSendMessage}
+              disabled={!newMessage.trim()}
+            >
+              <Ionicons 
+                name="send" 
+                size={20} 
+                color={newMessage.trim() ? '#fff' : '#ccc'} 
+              />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -354,15 +571,23 @@ const PetOwnerMessagesScreen = () => {
 
       {/* Messages List */}
       <FlatList
-        data={messages}
-        renderItem={renderMessageItem}
-        keyExtractor={(item) => item.id}
+        data={conversations}
+        renderItem={renderConversationItem}
+        keyExtractor={(item) => item.conversation_id}
         style={styles.messagesList}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3B82F6']}
+            tintColor="#3B82F6"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyTitle}>No messages yet</Text>
+            <Text style={styles.emptyTitle}>No conversations yet</Text>
             <Text style={styles.emptySubtitle}>When you book with pet sitters, you can message them here.</Text>
           </View>
         }
@@ -375,6 +600,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -625,6 +853,70 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  conversationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  conversationContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  conversationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  conversationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  conversationTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  conversationLastMessage: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  emptyChatContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyChatTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyChatSubtitle: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  placeholderAvatar: {
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#666',
   },
 });
 

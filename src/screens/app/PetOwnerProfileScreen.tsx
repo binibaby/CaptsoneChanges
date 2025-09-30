@@ -3,15 +3,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -36,13 +36,14 @@ const PetOwnerProfileScreen = () => {
   useEffect(() => {
     if (user) {
       console.log('📱 PetOwnerProfileScreen: Updating profile data from user:', user);
-      // Use firstName and lastName if available, otherwise fallback to splitting name
-      const firstName = user.firstName || (user.name ? user.name.split(' ')[0] : '');
-      const lastName = user.lastName || (user.name ? user.name.split(' ').slice(1).join(' ') : '');
+      // Split name into firstName and lastName
+      const nameParts = (user.name || '').split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
 
       setProfile({
-        firstName,
-        lastName,
+        firstName: firstName,
+        lastName: lastName,
         email: user.email || '',
         phone: user.phone || '',
         address: user.address || '',
@@ -58,8 +59,12 @@ const PetOwnerProfileScreen = () => {
 
   const handleSave = async () => {
     try {
+      // Combine firstName and lastName into full name
+      const fullName = `${profile.firstName} ${profile.lastName}`.trim();
+      
       // Update the user profile with the new data
       await updateUserProfile({
+        name: fullName,
         firstName: profile.firstName,
         lastName: profile.lastName,
         email: profile.email,
@@ -106,7 +111,11 @@ const PetOwnerProfileScreen = () => {
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/storage/')) return `http://172.20.10.2:8000${uri}`;
+    if (uri.startsWith('file://') || uri.startsWith('content://')) return uri;
+    if (uri.startsWith('/storage/') || uri.includes('profile_images/')) {
+      const { networkService } = require('../../services/networkService');
+      return networkService.getImageUrl(uri.startsWith('/storage/') ? uri : `/storage/${uri}`);
+    }
     return uri;
   };
 
@@ -134,7 +143,10 @@ const PetOwnerProfileScreen = () => {
     
     if (user && user.profileImage && user.profileImage !== profileImage) {
       console.log('✅ PetOwnerProfileScreen: Updating profile image from user data:', user.profileImage);
-      setProfileImage(user.profileImage);
+      // Convert storage path to full URL if needed
+      const fullUrl = user.profileImage.startsWith('http') ? user.profileImage : getFullImageUrl(user.profileImage);
+      console.log('✅ PetOwnerProfileScreen: Converted to full URL:', fullUrl);
+      setProfileImage(fullUrl);
       setImageError(false);
     } else if (!user?.profileImage && profileImage && !profileImage.startsWith('file://') && !profileImage.startsWith('content://')) {
       // Only clear if the current image is not a local file (camera/gallery pick)
@@ -222,7 +234,7 @@ const PetOwnerProfileScreen = () => {
       setImageError(false);
       
       const formData = new FormData();
-      formData.append('profile_image', {
+      formData.append('image', {
         uri: imageUri,
         type: 'image/jpeg',
         name: 'profile_image.jpg',
@@ -245,12 +257,23 @@ const PetOwnerProfileScreen = () => {
       const result = await response.json();
       
       if (result.success) {
-        // Update the user context first, then let useEffect handle the local state update
-        // This prevents double state updates and blinking
-        await updateUserProfile({ profileImage: result.profile_image });
+        console.log('PetOwnerProfileScreen: Upload successful:', result.profile_image);
+        console.log('PetOwnerProfileScreen: Backend response fields:');
+        console.log('  - result.profile_image:', result.profile_image);
+        console.log('  - result.full_url:', result.full_url);
+        console.log('  - result.profile_image_url:', result.profile_image_url);
         
-        // The useEffect will automatically update the local state when user.profileImage changes
+        // Use the full URL from backend response if available, otherwise generate it
+        const fullImageUrl = result.full_url || result.profile_image_url || getFullImageUrl(result.profile_image);
+        console.log('PetOwnerProfileScreen: Using full URL from backend:', fullImageUrl);
+        
+        // Update local state immediately for instant display
+        setProfileImage(fullImageUrl);
         setImageError(false);
+        
+        // Update the user context with storage path for persistence
+        await updateUserProfile({ profileImage: result.profile_image });
+        console.log('PetOwnerProfileScreen: User context updated with storage path');
         
         Alert.alert('Success', 'Profile image updated successfully!');
       } else {
@@ -297,7 +320,7 @@ const PetOwnerProfileScreen = () => {
           <TouchableOpacity onPress={pickImage} style={styles.profileImageContainer}>
             <Image 
               source={
-                profileImage && isValidImageUri(profileImage) && !imageError 
+                profileImage 
                   ? { uri: getFullImageUrl(profileImage) } 
                   : require('../../assets/images/default-avatar.png')
               } 
@@ -311,9 +334,7 @@ const PetOwnerProfileScreen = () => {
             </View>
           </TouchableOpacity>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>
-              {`${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Enter Your Name'}
-            </Text>
+            <Text style={styles.profileName}>{`${profile.firstName} ${profile.lastName}`.trim()}</Text>
             <Text style={styles.profileSubtitle}>Pet Owner</Text>
             <Text style={styles.locationText}>📍 {profile.address || 'No address set'}</Text>
           </View>
@@ -351,14 +372,15 @@ const PetOwnerProfileScreen = () => {
               <Text style={[styles.input, styles.disabledInput]}>{profile.firstName}</Text>
             )}
           </View>
+
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Last Name</Text>
+            <Text style={styles.inputLabel}>Last Name </Text>
             {isEditing ? (
               <TextInput
                 style={styles.input}
                 value={profile.lastName}
                 onChangeText={(text) => setProfile({...profile, lastName: text})}
-                placeholder="Enter your last name"
+                placeholder="Enter your last name (required)"
               />
             ) : (
               <Text style={[styles.input, styles.disabledInput]}>{profile.lastName}</Text>

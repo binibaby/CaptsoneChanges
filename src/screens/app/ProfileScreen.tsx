@@ -1,18 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -24,29 +23,22 @@ const ProfileScreen = () => {
   console.log('ProfileScreen: User details:', {
     id: user?.id,
     name: user?.name,
-    firstName: user?.firstName,
-    lastName: user?.lastName,
     email: user?.email,
     role: user?.userRole,
     phone: user?.phone,
-    address: user?.address
+    address: user?.address,
+    profileImage: user?.profileImage
   });
-  
-  // Enhanced debugging for name display issue
-  console.log('🔍 NAME DEBUG - User object keys:', user ? Object.keys(user) : 'No user');
-  console.log('🔍 NAME DEBUG - User firstName type:', typeof user?.firstName);
-  console.log('🔍 NAME DEBUG - User lastName type:', typeof user?.lastName);
-  console.log('🔍 NAME DEBUG - User name type:', typeof user?.name);
-  console.log('🔍 NAME DEBUG - User firstName value:', JSON.stringify(user?.firstName));
-  console.log('🔍 NAME DEBUG - User lastName value:', JSON.stringify(user?.lastName));
-  console.log('🔍 NAME DEBUG - User name value:', JSON.stringify(user?.name));
   
   const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
   const [imageError, setImageError] = useState(false);
+  const [justUploadedImage, setJustUploadedImage] = useState(false);
+  
+  console.log('ProfileScreen: Current profileImage state:', profileImage);
+  console.log('ProfileScreen: Image error state:', imageError);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageRetryCount, setImageRetryCount] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [newSpecialty, setNewSpecialty] = useState('');
   const [profileData, setProfileData] = useState<{
     firstName: string;
@@ -74,73 +66,70 @@ const ProfileScreen = () => {
   });
 
   console.log('ProfileScreen: Current profileData:', profileData);
-  console.log('ProfileScreen: Current user firstName:', user?.firstName);
-  console.log('ProfileScreen: Current user lastName:', user?.lastName);
-  console.log('ProfileScreen: Current user name:', user?.name);
-  
-  // Debug AsyncStorage data
-  React.useEffect(() => {
-    const debugAsyncStorage = async () => {
-      try {
-        console.log('🔍 DEBUGGING ASYNC STORAGE FROM PROFILE SCREEN...');
-        
-        // Check user data
-        const userData = await AsyncStorage.getItem('user');
-        console.log('📱 User data from AsyncStorage:', userData);
-        
-        if (userData) {
-          const user = JSON.parse(userData);
-          console.log('📱 Parsed user object:', user);
-          console.log('📱 User firstName:', user.firstName);
-          console.log('📱 User lastName:', user.lastName);
-          console.log('📱 User name:', user.name);
-          console.log('📱 User email:', user.email);
-        }
-        
-        // Check profile data
-        const profileData = await AsyncStorage.getItem('user_profile_data');
-        console.log('📱 Profile data from AsyncStorage:', profileData);
-        
-        if (profileData) {
-          const profile = JSON.parse(profileData);
-          console.log('📱 Parsed profile object:', profile);
-          console.log('📱 Profile firstName:', profile.firstName);
-          console.log('📱 Profile lastName:', profile.lastName);
-        }
-        
-      } catch (error) {
-        console.error('❌ Error debugging AsyncStorage:', error);
-      }
-    };
-    
-    debugAsyncStorage();
-    
-    // Force refresh user data if user is null or has empty name
-    if (!user || (!user.name && !user.firstName && !user.lastName)) {
-      console.log('🔍 FORCING USER DATA REFRESH...');
-      refresh();
-    }
-  }, [user, refresh]);
 
   // Helper function to validate image URI
   const isValidImageUri = (uri: string | null): boolean => {
     if (!uri || uri.trim() === '') return false;
     // Check if it's a valid URL or local file path
-    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+    return uri.startsWith('http') || 
+           uri.startsWith('file://') || 
+           uri.startsWith('content://') || 
+           uri.startsWith('data:') || 
+           uri.startsWith('/storage/') ||
+           uri.includes('profile_images/');
   };
 
   // Helper function to get full image URL
   const getFullImageUrl = (uri: string | null): string | null => {
-    if (!uri) return null;
-    if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/storage/')) {
-      const fullUrl = `http://172.20.10.2:8000${uri}`;
-      console.log('🔗 ProfileScreen: Generated full URL:', fullUrl);
-      return fullUrl;
+    console.log('🔗 getFullImageUrl called with:', uri);
+    if (!uri) {
+      console.log('🔗 getFullImageUrl: No URI provided');
+      return null;
     }
-    if (uri.startsWith('file://') || uri.startsWith('content://')) return uri; // Keep local URIs as-is
+    if (uri.startsWith('http')) {
+      console.log('🔗 getFullImageUrl: Already HTTP URL:', uri);
+      return uri;
+    }
+    if (uri.startsWith('file://') || uri.startsWith('content://')) {
+      console.log('🔗 getFullImageUrl: Local URI:', uri);
+      return uri; // Keep local URIs as-is
+    }
+    if (uri.startsWith('/storage/') || uri.includes('profile_images/')) {
+      try {
+        const { networkService } = require('../../services/networkService');
+        // Ensure the path starts with /storage/ for proper URL generation
+        const storagePath = uri.startsWith('/storage/') ? uri : `/storage/${uri}`;
+        const fullUrl = networkService.getImageUrl(storagePath);
+        console.log('🔗 ProfileScreen: Generated full URL via network service:', fullUrl);
+        return fullUrl;
+      } catch (error) {
+        console.error('❌ ProfileScreen: Error getting image URL:', error);
+        // Fallback to hardcoded URL if network service fails
+        const storagePath = uri.startsWith('/storage/') ? uri : `/storage/${uri}`;
+        const fallbackUrl = `http://192.168.100.192:8000${storagePath}`;
+        console.log('🔗 ProfileScreen: Using fallback URL:', fallbackUrl);
+        return fallbackUrl;
+      }
+    }
+    console.log('🔗 getFullImageUrl: No processing needed, returning as-is:', uri);
     return uri;
   };
+
+  // Force network detection on component mount
+  React.useEffect(() => {
+    const forceNetworkDetection = async () => {
+      try {
+        const { networkService } = require('../../services/networkService');
+        console.log('🌐 ProfileScreen: Forcing network detection...');
+        await networkService.detectWorkingIP();
+        console.log('🌐 ProfileScreen: Network detection complete, base URL:', networkService.getBaseUrl());
+      } catch (error) {
+        console.error('❌ ProfileScreen: Network detection failed:', error);
+      }
+    };
+    
+    forceNetworkDetection();
+  }, []);
 
   // Handle image load error
   const handleImageError = () => {
@@ -163,24 +152,25 @@ const ProfileScreen = () => {
     setImageRetryCount(0); // Reset retry count on successful load
   };
 
-  // Sync profile image with user data - only sync when user data changes and local state is different
+  // Sync profile image with user data
   useEffect(() => {
     console.log('🔍 ProfileScreen: useEffect triggered, user profileImage:', user?.profileImage);
     console.log('🔍 ProfileScreen: Current local profileImage state:', profileImage);
     console.log('🔍 ProfileScreen: Is uploading:', isUploadingImage);
-    console.log('🔍 ProfileScreen: User object:', user);
     
-    // Don't sync during upload to prevent blinking
-    if (isUploadingImage) {
-      console.log('⏳ ProfileScreen: Skipping sync during upload');
+    // Don't sync during upload or immediately after upload to prevent blinking
+    if (isUploadingImage || justUploadedImage) {
+      console.log('⏳ ProfileScreen: Skipping sync during upload or just after upload');
       return;
     }
     
-    // Only sync if the user data has a different profile image than what we currently have
-    // This prevents unnecessary re-renders and blinking
+    // Always sync with user data when it changes
     if (user?.profileImage && user.profileImage !== profileImage) {
       console.log('✅ ProfileScreen: Updating profile image from user data:', user.profileImage);
-      setProfileImage(user.profileImage);
+      // Convert storage path to full URL if needed
+      const fullUrl = user.profileImage.startsWith('http') ? user.profileImage : getFullImageUrl(user.profileImage);
+      console.log('✅ ProfileScreen: Converted to full URL:', fullUrl);
+      setProfileImage(fullUrl);
       setImageError(false);
     } else if (!user?.profileImage && profileImage && !profileImage.startsWith('file://') && !profileImage.startsWith('content://')) {
       // Only clear if the current image is not a local file (camera/gallery pick)
@@ -190,7 +180,7 @@ const ProfileScreen = () => {
     } else {
       console.log('🔄 ProfileScreen: Profile image already in sync');
     }
-  }, [user?.profileImage, isUploadingImage]);
+  }, [user?.profileImage, isUploadingImage, justUploadedImage]);
 
   // Show loading state while auth context is loading
   if (isLoading) {
@@ -231,58 +221,13 @@ const ProfileScreen = () => {
       // Profile image is handled by the separate useEffect above
       console.log('📱 ProfileScreen: Profile image will be handled by sync useEffect');
       
-      // Use firstName and lastName if available, otherwise fallback to splitting name
-      let firstName = user.firstName || '';
-      let lastName = user.lastName || '';
+      // Safely extract name parts with proper fallbacks
+      const userName = user.name || '';
+      const nameParts = userName ? userName.split(' ') : [];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
       
-      // If firstName and lastName are empty but name exists, split the name
-      if (!firstName && !lastName && user.name && user.name.trim()) {
-        const nameParts = user.name.trim().split(' ');
-        firstName = nameParts[0] || '';
-        lastName = nameParts.slice(1).join(' ') || '';
-      }
-      
-      // If still empty, try to get from AsyncStorage directly
-      if (!firstName && !lastName) {
-        try {
-          const userData = await AsyncStorage.getItem('user');
-          if (userData) {
-            const storedUser = JSON.parse(userData);
-            firstName = storedUser.firstName || '';
-            lastName = storedUser.lastName || '';
-            
-            // If still empty, split the name from storage
-            if (!firstName && !lastName && storedUser.name && storedUser.name.trim()) {
-              const nameParts = storedUser.name.trim().split(' ');
-              firstName = nameParts[0] || '';
-              lastName = nameParts.slice(1).join(' ') || '';
-            }
-          }
-        } catch (error) {
-          console.error('Error getting user data from AsyncStorage:', error);
-        }
-      }
-      
-      console.log('Profile screen: User name parts:', { 
-        userName: user.name, 
-        userFirstName: user.firstName, 
-        userLastName: user.lastName,
-        extractedFirstName: firstName, 
-        extractedLastName: lastName,
-        firstNameExists: !!user.firstName,
-        lastNameExists: !!user.lastName,
-        nameExists: !!user.name
-      });
-      
-      // Enhanced debugging for name extraction
-      console.log('🔍 NAME EXTRACTION DEBUG:');
-      console.log('  - user.firstName:', JSON.stringify(user.firstName));
-      console.log('  - user.lastName:', JSON.stringify(user.lastName));
-      console.log('  - user.name:', JSON.stringify(user.name));
-      console.log('  - firstName result:', JSON.stringify(firstName));
-      console.log('  - lastName result:', JSON.stringify(lastName));
-      console.log('  - firstName length:', firstName?.length);
-      console.log('  - lastName length:', lastName?.length);
+      console.log('Profile screen: User name parts:', { userName, nameParts, firstName, lastName });
       
       const newProfileData = {
         firstName,
@@ -303,11 +248,6 @@ const ProfileScreen = () => {
       };
       
       console.log('Profile screen: Setting new profile data:', newProfileData);
-      console.log('🔍 PROFILE DATA DEBUG:');
-      console.log('  - newProfileData.firstName:', JSON.stringify(newProfileData.firstName));
-      console.log('  - newProfileData.lastName:', JSON.stringify(newProfileData.lastName));
-      console.log('  - newProfileData.firstName length:', newProfileData.firstName?.length);
-      console.log('  - newProfileData.lastName length:', newProfileData.lastName?.length);
       setProfileData(newProfileData);
     } else {
       console.log('Profile screen: No user data, starting fresh');
@@ -464,7 +404,7 @@ const ProfileScreen = () => {
       setImageError(false);
       
       const formData = new FormData();
-      formData.append('profile_image', {
+      formData.append('image', {
         uri: imageUri,
         type: 'image/jpeg',
         name: 'profile_image.jpg',
@@ -497,14 +437,65 @@ const ProfileScreen = () => {
       
       if (result.success) {
         console.log('Profile image uploaded successfully:', result.profile_image);
+        console.log('Full result object:', JSON.stringify(result, null, 2));
         
-        // Update the user context first, then let useEffect handle the local state update
-        // This prevents double state updates and blinking
-        await updateUserProfile({ profileImage: result.profile_image });
-        console.log('ProfileScreen: User context updated with profile image');
+        // Use the full URL from backend response if available, otherwise generate it
+        const fullImageUrl = result.full_url || result.profile_image_url || getFullImageUrl(result.profile_image);
+        console.log('ProfileScreen: Backend response fields:');
+        console.log('  - result.profile_image:', result.profile_image);
+        console.log('  - result.full_url:', result.full_url);
+        console.log('  - result.profile_image_url:', result.profile_image_url);
+        console.log('ProfileScreen: Using full URL from backend:', fullImageUrl);
+        console.log('ProfileScreen: Is valid URI:', isValidImageUri(fullImageUrl));
+        console.log('ProfileScreen: Setting local profile image immediately:', fullImageUrl);
         
-        // The useEffect will automatically update the local state when user.profileImage changes
+        // Force the image to display by bypassing validation temporarily
+        console.log('ProfileScreen: FORCING IMAGE DISPLAY - bypassing validation');
+        setProfileImage(fullImageUrl);
         setImageError(false);
+        setJustUploadedImage(true); // Flag to prevent useEffect from overriding
+        
+        // Also try with a hardcoded URL to test
+        const testUrl = `http://192.168.100.192:8000/storage/${result.profile_image}`;
+        console.log('ProfileScreen: TEST URL:', testUrl);
+        setTimeout(() => {
+          console.log('ProfileScreen: Trying test URL after 500ms');
+          setProfileImage(testUrl);
+        }, 500);
+        
+        // Update the user context with storage path for persistence
+        await updateUserProfile({ profileImage: result.profile_image });
+        console.log('ProfileScreen: User context updated with storage path');
+        
+        // Force refresh user data to ensure we have the latest from backend
+        await refresh();
+        console.log('ProfileScreen: User data refreshed from backend');
+        
+        // Clear the flag after a delay to allow normal syncing
+        setTimeout(() => {
+          setJustUploadedImage(false);
+          console.log('ProfileScreen: Cleared justUploadedImage flag');
+        }, 2000);
+        
+        // Test the image URL after a short delay
+        setTimeout(() => {
+          console.log('🧪 POST-UPLOAD TEST:');
+          console.log('  - Local profileImage state:', profileImage);
+          console.log('  - User profileImage:', user?.profileImage);
+          console.log('  - Generated URL:', getFullImageUrl(profileImage));
+          console.log('  - Is valid:', isValidImageUri(profileImage));
+          
+          // Test if the URL is accessible
+          if (fullImageUrl) {
+            fetch(fullImageUrl, { method: 'HEAD' })
+              .then(response => {
+                console.log('🧪 URL accessibility test:', response.status, response.ok ? 'SUCCESS' : 'FAILED');
+              })
+              .catch(error => {
+                console.log('🧪 URL accessibility test FAILED:', error.message);
+              });
+          }
+        }, 1000);
         
         Alert.alert('Success', 'Profile image updated successfully!');
       } else {
@@ -523,11 +514,7 @@ const ProfileScreen = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (isSaving) return; // Prevent multiple saves
-    
     try {
-      setIsSaving(true);
-      
       // Validate profileData exists and has required fields
       if (!profileData) {
         console.error('ProfileScreen: profileData is null or undefined');
@@ -535,15 +522,34 @@ const ProfileScreen = () => {
         return;
       }
 
+      // Validate required fields
+      if (!profileData.firstName || profileData.firstName.trim() === '') {
+        Alert.alert('Error', 'First name is required. Please enter your first name.');
+        return;
+      }
+      
+      if (!profileData.lastName || profileData.lastName.trim() === '') {
+        Alert.alert('Error', 'Last name is required. Please enter your last name.');
+        return;
+      }
+
       // Ensure firstName and lastName have fallback values
-      const firstName = profileData.firstName || '';
-      const lastName = profileData.lastName || '';
+      const firstName = profileData.firstName.trim();
+      const lastName = profileData.lastName.trim();
       
       console.log('ProfileScreen: Saving profile with data:', {
         firstName,
         lastName,
         email: profileData.email,
         phone: profileData.phone,
+      });
+      
+      console.log('ProfileScreen: Current user object before update:', {
+        id: user?.id,
+        name: user?.name,
+        firstName: user?.firstName,
+        lastName: user?.lastName,
+        email: user?.email
       });
 
       // Save the profile data to the auth context
@@ -561,16 +567,11 @@ const ProfileScreen = () => {
         specialties: profileData.specialties || [],
       });
       
-      // Refresh user data to ensure we have the latest from backend
-      await refresh();
-      
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
       console.error('Error saving profile:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -625,16 +626,29 @@ const ProfileScreen = () => {
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <TouchableOpacity onPress={pickProfileImage} disabled={isUploadingImage}>
-          {console.log('🖼️ ProfileScreen: Rendering image with:', {
-            profileImage,
-            isValidUri: isValidImageUri(profileImage),
-            imageError,
-            isUploadingImage,
-            willShowDefault: !(profileImage && isValidImageUri(profileImage) && !imageError)
-          })}
+          {(() => {
+            const imageSource = profileImage && isValidImageUri(profileImage) && !imageError 
+              ? { 
+                  uri: getFullImageUrl(profileImage),
+                  cache: 'force-cache'
+                } 
+              : require('../../assets/images/default-avatar.png');
+            
+            console.log('🖼️ ProfileScreen: Image rendering debug:', {
+              profileImage,
+              isValidUri: isValidImageUri(profileImage),
+              imageError,
+              fullUrl: getFullImageUrl(profileImage),
+              willUseDefault: !(profileImage && isValidImageUri(profileImage) && !imageError),
+              imageSource,
+              userProfileImage: user?.profileImage
+            });
+            
+            return null;
+          })()}
           <Image
             source={
-              profileImage && isValidImageUri(profileImage) && !imageError 
+              profileImage 
                 ? { 
                     uri: getFullImageUrl(profileImage),
                     cache: 'force-cache' // Force cache for better performance
@@ -669,34 +683,10 @@ const ProfileScreen = () => {
           </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>
-              {(() => {
-                // Try multiple sources for the name
-                let displayName = '';
-                
-                // First try profileData
-                if (profileData.firstName || profileData.lastName) {
-                  displayName = `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim();
-                }
-                
-                // If still empty, try user object
-                if (!displayName && user) {
-                  if (user.firstName || user.lastName) {
-                    displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-                  } else if (user.name && user.name.trim()) {
-                    displayName = user.name.trim();
-                  }
-                }
-                
-                console.log('🔍 NAME DISPLAY DEBUG:');
-                console.log('  - profileData.firstName:', JSON.stringify(profileData.firstName));
-                console.log('  - profileData.lastName:', JSON.stringify(profileData.lastName));
-                console.log('  - user.firstName:', JSON.stringify(user?.firstName));
-                console.log('  - user.lastName:', JSON.stringify(user?.lastName));
-                console.log('  - user.name:', JSON.stringify(user?.name));
-                console.log('  - displayName:', JSON.stringify(displayName));
-                
-                return displayName || 'Enter Your Name';
-              })()}
+              {(profileData.firstName || profileData.lastName)
+                ? `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim()
+                : 'Enter Your Name'
+              }
             </Text>
           </View>
         </View>
@@ -707,20 +697,51 @@ const ProfileScreen = () => {
             <Text style={styles.debugText}>Debug: User ID: {user?.id || 'None'}</Text>
             <Text style={styles.debugText}>Debug: User Name: {user?.name || 'None'}</Text>
             <Text style={styles.debugText}>Debug: User Role: {user?.userRole || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - First: {profileData.firstName || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Last: {profileData.lastName || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Email: {profileData.email || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Phone: {profileData.phone || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Address: {profileData.address || 'None'}</Text>
-            {user?.role === 'pet_sitter' && (
-              <>
-                <Text style={styles.debugText}>Debug: Profile Data - Experience: {profileData.experience || 'None'}</Text>
-                <Text style={styles.debugText}>Debug: Profile Data - Hourly Rate: {profileData.hourlyRate || 'None'}</Text>
-                <Text style={styles.debugText}>Debug: Profile Data - Specialties: {profileData.specialties && profileData.specialties.length > 0 ? profileData.specialties.join(', ') : 'None'}</Text>
-              </>
-            )}
-            <Text style={styles.debugText}>Debug: Profile Data - About Me: {profileData.aboutMe || 'None'}</Text>
-            <Text style={styles.debugText}>Debug: Profile Data - Pet Breeds: {profileData.petBreeds.length > 0 ? profileData.petBreeds.join(', ') : 'None'}</Text>
+            <Text style={styles.debugText}>Debug: User ProfileImage: {user?.profileImage || 'None'}</Text>
+            <Text style={styles.debugText}>Debug: Local ProfileImage: {profileImage || 'None'}</Text>
+            <Text style={styles.debugText}>Debug: Image Valid: {isValidImageUri(profileImage) ? 'Yes' : 'No'}</Text>
+            <Text style={styles.debugText}>Debug: Image Error: {imageError ? 'Yes' : 'No'}</Text>
+            <Text style={styles.debugText}>Debug: Full URL: {getFullImageUrl(profileImage) || 'None'}</Text>
+            <TouchableOpacity 
+              style={styles.testButton} 
+              onPress={() => {
+                console.log('🧪 TEST: Testing image URL generation...');
+                console.log('🧪 TEST: User profileImage:', user?.profileImage);
+                console.log('🧪 TEST: Local profileImage:', profileImage);
+                console.log('🧪 TEST: Generated URL:', getFullImageUrl(profileImage));
+                console.log('🧪 TEST: Is valid URI:', isValidImageUri(profileImage));
+                
+                // Test the actual URL
+                const testUrl = getFullImageUrl(profileImage);
+                if (testUrl) {
+                  fetch(testUrl, { method: 'HEAD' })
+                    .then(response => {
+                      console.log('🧪 TEST: URL accessibility test:', response.status, response.ok ? 'SUCCESS' : 'FAILED');
+                      Alert.alert('Test Complete', `URL: ${testUrl}\nStatus: ${response.status} ${response.ok ? 'SUCCESS' : 'FAILED'}`);
+                    })
+                    .catch(error => {
+                      console.log('🧪 TEST: URL accessibility test FAILED:', error.message);
+                      Alert.alert('Test Complete', `URL: ${testUrl}\nError: ${error.message}`);
+                    });
+                } else {
+                  Alert.alert('Test Complete', 'No URL generated');
+                }
+              }}
+            >
+              <Text style={styles.testButtonText}>Test Image URL</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.testButton, { backgroundColor: '#FF6B6B', marginTop: 10 }]} 
+              onPress={() => {
+                const testUrl = `http://192.168.100.192:8000/storage/profile_images/h0SuQ7rQBRwmpycUgSBgtmsm8CXFTSeTVc7tHJyr.jpg`;
+                console.log('🧪 FORCE TEST: Setting hardcoded URL:', testUrl);
+                setProfileImage(testUrl);
+                setImageError(false);
+                Alert.alert('Force Test', `Set hardcoded URL: ${testUrl}`);
+              }}
+            >
+              <Text style={styles.testButtonText}>Force Test Image</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -785,13 +806,13 @@ const ProfileScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Last Name</Text>
+            <Text style={styles.inputLabel}>Last Name *</Text>
             <TextInput
               style={[styles.input, !isEditing && styles.disabledInput]}
               value={profileData.lastName}
               onChangeText={(text) => setProfileData({...profileData, lastName: text})}
               editable={isEditing}
-              placeholder="Enter your last name"
+              placeholder="Enter your last name (required)"
             />
           </View>
 
@@ -974,13 +995,10 @@ const ProfileScreen = () => {
         {isEditing && (
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} 
+              style={styles.saveButton} 
               onPress={handleSaveProfile}
-              disabled={isSaving}
             >
-              <Text style={styles.saveButtonText}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </Text>
+              <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.cancelButton} 
@@ -1268,10 +1286,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  saveButtonDisabled: {
-    backgroundColor: '#A0A0A0',
-    opacity: 0.6,
-  },
   saveButtonText: {
     color: '#fff',
     fontSize: 18,
@@ -1337,6 +1351,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginBottom: 5,
+  },
+  testButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

@@ -61,9 +61,10 @@ export class NetworkService {
   public async detectWorkingIP(): Promise<string> {
     console.log('🔍 Detecting working IP address...');
 
-    // Try the most likely IPs first (prioritize mobile data)
+    // Try the most likely IPs first (prioritize WiFi for current connection)
     const priorityIPs = [
-      '172.20.10.2',      // Current mobile data IP (most likely)
+      '192.168.100.192',  // Current WiFi IP (most likely)
+      '172.20.10.2',      // Mobile data IP (fallback)
       'localhost',         // Local development
       '127.0.0.1',        // Local development
     ];
@@ -89,7 +90,7 @@ export class NetworkService {
     ];
 
     // Remove duplicates and priority IPs
-    const uniqueIPs = [...new Set(allIPs)].filter(ip => !priorityIPs.includes(ip));
+    const uniqueIPs = Array.from(new Set(allIPs)).filter(ip => !priorityIPs.includes(ip));
     
     for (const ip of uniqueIPs) {
       console.log(`🌐 Testing IP: ${ip}:8000`);
@@ -104,8 +105,8 @@ export class NetworkService {
       }
     }
 
-    // If all fail, use the current mobile data IP as default but mark as disconnected
-    this.currentBaseUrl = `http://172.20.10.2:8000`;
+    // If all fail, use the current WiFi IP as default but mark as disconnected
+    this.currentBaseUrl = `http://192.168.100.192:8000`;
     this.isConnected = false;
     console.log(`⚠️ All IPs failed. Using default IP: ${this.currentBaseUrl}`);
     console.log(`⚠️ Please ensure your server is running and accessible`);
@@ -115,6 +116,16 @@ export class NetworkService {
   // Get current working base URL
   public getBaseUrl(): string {
     return this.currentBaseUrl;
+  }
+
+  // Helper function to get full image URL
+  public getImageUrl(imagePath: string): string {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('/storage/')) {
+      return `${this.currentBaseUrl}${imagePath}`;
+    }
+    return imagePath;
   }
 
   // Check if currently connected

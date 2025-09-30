@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 interface PaymentScreenProps {
@@ -60,7 +60,8 @@ const PaymentScreen: React.FC = () => {
 
     try {
       const token = await getAuthToken(); // Get from AsyncStorage or context
-      const apiUrl = 'http://172.20.10.2:8000/api';
+      const { networkService } = require('../../services/networkService');
+      const apiUrl = `${networkService.getBaseUrl()}/api`;
 
       let endpoint = '';
       let body: any = {

@@ -204,14 +204,9 @@ class RealtimeLocationService {
 
     try {
       const token = await this.getAuthToken();
-      const response = await makeApiCall('/api/location/nearby-sitters', {
-        method: 'POST',
+      const response = await makeApiCall(`/api/location/nearby-sitters?latitude=${latitude}&longitude=${longitude}&radius_km=${radiusKm}`, {
+        method: 'GET',
         headers: getAuthHeaders(token || undefined),
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          radius_km: radiusKm,
-        }),
       });
 
       const data = await response.json();
@@ -244,20 +239,32 @@ class RealtimeLocationService {
             lastSeen: new Date(sitter.lastSeen),
             // Map different possible image fields and ensure proper URL handling
             images: sitter.images || (sitter.profile_image ? [sitter.profile_image] : undefined),
-            profileImage: sitter.profile_image || sitter.avatar,
+            // Use profile_image_url if available (full URL), otherwise fall back to profile_image (storage path)
+            profileImage: sitter.profile_image_url || sitter.profile_image || sitter.avatar,
             // Add helper to determine if image is a URL or local asset
-            imageSource: sitter.profile_image || sitter.avatar || sitter.images?.[0],
+            imageSource: sitter.profile_image_url || sitter.profile_image || sitter.avatar || sitter.images?.[0],
             // Map pet types and breeds from backend field names to frontend field names
             petTypes: sitter.petTypes || (sitter.selected_pet_types && sitter.selected_pet_types.length > 0 ? sitter.selected_pet_types : ['dogs', 'cats']),
             selectedBreeds: sitter.selectedBreeds || (sitter.pet_breeds && sitter.pet_breeds.length > 0 ? sitter.pet_breeds : ['All breeds welcome'])
           };
+          
+          // Enhanced debugging for image mapping
+          console.log(`🖼️ RealtimeLocationService - Image mapping for sitter ${sitter.name}:`, {
+            'sitter.profile_image': sitter.profile_image,
+            'sitter.profile_image_url': sitter.profile_image_url,
+            'sitter.avatar': sitter.avatar,
+            'sitter.images': sitter.images,
+            'mapped.profileImage': mappedSitter.profileImage,
+            'mapped.imageSource': mappedSitter.imageSource,
+            'mapped.images': mappedSitter.images
+          });
           
           console.log(`👤 Final mapped sitter:`, JSON.stringify(mappedSitter, null, 2));
           return mappedSitter;
         });
         
         // Filter out offline sitters and deduplicate
-        const onlineSitters = apiSitters.filter(sitter => {
+        const onlineSitters = apiSitters.filter((sitter: RealtimeSitter) => {
           // Only show sitters who are online and have recent activity (within last 5 minutes)
           const lastSeen = new Date(sitter.lastSeen);
           const now = new Date();
@@ -269,8 +276,8 @@ class RealtimeLocationService {
           return sitter.isOnline && isRecent;
         });
         
-        const uniqueSitters = onlineSitters.filter((sitter, index, self) => 
-          index === self.findIndex(s => s.id === sitter.id)
+        const uniqueSitters = onlineSitters.filter((sitter: RealtimeSitter, index: number, self: RealtimeSitter[]) => 
+          index === self.findIndex((s: RealtimeSitter) => s.id === sitter.id)
         );
         
         console.log(`👥 Filtered sitters: ${apiSitters.length} total, ${onlineSitters.length} online, ${uniqueSitters.length} unique online`);
@@ -305,8 +312,8 @@ class RealtimeLocationService {
   ): RealtimeSitter[] {
     const nearbySitters: RealtimeSitter[] = [];
     
-    for (const sitter of this.sitters.values()) {
-      if (!sitter.isOnline) continue;
+    this.sitters.forEach((sitter, sitterId) => {
+      if (!sitter.isOnline) return;
 
       const distance = this.calculateDistance(
         latitude,
@@ -321,7 +328,7 @@ class RealtimeLocationService {
           distance: `${distance.toFixed(1)} km`
         } as RealtimeSitter & { distance: string });
       }
-    }
+    });
 
     // Sort by distance
     return nearbySitters.sort((a, b) => {
@@ -519,6 +526,21 @@ class RealtimeLocationService {
     this.lastApiCallTime = 0; // Reset API call time to allow immediate refresh
     this.notifyListeners();
     console.log('🧹 Cleared all sitters, cache timestamp, and API call time');
+  }
+
+  // Update a specific sitter's data (useful for profile updates)
+  updateSitterData(sitterId: string, updatedData: Partial<RealtimeSitter>): void {
+    const existingSitter = this.sitters.get(sitterId);
+    if (existingSitter) {
+      const updatedSitter = {
+        ...existingSitter,
+        ...updatedData,
+        lastSeen: new Date(), // Update last seen time
+      };
+      this.sitters.set(sitterId, updatedSitter);
+      this.notifyListeners();
+      console.log(`🔄 Updated sitter ${sitterId} data:`, updatedData);
+    }
   }
 
   // Force clear everything and refresh

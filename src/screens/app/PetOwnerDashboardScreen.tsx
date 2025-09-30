@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
     Image,
     SafeAreaView,
@@ -14,15 +15,67 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const PetOwnerDashboardScreen = () => {
   const router = useRouter();
+  const { user, profileUpdateTrigger } = useAuth();
+  const [imageError, setImageError] = useState<boolean>(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState<number>(0);
   
-  try {
-    const { user, currentLocation, userAddress } = useAuth();
-    
-    console.log('PetOwnerDashboardScreen render:', {
-      hasUser: !!user,
-      hasCurrentLocation: !!currentLocation,
-      hasUserAddress: !!userAddress
-    });
+  // Helper function to check if image URI is valid
+  const isValidImageUri = (uri: string | undefined): boolean => {
+    if (!uri) return false;
+    const isValid = uri.startsWith('http') || uri.startsWith('file://') || uri.includes('profile_images/') || uri.startsWith('/storage/');
+    console.log('🔍 PetOwnerDashboardScreen: isValidImageUri check:', { uri, isValid });
+    return isValid;
+  };
+
+  // Helper function to get full image URL
+  const getFullImageUrl = (uri: string): string => {
+    if (uri.startsWith('http')) {
+      return uri;
+    }
+    if (uri.startsWith('/storage/')) {
+      const fullUrl = `http://192.168.100.192:8000${uri}`;
+      console.log('🔗 PetOwnerDashboardScreen: Generated URL for /storage/ path:', fullUrl);
+      return fullUrl;
+    }
+    if (uri.includes('profile_images/')) {
+      const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+      console.log('🔗 PetOwnerDashboardScreen: Generated URL for profile_images/ path:', fullUrl);
+      return fullUrl;
+    }
+    const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+    console.log('🔗 PetOwnerDashboardScreen: Generated URL for fallback path:', fullUrl);
+    return fullUrl;
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle image load success
+  const handleImageLoad = () => {
+    setImageError(false);
+  };
+
+  // Reset image error when profile updates
+  useEffect(() => {
+    console.log('🔄 PetOwnerDashboardScreen: Profile update detected, refreshing profile image');
+    console.log('🔄 PetOwnerDashboardScreen: Profile update trigger:', profileUpdateTrigger);
+    console.log('🔄 PetOwnerDashboardScreen: User profile image:', user?.profileImage);
+    console.log('🔄 PetOwnerDashboardScreen: Is valid image URI:', user?.profileImage ? isValidImageUri(user.profileImage) : false);
+    console.log('🔄 PetOwnerDashboardScreen: Full image URL:', user?.profileImage ? getFullImageUrl(user.profileImage) : 'No image');
+    setImageError(false);
+    // Force image refresh by updating the key
+    setImageRefreshKey(prev => prev + 1);
+  }, [profileUpdateTrigger, user?.profileImage]);
+  
+  const { currentLocation, userAddress } = useAuth();
+  
+  console.log('PetOwnerDashboardScreen render:', {
+    hasUser: !!user,
+    hasCurrentLocation: !!currentLocation,
+    hasUserAddress: !!userAddress
+  });
 
   const handleFindSitter = () => {
     router.push('/find-sitter-map');
@@ -53,12 +106,49 @@ const PetOwnerDashboardScreen = () => {
             <Text style={styles.greeting}>Good morning, {user?.name || 'User'}! 👋</Text>
             <Text style={styles.subtitle}>Ready to find care for your pets?</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton} onPress={handleViewProfile}>
-            <Image 
-              source={require('../../assets/images/default-avatar.png')} 
-              style={styles.profileImage} 
-            />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={handleViewNotifications} style={{ marginRight: 16 }}>
+              <Ionicons name="notifications-outline" size={24} color="#222" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileButton} onPress={handleViewProfile}>
+              <Image 
+                key={`profile-${user?.id}-${user?.profileImage || 'default'}-${profileUpdateTrigger}-${imageRefreshKey}-${Date.now()}`}
+                source={(() => {
+                  console.log('🖼️ PetOwnerDashboardScreen: Image source decision:');
+                  console.log('  - user?.profileImage:', user?.profileImage);
+                  console.log('  - isValidImageUri:', user?.profileImage ? isValidImageUri(user.profileImage) : false);
+                  console.log('  - imageError:', imageError);
+                  
+                  if (user?.profileImage && isValidImageUri(user.profileImage) && !imageError) {
+                    const fullUrl = getFullImageUrl(user.profileImage);
+                    console.log('  - Using profile image with URL:', fullUrl);
+                    return { 
+                      uri: fullUrl,
+                      cache: 'reload' // Force reload to prevent white image
+                    };
+                  } else {
+                    console.log('  - Using default avatar');
+                    return require('../../assets/images/default-avatar.png');
+                  }
+                })()}
+                style={styles.profileImage}
+                onError={(error) => {
+                  console.log('❌ PetOwnerDashboardScreen: Profile image failed to load:', error.nativeEvent.error);
+                  console.log('❌ PetOwnerDashboardScreen: Failed image URI:', user?.profileImage);
+                  console.log('❌ PetOwnerDashboardScreen: Full URL:', getFullImageUrl(user?.profileImage || ''));
+                  handleImageError();
+                }}
+                onLoad={() => {
+                  console.log('✅ PetOwnerDashboardScreen: Profile image loaded successfully:', user?.profileImage);
+                  console.log('✅ PetOwnerDashboardScreen: Full URL:', getFullImageUrl(user?.profileImage || ''));
+                  handleImageLoad();
+                }}
+                defaultSource={require('../../assets/images/default-avatar.png')}
+                resizeMode="cover"
+                fadeDuration={0}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Location Status */}

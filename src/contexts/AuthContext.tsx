@@ -330,6 +330,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: updateUserProfile called with:', profileData);
       console.log('AuthContext: Current user state:', user);
       console.log('AuthContext: Profile image in update data:', profileData.profileImage);
+      console.log('AuthContext: Name fields in profileData:', {
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        name: profileData.name
+      });
       
       // Validate profileData before processing
       if (!profileData) {
@@ -344,20 +349,90 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
       console.log('AuthContext: Updated user name:', updatedUser.name);
       
-      // Trigger global refresh for all components
+      // Trigger global refresh for all components immediately
       setProfileUpdateTrigger(prev => prev + 1);
       console.log('AuthContext: Triggered global profile update refresh');
       
+      // Force a second trigger update after a short delay to ensure all async operations complete
+      setTimeout(() => {
+        setProfileUpdateTrigger(prev => prev + 1);
+        console.log('AuthContext: Triggered delayed profile update refresh');
+      }, 100);
+      
       // If this is a pet sitter and profile was updated, refresh location data
       console.log('AuthContext: Checking user role for profile update:', updatedUser.role, 'is pet_sitter:', updatedUser.role === 'pet_sitter');
-      if (updatedUser.role === 'pet_sitter' && (profileData.hourlyRate !== undefined || profileData.name !== undefined)) {
+      if (updatedUser.role === 'pet_sitter') {
         console.log('AuthContext: Pet sitter profile updated, refreshing location data');
         try {
           // Clear sitter cache to force refresh in find sitter map
           realtimeLocationService.clearSitterCache();
           console.log('AuthContext: Cleared sitter cache for profile update');
           
-          // Update the sitter's location data with the new profile info
+          // Update the sitter's data in real-time (including profile image)
+          const updatedSitterData = {
+            name: updatedUser.name,
+            email: updatedUser.email,
+            specialties: updatedUser.specialties || ['General Pet Care'],
+            experience: updatedUser.experience || '1 year',
+            petTypes: updatedUser.selectedPetTypes || ['dogs', 'cats'],
+            selectedBreeds: updatedUser.selectedBreeds || ['All breeds welcome'],
+            hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
+            bio: updatedUser.aboutMe || 'Professional pet sitter ready to help!',
+            profileImage: updatedUser.profileImage,
+            imageSource: updatedUser.profileImage,
+            images: updatedUser.profileImage ? [updatedUser.profileImage] : undefined,
+          };
+          
+          // Update sitter data in real-time
+          try {
+            console.log('AuthContext: realtimeLocationService type:', typeof realtimeLocationService);
+            console.log('AuthContext: realtimeLocationService constructor:', realtimeLocationService.constructor.name);
+            console.log('AuthContext: Checking realtimeLocationService methods:', Object.getOwnPropertyNames(realtimeLocationService));
+            console.log('AuthContext: updateSitterData method exists:', typeof realtimeLocationService.updateSitterData);
+            
+            // Try to call the method directly
+            if (realtimeLocationService && typeof realtimeLocationService.updateSitterData === 'function') {
+              realtimeLocationService.updateSitterData(updatedUser.id, updatedSitterData);
+              console.log('AuthContext: Updated sitter data in real-time with profile image:', updatedUser.profileImage);
+            } else {
+              console.error('AuthContext: updateSitterData method is not available, using updateSitterLocation as fallback');
+              console.error('AuthContext: Available methods:', Object.getOwnPropertyNames(realtimeLocationService));
+              console.error('AuthContext: Service prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(realtimeLocationService)));
+              
+              // Fallback: Use updateSitterLocation with the updated data
+              const sitterData = {
+                id: updatedUser.id,
+                userId: updatedUser.id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                location: {
+                  latitude: 0, // Will be updated by the location service
+                  longitude: 0,
+                  address: 'Location not available'
+                },
+                specialties: updatedUser.specialties || ['General Pet Care'],
+                experience: updatedUser.experience || '1 year',
+                petTypes: updatedUser.selectedPetTypes || ['dogs', 'cats'],
+                selectedBreeds: updatedUser.selectedBreeds || ['All breeds welcome'],
+                hourlyRate: typeof profileData.hourlyRate === 'string' ? parseFloat(profileData.hourlyRate) : (profileData.hourlyRate || 0),
+                rating: 4.5,
+                reviews: 0,
+                bio: updatedUser.aboutMe || 'Professional pet sitter ready to help!',
+                isOnline: true,
+                lastSeen: new Date(),
+                profileImage: updatedUser.profileImage,
+                imageSource: updatedUser.profileImage,
+                images: updatedUser.profileImage ? [updatedUser.profileImage] : undefined,
+              };
+              
+              await realtimeLocationService.updateSitterLocation(sitterData);
+              console.log('AuthContext: Updated sitter data via updateSitterLocation fallback');
+            }
+          } catch (error) {
+            console.error('AuthContext: Error updating sitter data:', error);
+          }
+          
+          // Also update the sitter's location data
           await realtimeLocationService.updateSitterLocation({
             id: updatedUser.id,
             userId: updatedUser.id,
@@ -379,9 +454,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             isOnline: true,
             lastSeen: new Date(),
             profileImage: updatedUser.profileImage,
+            imageSource: updatedUser.profileImage,
+            images: updatedUser.profileImage ? [updatedUser.profileImage] : undefined,
             followers: 0,
             following: 0,
           });
+          
+          // Trigger another refresh after realtime updates are complete
+          setProfileUpdateTrigger(prev => prev + 1);
+          console.log('AuthContext: Triggered profile update refresh after realtime updates');
         } catch (error) {
           console.error('AuthContext: Error updating sitter location data:', error);
         }
@@ -399,6 +480,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw error;
       }
     }
+    
+    // Final trigger update to ensure all components refresh
+    setProfileUpdateTrigger(prev => prev + 1);
+    console.log('AuthContext: Final profile update trigger set');
   };
 
   const storeUserFromBackend = async (backendUser: any) => {

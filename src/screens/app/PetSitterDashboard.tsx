@@ -4,13 +4,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import SitterLocationSharing from '../../components/SitterLocationSharing';
 import authService from '../../services/authService';
@@ -152,6 +152,8 @@ const PetSitterDashboard = () => {
   const loadUserData = async () => {
     try {
       const user = await authService.getCurrentUser();
+      console.log('🔍 PetSitterDashboard: Loaded user data:', user);
+      console.log('🔍 PetSitterDashboard: User profileImage:', user?.profileImage);
       setCurrentUserId(user?.id || null);
       setCurrentUser(user);
     } catch (error) {
@@ -163,15 +165,28 @@ const PetSitterDashboard = () => {
   const isValidImageUri = (uri: string | null): boolean => {
     if (!uri || uri.trim() === '') return false;
     // Check if it's a valid URL or local file path
-    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+    const isValid = uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/') || uri.includes('profile_images/');
+    console.log('🔍 PetSitterDashboard: isValidImageUri check:', { uri, isValid });
+    return isValid;
   };
 
   // Helper function to get full image URL
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/storage/')) return `http://172.20.10.2:8000${uri}`;
-    return uri;
+    if (uri.startsWith('/storage/')) {
+      const fullUrl = `http://192.168.100.192:8000${uri}`;
+      console.log('🔗 PetSitterDashboard: Generated URL for /storage/ path:', fullUrl);
+      return fullUrl;
+    }
+    if (uri.startsWith('profile_images/')) {
+      const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+      console.log('🔗 PetSitterDashboard: Generated URL for profile_images/ path:', fullUrl);
+      return fullUrl;
+    }
+    const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+    console.log('🔗 PetSitterDashboard: Generated URL for fallback path:', fullUrl);
+    return fullUrl;
   };
 
   // Handle image load error
@@ -245,14 +260,33 @@ const PetSitterDashboard = () => {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/pet-sitter-profile')} style={styles.profileButton}>
               <Image
-                source={
-                  currentUser?.profileImage && isValidImageUri(currentUser.profileImage) && !imageError 
-                    ? { uri: getFullImageUrl(currentUser.profileImage) } 
-                    : require('../../assets/images/default-avatar.png')
-                }
+                source={(() => {
+                  console.log('🖼️ PetSitterDashboard: Image source decision:');
+                  console.log('  - currentUser?.profileImage:', currentUser?.profileImage);
+                  console.log('  - isValidImageUri:', currentUser?.profileImage ? isValidImageUri(currentUser.profileImage) : false);
+                  console.log('  - imageError:', imageError);
+                  
+                  if (currentUser?.profileImage && isValidImageUri(currentUser.profileImage) && !imageError) {
+                    const fullUrl = getFullImageUrl(currentUser.profileImage);
+                    console.log('  - Using profile image with URL:', fullUrl);
+                    return { uri: fullUrl };
+                  } else {
+                    console.log('  - Using default avatar');
+                    return require('../../assets/images/default-avatar.png');
+                  }
+                })()}
                 style={styles.profileImage}
-                onError={handleImageError}
-                onLoad={handleImageLoad}
+                onError={(error) => {
+                  console.log('❌ PetSitterDashboard: Profile image failed to load:', error.nativeEvent.error);
+                  console.log('❌ PetSitterDashboard: Failed image URI:', currentUser?.profileImage);
+                  console.log('❌ PetSitterDashboard: Full URL:', getFullImageUrl(currentUser?.profileImage || ''));
+                  handleImageError();
+                }}
+                onLoad={() => {
+                  console.log('✅ PetSitterDashboard: Profile image loaded successfully:', currentUser?.profileImage);
+                  console.log('✅ PetSitterDashboard: Full URL:', getFullImageUrl(currentUser?.profileImage || ''));
+                  handleImageLoad();
+                }}
                 defaultSource={require('../../assets/images/default-avatar.png')}
               />
             </TouchableOpacity>

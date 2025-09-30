@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Alert,
     AppState,
     Image,
     Platform,
@@ -50,6 +51,7 @@ const FindSitterMapScreen = () => {
   const [sitters, setSitters] = useState<any[]>([]);
   const [selectedSitter, setSelectedSitter] = useState<any>(null);
   const [showProfilePopup, setShowProfilePopup] = useState<boolean>(false);
+  const [is3DMode, setIs3DMode] = useState(false);
   const router = useRouter();
   const { currentLocation, userAddress, isLocationTracking, startLocationTracking, profileUpdateTrigger } = useAuth();
 
@@ -93,6 +95,14 @@ const FindSitterMapScreen = () => {
     // Find and show sitter profile popup from real-time data
     const sitter = sitters.find(s => s.id === sitterId);
     if (sitter) {
+      console.log('🔍 FindSitterMapScreen - Selected sitter for popup:', {
+        id: sitter.id,
+        name: sitter.name,
+        profileImage: sitter.profileImage,
+        imageSource: sitter.imageSource,
+        images: sitter.images,
+        allKeys: Object.keys(sitter)
+      });
       setSelectedSitter(sitter);
       setShowProfilePopup(true);
     }
@@ -104,9 +114,54 @@ const FindSitterMapScreen = () => {
   };
 
 
-  const handleMessage = (sitterId: string) => {
-    // TODO: Navigate to messaging
-  };
+    const handleMessage = async (sitterId: string) => {
+      try {
+        console.log('💬 Starting conversation with sitter:', sitterId);
+        
+        // Find the sitter to get their name and image
+        const sitter = sitters.find(s => s.id === sitterId);
+        if (!sitter) {
+          console.error('❌ Sitter not found:', sitterId);
+          Alert.alert('Error', 'Sitter not found. Please try again.');
+          return;
+        }
+        
+        console.log('💬 Sitter details:', {
+          id: sitter.id,
+          name: sitter.name,
+          profileImage: sitter.profileImage
+        });
+        
+        // Import the Reverb messaging service
+        const { reverbMessagingService } = require('../../services/reverbMessagingService');
+        
+        // Start conversation with sitter details
+        console.log('💬 Calling startConversation...');
+        const result = await reverbMessagingService.startConversation(
+          sitterId, 
+          sitter.name, 
+          sitter.profileImage
+        );
+        
+        console.log('💬 Conversation started successfully:', result);
+        
+        // Navigate to messages screen with conversation details
+        router.push({
+          pathname: '/pet-owner-messages',
+          params: {
+            conversationId: result.conversation_id,
+            otherUserId: sitterId,
+            otherUserName: result.other_user.name,
+            otherUserImage: result.other_user.profile_image,
+          }
+        });
+        
+        console.log('💬 Navigated to messages screen with conversation:', result.conversation_id);
+      } catch (error) {
+        console.error('❌ Error starting conversation:', error);
+        Alert.alert('Error', `Failed to start conversation: ${error.message || 'Unknown error'}`);
+      }
+    };
 
   const handleViewBadges = (sitterId: string) => {
     // TODO: Navigate to badges view
@@ -132,35 +187,59 @@ const FindSitterMapScreen = () => {
 
   // Helper function to get proper image source
   const getImageSource = (sitter: any) => {
+    // Debug logging for sitter image data
+    console.log('🖼️ FindSitterMapScreen - getImageSource for sitter:', {
+      sitterId: sitter.id,
+      sitterName: sitter.name,
+      profileImage: sitter.profileImage,
+      imageSource: sitter.imageSource,
+      images: sitter.images,
+      allKeys: Object.keys(sitter)
+    });
+    
     const imageSource = sitter.profileImage || sitter.imageSource || sitter.images?.[0];
     
     if (!imageSource) {
+      console.log('🖼️ FindSitterMapScreen - No image source found, using default');
       return require('../../assets/images/default-avatar.png');
     }
     
+    console.log('🖼️ FindSitterMapScreen - Using image source:', imageSource);
+    
     // If it's a URL (starts with http), use it directly
     if (typeof imageSource === 'string' && (imageSource.startsWith('http') || imageSource.startsWith('https'))) {
+      console.log('🖼️ FindSitterMapScreen - Using HTTP URL:', imageSource);
       return { uri: imageSource };
     }
     
     // If it's a relative URL (starts with /storage/), convert to full URL
     if (typeof imageSource === 'string' && imageSource.startsWith('/storage/')) {
-      const fullUrl = `http://172.20.10.2:8000${imageSource}`;
+      // Use the network service synchronously - it should already be initialized
+      const { networkService } = require('../../services/networkService');
+      const fullUrl = networkService.getImageUrl(imageSource);
+      console.log('🖼️ FindSitterMapScreen - Converted storage path to full URL:', {
+        originalPath: imageSource,
+        fullUrl: fullUrl,
+        baseUrl: networkService.getBaseUrl()
+      });
       return { uri: fullUrl };
     }
     
     // If it's already a require() object, use it directly
     if (typeof imageSource === 'object' && imageSource.uri !== undefined) {
+      console.log('🖼️ FindSitterMapScreen - Using object with URI:', imageSource.uri);
       return imageSource;
     }
     
     // For any other string (local paths), treat as URI
     if (typeof imageSource === 'string') {
+      console.log('🖼️ FindSitterMapScreen - Using string as URI:', imageSource);
       return { uri: imageSource };
     }
     
-    // If it's already a require() object, use it directly
-    return imageSource;
+    // Fallback to default avatar
+    console.log('🖼️ FindSitterMapScreen - Fallback to default avatar');
+    return require('../../assets/images/default-avatar.png');
   };
 
   const handleFilterPress = (filter: string) => {
@@ -203,6 +282,18 @@ const FindSitterMapScreen = () => {
             profileImage: sitter.profileImage,
             imageSource: sitter.imageSource,
             allKeys: Object.keys(sitter)
+          });
+          
+          // Additional debugging for image fields
+          console.log(`🖼️ Sitter ${index + 1} image analysis:`, {
+            'sitter.profileImage': sitter.profileImage,
+            'sitter.imageSource': sitter.imageSource,
+            'sitter.images': sitter.images,
+            'sitter.images?.[0]': sitter.images?.[0],
+            'typeof profileImage': typeof sitter.profileImage,
+            'typeof imageSource': typeof sitter.imageSource,
+            'profileImage starts with http': sitter.profileImage?.startsWith('http'),
+            'imageSource starts with http': sitter.imageSource?.startsWith('http'),
           });
         });
       } else {
@@ -315,6 +406,14 @@ const FindSitterMapScreen = () => {
       }
     }, [currentLocation])
   );
+
+  // Refresh sitters when profile updates occur (e.g., profile image changes)
+  useEffect(() => {
+    if (profileUpdateTrigger > 0) {
+      console.log('🔄 Profile update detected - refreshing sitters');
+      loadSittersFromAPI(true);
+    }
+  }, [profileUpdateTrigger]);
 
   // Add periodic refresh to ensure fresh data across devices
   useEffect(() => {
@@ -433,9 +532,21 @@ const FindSitterMapScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Find Pet Sitters</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshSitters}>
-          <Ionicons name="refresh" size={24} color="#333" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={[styles.toggle3DButton, is3DMode && styles.toggle3DButtonActive]} 
+            onPress={() => setIs3DMode(!is3DMode)}
+          >
+            <Ionicons 
+              name={is3DMode ? "cube" : "cube-outline"} 
+              size={20} 
+              color={is3DMode ? "#fff" : "#333"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshSitters}>
+            <Ionicons name="refresh" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
       </View>
 
 
@@ -457,6 +568,12 @@ const FindSitterMapScreen = () => {
             initialRegion={initialRegion}
             showsUserLocation
             showsPointsOfInterest={false}
+            mapType={is3DMode ? "hybrid" : "standard"}
+            pitchEnabled={is3DMode}
+            scrollEnabled={true}
+            zoomEnabled={true}
+            rotateEnabled={is3DMode}
+            tiltEnabled={is3DMode}
             ref={mapRef}
           >
             {filteredSitters.map((sitter) => (
@@ -480,6 +597,15 @@ const FindSitterMapScreen = () => {
                         borderRadius: 21,
                       }}
                       resizeMode="cover"
+                      onError={(error) => {
+                        console.log('❌ Map - Marker image failed to load:', error.nativeEvent.error);
+                        console.log('❌ Map - Failed marker sitter:', sitter.name, getImageSource(sitter));
+                      }}
+                      onLoad={() => {
+                        console.log('✅ Map - Marker image loaded successfully for:', sitter.name);
+                      }}
+                      defaultSource={require('../../assets/images/default-avatar.png')}
+                      fadeDuration={0}
                     />
                   </View>
                   {sitter.isOnline && (
@@ -555,9 +681,21 @@ const FindSitterMapScreen = () => {
                   style={styles.sitterAvatar}
                   onError={(error) => {
                     console.log('❌ Map - Sitter list image failed to load:', error.nativeEvent.error);
+                    console.log('❌ Map - Failed sitter data:', {
+                      sitterId: sitter.id,
+                      sitterName: sitter.name,
+                      profileImage: sitter.profileImage,
+                      imageSource: sitter.imageSource,
+                      images: sitter.images,
+                      imageSourceResult: getImageSource(sitter)
+                    });
+                  }}
+                  onLoad={() => {
+                    console.log('✅ Map - Sitter list image loaded successfully for:', sitter.name);
                   }}
                   defaultSource={require('../../assets/images/default-avatar.png')}
                   resizeMode="cover"
+                  fadeDuration={0}
                 />
               </View>
               <View style={styles.sitterInfo}>
@@ -632,6 +770,22 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     padding: 5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  toggle3DButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  toggle3DButtonActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
   },
   refreshButton: {
     padding: 5,

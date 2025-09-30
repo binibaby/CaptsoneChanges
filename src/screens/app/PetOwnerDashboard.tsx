@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
 // @ts-ignore
 import FindIcon from '../../assets/icons/find.png';
@@ -50,7 +51,7 @@ const reflectionColors = {
 
 const PetOwnerDashboard = () => {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { user, profileUpdateTrigger } = useAuth();
   const [imageError, setImageError] = useState<boolean>(false);
 
   useEffect(() => {
@@ -84,7 +85,7 @@ const PetOwnerDashboard = () => {
       }
 
       // User is authenticated and is a pet owner
-      loadUserData();
+      // User data is now available from AuthContext
     } catch (error) {
       console.error('Error checking authentication:', error);
       router.replace('/onboarding');
@@ -99,28 +100,33 @@ const PetOwnerDashboard = () => {
     }, [])
   );
 
-  const loadUserData = async () => {
-    try {
-      const user = await authService.getCurrentUser();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
-  };
 
   // Helper function to validate image URI
   const isValidImageUri = (uri: string | null): boolean => {
     if (!uri || uri.trim() === '') return false;
     // Check if it's a valid URL or local file path
-    return uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/');
+    const isValid = uri.startsWith('http') || uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('data:') || uri.startsWith('/storage/') || uri.includes('profile_images/');
+    console.log('🔍 PetOwnerDashboard: isValidImageUri check:', { uri, isValid });
+    return isValid;
   };
 
   // Helper function to get full image URL
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/storage/')) return `http://172.20.10.2:8000${uri}`;
-    return uri;
+    if (uri.startsWith('/storage/')) {
+      const fullUrl = `http://192.168.100.192:8000${uri}`;
+      console.log('🔗 PetOwnerDashboard: Generated URL for /storage/ path:', fullUrl);
+      return fullUrl;
+    }
+    if (uri.startsWith('profile_images/')) {
+      const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+      console.log('🔗 PetOwnerDashboard: Generated URL for profile_images/ path:', fullUrl);
+      return fullUrl;
+    }
+    const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+    console.log('🔗 PetOwnerDashboard: Generated URL for fallback path:', fullUrl);
+    return fullUrl;
   };
 
   // Handle image load error
@@ -132,6 +138,12 @@ const PetOwnerDashboard = () => {
   const handleImageLoad = () => {
     setImageError(false);
   };
+
+  // Reset image error when profile updates
+  useEffect(() => {
+    console.log('🔄 PetOwnerDashboard: Profile update detected, refreshing profile image');
+    setImageError(false);
+  }, [profileUpdateTrigger, user?.profileImage]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -148,15 +160,40 @@ const PetOwnerDashboard = () => {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/pet-owner-profile')} style={styles.profileButton}>
               <Image
-                source={
-                  currentUser?.profileImage && isValidImageUri(currentUser.profileImage) && !imageError 
-                    ? { uri: getFullImageUrl(currentUser.profileImage) } 
-                    : require('../../assets/images/default-avatar.png')
-                }
+                key={`profile-${user?.id}-${user?.profileImage || 'default'}-${profileUpdateTrigger}-${Date.now()}`}
+                source={(() => {
+                  console.log('🖼️ PetOwnerDashboard: Image source decision:');
+                  console.log('  - user?.profileImage:', user?.profileImage);
+                  console.log('  - isValidImageUri:', user?.profileImage ? isValidImageUri(user.profileImage) : false);
+                  console.log('  - imageError:', imageError);
+                  
+                  if (user?.profileImage && isValidImageUri(user.profileImage) && !imageError) {
+                    const fullUrl = getFullImageUrl(user.profileImage);
+                    console.log('  - Using profile image with URL:', fullUrl);
+                    return { 
+                      uri: fullUrl,
+                      cache: 'reload' // Force reload to prevent white image
+                    };
+                  } else {
+                    console.log('  - Using default avatar');
+                    return require('../../assets/images/default-avatar.png');
+                  }
+                })()}
                 style={styles.profileImage}
-                onError={handleImageError}
-                onLoad={handleImageLoad}
+                onError={(error) => {
+                  console.log('❌ PetOwnerDashboard: Profile image failed to load:', error.nativeEvent.error);
+                  console.log('❌ PetOwnerDashboard: Failed image URI:', user?.profileImage);
+                  console.log('❌ PetOwnerDashboard: Full URL:', getFullImageUrl(user?.profileImage || ''));
+                  handleImageError();
+                }}
+                onLoad={() => {
+                  console.log('✅ PetOwnerDashboard: Profile image loaded successfully:', user?.profileImage);
+                  console.log('✅ PetOwnerDashboard: Full URL:', getFullImageUrl(user?.profileImage || ''));
+                  handleImageLoad();
+                }}
                 defaultSource={require('../../assets/images/default-avatar.png')}
+                resizeMode="cover"
+                fadeDuration={0}
               />
             </TouchableOpacity>
           </View>

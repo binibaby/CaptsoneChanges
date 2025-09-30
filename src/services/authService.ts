@@ -137,7 +137,7 @@ class AuthService {
           phone_verified: result.user.phone_verified || false,
           selectedPetTypes: result.user.selected_pet_types || [],
           selectedBreeds: result.user.pet_breeds || [],
-          profileImage: result.user.profile_image || undefined,
+          profileImage: result.user.profile_image_url || result.user.profile_image || undefined,
           token: result.token || undefined,
         };
 
@@ -285,7 +285,7 @@ class AuthService {
           phone_verified: result.user.phone_verified || false,
           selectedPetTypes: result.user.selected_pet_types || [],
           selectedBreeds: result.user.pet_breeds || [],
-          profileImage: result.user.profile_image || undefined,
+          profileImage: result.user.profile_image_url || result.user.profile_image || undefined,
           token: result.token || undefined,
         };
 
@@ -547,6 +547,11 @@ class AuthService {
     console.log('AuthService: updateUserProfile called with:', profileData);
     console.log('AuthService: Current user:', this.currentUser);
     console.log('AuthService: Profile image in update data:', profileData.profileImage);
+    console.log('AuthService: Name fields in profileData:', {
+      firstName: profileData.firstName,
+      lastName: profileData.lastName,
+      name: profileData.name
+    });
     
     // Validate profileData
     if (!profileData) {
@@ -630,6 +635,11 @@ class AuthService {
     console.log('AuthService: Updated user profileImage:', updatedUser.profileImage);
     console.log('AuthService: Preserved selectedPetTypes:', updatedUser.selectedPetTypes);
     console.log('AuthService: Preserved selectedBreeds:', updatedUser.selectedBreeds);
+    console.log('AuthService: Updated user name fields:', {
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      name: updatedUser.name
+    });
     
     // Update the name field if firstName, lastName, or name changed
     if (profileData.firstName !== undefined || profileData.lastName !== undefined) {
@@ -752,9 +762,16 @@ class AuthService {
       console.log('AuthService: Backend update data - lastName:', user.lastName);
       console.log('AuthService: Full backend update payload:', JSON.stringify(updateData, null, 2));
       
-      // Always include name fields (even if empty) to ensure backend gets the full name
-      updateData.first_name = user.firstName || '';
-      updateData.last_name = user.lastName || '';
+      // Always include name fields, but provide defaults for empty values
+      updateData.first_name = user.firstName || 'User';
+      // If last name is empty, use a single space to satisfy backend validation
+      updateData.last_name = user.lastName || ' ';
+      
+      console.log('AuthService: Setting name fields in updateData:');
+      console.log('  - user.firstName:', user.firstName);
+      console.log('  - user.lastName:', user.lastName);
+      console.log('  - updateData.first_name:', updateData.first_name);
+      console.log('  - updateData.last_name:', updateData.last_name);
       
       // Ensure the main name field is always updated with the full name
       updateData.name = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User';
@@ -768,7 +785,19 @@ class AuthService {
       if (user.specialties && user.specialties.length > 0) updateData.specialties = user.specialties;
       if (user.selectedBreeds && user.selectedBreeds.length > 0) updateData.pet_breeds = user.selectedBreeds;
       if (user.selectedPetTypes && user.selectedPetTypes.length > 0) updateData.selected_pet_types = user.selectedPetTypes;
-      if (user.profileImage) updateData.profile_image = user.profileImage;
+      if (user.profileImage) {
+        // Convert full URL back to storage path if needed
+        let profileImagePath = user.profileImage;
+        if (profileImagePath.startsWith('http')) {
+          // Extract storage path from full URL
+          const urlParts = profileImagePath.split('/storage/');
+          if (urlParts.length > 1) {
+            profileImagePath = urlParts[1];
+          }
+        }
+        updateData.profile_image = profileImagePath;
+        console.log('AuthService: Backend update data - profile_image:', profileImagePath);
+      }
       
       const response = await makeApiCall('/api/profile/update', {
         method: 'POST',
@@ -784,12 +813,7 @@ class AuthService {
         console.error('Backend profile update failed:', response.status, errorText);
         console.error('Response URL:', response.url);
         console.error('Response headers:', response.headers);
-        console.error('Request body sent:', JSON.stringify({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role
-        }, null, 2));
+        console.error('Request body sent:', JSON.stringify(updateData, null, 2));
         throw new Error(`Backend update failed: ${response.status} - ${errorText}`);
       }
 
@@ -854,7 +878,7 @@ class AuthService {
       phone_verified: backendUser.phone_verified || false,
       selectedPetTypes: backendUser.selected_pet_types || [],
       selectedBreeds: backendUser.pet_breeds || [],
-      profileImage: backendUser.profile_image || undefined,
+      profileImage: backendUser.profile_image_url || backendUser.profile_image || undefined,
       token: backendUser.token || undefined,
       // Always include sitter-specific fields for pet sitters
       experience: (backendUser.role === 'pet_sitter' || backendUser.role === 'Pet Sitter') ? (backendUser.experience || '') : '',

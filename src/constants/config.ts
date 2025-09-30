@@ -1,25 +1,26 @@
 // Network detection utility for dual WiFi/mobile data support
 const getNetworkIP = () => {
   if (__DEV__) {
-    // Use mobile data IP for development
-    return '172.20.10.2';
+    // Use WiFi IP for development (current connection)
+    return '192.168.100.192';
   }
   return 'https://your-production-domain.com';
 };
 
 // Network fallback configuration for dual connectivity
 export const NETWORK_FALLBACK = {
-  // Primary IPs to try in order - Mobile data first for current connection
+  // Primary IPs to try in order - WiFi first for current connection
   PRIMARY_IPS: [
-    '172.20.10.2',      // Mobile data IP (primary)
+    '192.168.100.192',  // Current WiFi IP (primary)
     '172.20.10.2',      // Mobile data IP (fallback)
   ],
   
   // Fallback IPs for different network scenarios
   FALLBACK_IPS: [
-    '172.20.10.2',      // Current mobile data IP (primary)
+    '192.168.100.192',  // Current WiFi IP (primary)
+    '172.20.10.2',      // Mobile data IP (fallback)
     '172.20.10.1',      // Common mobile hotspot
-    '192.168.100.184',  // WiFi IP (fallback)
+    '192.168.100.184',  // Previous WiFi IP
     '192.168.100.179',  // Previous WiFi IP
     '192.168.1.100',    // Common home WiFi
     '192.168.0.100',    // Common home WiFi
@@ -75,7 +76,7 @@ export const getApiUrl = (endpoint: string): string => {
 
 // New helper function using network service for automatic IP detection
 export const getApiUrlWithFallback = async (endpoint: string): Promise<string> => {
-  const { networkService } = await import('../services/networkService');
+  const { networkService } = require('../services/networkService');
   const baseUrl = networkService.getBaseUrl();
   return `${baseUrl}${endpoint}`;
 };

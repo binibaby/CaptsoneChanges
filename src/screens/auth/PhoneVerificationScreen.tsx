@@ -1,15 +1,15 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { getAuthHeaders } from '../../constants/config';
 import { networkService } from '../../services/networkService';
@@ -150,7 +150,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       if (error.name === 'AbortError') {
         errorMessage = 'Request timed out. Please check your internet connection and try again.';
       } else if (error.message?.includes('Network request failed')) {
-        errorMessage = 'Unable to connect to server. Please check:\n\n1. Your internet connection\n2. Server is running on 172.20.10.2:8000\n3. Both devices are on same network';
+        errorMessage = 'Unable to connect to server. Please check:\n\n1. Your internet connection\n2. Server is running and accessible\n3. Both devices are on same network';
       } else if (error.message?.includes('JSON')) {
         errorMessage = 'Invalid response from server. Please try again.';
       } else if (error.message?.includes('fetch')) {
@@ -383,7 +383,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
                     <Text style={styles.tipsText}>• Ensure the phone number is correct</Text>
                     <Text style={styles.tipsText}>• Try switching between WiFi and mobile data</Text>
                     <Text style={styles.tipsText}>• Wait a few minutes before retrying</Text>
-                    <Text style={styles.tipsText}>• Verify server is running on 172.20.10.2:8000</Text>
+                    <Text style={styles.tipsText}>• Verify server is running and accessible</Text>
                     <Text style={styles.tipsText}>• Ensure both devices are on same network</Text>
                     <Text style={styles.tipsText}>• Note: Using simulation mode for development</Text>
                   </View>

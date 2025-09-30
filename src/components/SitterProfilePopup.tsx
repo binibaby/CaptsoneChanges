@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { RealtimeSitter } from '../services/realtimeLocationService';
+import CertificateViewer from './CertificateViewer';
 
 interface SitterProfilePopupProps {
   sitter: RealtimeSitter | null;
@@ -31,7 +32,33 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const [certificateViewerVisible, setCertificateViewerVisible] = useState(false);
   const currentImageSource = useRef<any>(null);
+
+  // Sample certificates for the sitter - in real app, these would come from API
+  const sitterCertificates = [
+    {
+      id: '1',
+      name: 'Pet First Aid Certification',
+      image: 'https://via.placeholder.com/400x300/4CAF50/white?text=Pet+First+Aid+Certification',
+      date: '2024-01-15',
+      issuer: 'Pet Care Academy',
+    },
+    {
+      id: '2',
+      name: 'Dog Training Certificate',
+      image: 'https://via.placeholder.com/400x300/2196F3/white?text=Dog+Training+Certificate',
+      date: '2024-02-20',
+      issuer: 'Canine Training Institute',
+    },
+    {
+      id: '3',
+      name: 'Pet Behavior Specialist',
+      image: 'https://via.placeholder.com/400x300/FF9800/white?text=Pet+Behavior+Specialist',
+      date: '2024-03-10',
+      issuer: 'Animal Behavior Society',
+    },
+  ];
   
   // Reset image error state when sitter changes
   useEffect(() => {
@@ -169,12 +196,13 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <>
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
       <View style={styles.overlay}>
         <View style={styles.popupContainer}>
           {/* Close button */}
@@ -233,7 +261,7 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.credentialButton}
-                onPress={() => onViewCertificates(sitter.id)}
+                onPress={() => setCertificateViewerVisible(true)}
                 activeOpacity={0.7}
               >
                 <Ionicons name="medal" size={20} color="#fff" />
@@ -357,6 +385,15 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
         </View>
       </View>
     </Modal>
+
+      {/* Certificate Viewer Modal */}
+      <CertificateViewer
+        visible={certificateViewerVisible}
+        onClose={() => setCertificateViewerVisible(false)}
+        certificates={sitterCertificates}
+        sitterName={sitter?.name || 'Pet Sitter'}
+      />
+    </>
   );
 };
 
