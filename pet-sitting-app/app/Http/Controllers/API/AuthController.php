@@ -485,6 +485,11 @@ class AuthController extends Controller
             'age' => $user->age,
             'bio' => $user->bio,
             'profile_image' => $user->profile_image,
+            'profile_image_url' => $user->profile_image ? (
+                str_starts_with($user->profile_image, 'http') 
+                    ? $user->profile_image 
+                    : asset('storage/' . $user->profile_image)
+            ) : null,
             'email_verified' => $user->email_verified_at !== null,
             'phone_verified' => $user->phone_verified_at !== null,
         ];

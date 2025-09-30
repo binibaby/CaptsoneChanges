@@ -138,6 +138,18 @@ class LocationController extends Controller
         // Get all active sitters from cache
         $sittersKey = 'active_sitters';
         $activeSitters = Cache::get($sittersKey, []);
+        
+        // Debug logging for cached sitter data
+        \Log::info('🔍 LocationController - Cached sitters found:', [
+            'count' => count($activeSitters),
+            'sitters' => array_map(function($sitter) {
+                return [
+                    'user_id' => $sitter['user_id'] ?? 'N/A',
+                    'name' => $sitter['name'] ?? 'N/A',
+                    'is_online' => $sitter['is_online'] ?? false
+                ];
+            }, $activeSitters)
+        ]);
 
         $nearbySitters = [];
         $addedSitterIds = []; // Track added sitter IDs to prevent duplicates
@@ -160,6 +172,14 @@ class LocationController extends Controller
             if ($distance <= $radiusKm) {
                 // Get latest user data from database to ensure we have the most up-to-date profile
                 $user = User::find($sitterData['user_id']);
+                
+                // Debug logging for user lookup
+                \Log::info('🔍 LocationController - User lookup debug:', [
+                    'sitter_user_id' => $sitterData['user_id'],
+                    'user_found' => $user ? 'YES' : 'NO',
+                    'user_profile_image' => $user ? $user->profile_image : 'N/A',
+                    'user_name' => $user ? $user->name : 'N/A'
+                ]);
                 
                 // Use database data if available, otherwise fallback to cached data
                 $sitterInfo = $user ? [
@@ -184,6 +204,11 @@ class LocationController extends Controller
                     'lastSeen' => $sitterData['last_seen'],
                     'distance' => round($distance, 1) . ' km',
                     'profile_image' => $user->profile_image,
+                    'profile_image_url' => $user->profile_image ? (
+                        str_starts_with($user->profile_image, 'http') 
+                            ? $user->profile_image 
+                            : asset('storage/' . $user->profile_image)
+                    ) : null,
                     'images' => $user->profile_image ? [$user->profile_image] : null,
                     'followers' => $user->followers ?? 0,
                     'following' => $user->following ?? 0
@@ -238,6 +263,14 @@ class LocationController extends Controller
             'count' => count($nearbySitters),
             'radius_km' => $radiusKm
         ]);
+    }
+
+    /**
+     * Update sitter status (alias for setOnlineStatus)
+     */
+    public function updateStatus(Request $request)
+    {
+        return $this->setOnlineStatus($request);
     }
 
     /**

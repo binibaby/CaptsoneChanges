@@ -3,243 +3,259 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class ProfileController extends Controller
 {
-    public function getProfile(Request $request)
+    /**
+     * Get the authenticated user's profile
+     */
+    public function show(Request $request)
     {
-        try {
-            $user = Auth::user();
-            
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated'
-                ], 401);
-            }
-
-            return response()->json([
-                'success' => true,
-                'user' => $this->buildUserProfile($user)
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Get profile error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to get profile: ' . $e->getMessage()
-            ], 500);
-        }
+        $user = Auth::user();
+        
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->first_name . ' ' . $user->last_name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'profile_image' => $user->profile_image,
+                'profile_image_url' => $user->profile_image ? (
+                    str_starts_with($user->profile_image, 'http') 
+                        ? $user->profile_image 
+                        : asset('storage/' . $user->profile_image)
+                ) : null,
+                'phone' => $user->phone,
+                'address' => $user->address,
+                'age' => $user->age,
+                'gender' => $user->gender,
+                'bio' => $user->bio,
+                'hourly_rate' => $user->hourly_rate,
+                'experience' => $user->experience,
+                'specialties' => $user->specialties,
+                'selected_pet_types' => $user->selected_pet_types,
+                'pet_breeds' => $user->pet_breeds,
+                'email_verified' => $user->email_verified,
+                'phone_verified' => $user->phone_verified,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+            ]
+        ]);
     }
 
-    public function updateProfile(Request $request)
+    /**
+     * Update the authenticated user's profile
+     */
+    public function update(Request $request)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        $user = Auth::user();
+        
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|string|max:255',
+            'first_name' => 'sometimes|string|max:255',
+            'last_name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+            'phone' => 'sometimes|string|max:20',
+            'address' => 'sometimes|string|max:500',
+            'age' => 'sometimes|integer|min:1|max:120',
+            'gender' => 'sometimes|string|in:male,female,other',
+            'bio' => 'sometimes|string|max:1000',
+            'hourly_rate' => 'sometimes|numeric|min:0',
+            'experience' => 'sometimes|string|max:255',
+            'specialties' => 'sometimes|array',
+            'specialties.*' => 'string|max:255',
+            'selected_pet_types' => 'sometimes|array',
+            'selected_pet_types.*' => 'string|max:255',
+            'pet_breeds' => 'sometimes|array',
+            'pet_breeds.*' => 'string|max:255',
+            'profile_image' => 'sometimes|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
         try {
-            $user = Auth::user();
+            // Update user profile
+            if ($request->has('name')) {
+                $nameParts = explode(' ', $request->name, 2);
+                $user->first_name = $nameParts[0];
+                $user->last_name = isset($nameParts[1]) ? $nameParts[1] : '';
+            }
             
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated'
-                ], 401);
+            if ($request->has('first_name')) {
+                $user->first_name = $request->first_name;
             }
-
-            // Log the incoming request data
-            Log::info('Profile update request received:', [
-                'user_id' => $user->id,
-                'request_data' => $request->all(),
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name,
-                'name' => $request->name
-            ]);
-
-            // Base validation rules for all users
-            $validationRules = [
-                'name' => 'sometimes|string|max:255',
-                'first_name' => 'sometimes|nullable|string|max:255',
-                'last_name' => 'sometimes|nullable|string|max:255',
-                'phone' => 'sometimes|nullable|string|max:20',
-                'address' => 'sometimes|nullable|string|max:500',
-                'gender' => 'sometimes|nullable|in:male,female,other',
-                'age' => 'sometimes|nullable|integer|min:1|max:120',
-                'bio' => 'sometimes|nullable|string|max:1000',
-                'profile_image' => 'sometimes|nullable|string|max:500',
-            ];
-
-            // Add pet sitter specific validation rules
-            if ($user->role === 'pet_sitter') {
-                $validationRules['experience'] = 'sometimes|nullable|string|max:500';
-                $validationRules['hourly_rate'] = 'sometimes|nullable|numeric|min:0|max:999999.99';
-                $validationRules['specialties'] = 'sometimes|nullable|array';
-                $validationRules['selected_pet_types'] = 'sometimes|nullable|array';
+            
+            if ($request->has('last_name')) {
+                $user->last_name = $request->last_name;
             }
-
-            $validationRules['pet_breeds'] = 'sometimes|nullable|array'; // Both roles can have pet breeds
-
-            $request->validate($validationRules);
-
-            // Handle profile image (can be file upload or URL string)
-            if ($request->hasFile('profile_image')) {
-                // Handle file upload
-                $file = $request->file('profile_image');
-                $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
-                $path = $file->storeAs('profile_images', $filename, 'public');
-                $profileImageUrl = '/storage/' . $path;
-                
-                // Delete old profile image if exists
-                if ($user->profile_image) {
-                    $oldPath = str_replace('/storage/', '', $user->profile_image);
-                    Storage::disk('public')->delete($oldPath);
+            
+            if ($request->has('email')) {
+                $user->email = $request->email;
+            }
+            
+            if ($request->has('phone')) {
+                $user->phone = $request->phone;
+            }
+            
+            if ($request->has('address')) {
+                $user->address = $request->address;
+            }
+            
+            if ($request->has('age')) {
+                $user->age = $request->age;
+            }
+            
+            if ($request->has('gender')) {
+                $user->gender = $request->gender;
+            }
+            
+            if ($request->has('bio')) {
+                $user->bio = $request->bio;
+            }
+            
+            if ($request->has('hourly_rate')) {
+                $user->hourly_rate = $request->hourly_rate;
+            }
+            
+            if ($request->has('experience')) {
+                $user->experience = $request->experience;
+            }
+            
+            if ($request->has('specialties')) {
+                $user->specialties = $request->specialties;
+            }
+            
+            if ($request->has('selected_pet_types')) {
+                $user->selected_pet_types = $request->selected_pet_types;
+            }
+            
+            if ($request->has('pet_breeds')) {
+                $user->pet_breeds = $request->pet_breeds;
+            }
+            
+            if ($request->has('profile_image')) {
+                $profileImage = $request->profile_image;
+                // Clean up profile image - remove full URL if present
+                if (str_starts_with($profileImage, 'http')) {
+                    // Extract storage path from full URL
+                    $urlParts = explode('/storage/', $profileImage);
+                    if (count($urlParts) > 1) {
+                        $profileImage = $urlParts[1];
+                    }
                 }
-                
-                $user->profile_image = $profileImageUrl;
-                
-                Log::info('📸 Profile image uploaded for user ' . $user->id . ': ' . $filename);
-            } elseif ($request->has('profile_image') && $request->profile_image !== null) {
-                // Handle profile image URL string
-                $user->profile_image = $request->profile_image;
-                Log::info('📸 Profile image URL updated for user ' . $user->id . ': ' . $request->profile_image);
-            }
-
-            // Update other profile fields based on user role
-            $baseFields = ['name', 'first_name', 'last_name', 'phone', 'address', 'gender', 'age', 'bio'];
-            $sitterFields = ['experience', 'hourly_rate', 'specialties', 'selected_pet_types'];
-            $commonFields = ['pet_breeds'];
-
-            $allowedFields = array_merge($baseFields, $commonFields);
-            if ($user->role === 'pet_sitter') {
-                $allowedFields = array_merge($allowedFields, $sitterFields);
-            }
-
-            $updateData = $request->only($allowedFields);
-
-            foreach ($updateData as $key => $value) {
-                if ($value !== null) {
-                    $user->$key = $value;
-                }
+                $user->profile_image = $profileImage;
             }
 
             $user->save();
-
-            // Log the saved user data
-            Log::info('Profile updated successfully:', [
-                'user_id' => $user->id,
-                'saved_first_name' => $user->first_name,
-                'saved_last_name' => $user->last_name,
-                'saved_name' => $user->name,
-                'saved_email' => $user->email
-            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
-                'user' => $this->buildUserProfile($user)
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->first_name . ' ' . $user->last_name,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'profile_image' => $user->profile_image,
+                    'profile_image_url' => $user->profile_image ? (
+                        str_starts_with($user->profile_image, 'http') 
+                            ? $user->profile_image 
+                            : asset('storage/' . $user->profile_image)
+                    ) : null,
+                    'phone' => $user->phone,
+                    'address' => $user->address,
+                    'age' => $user->age,
+                    'gender' => $user->gender,
+                    'bio' => $user->bio,
+                    'hourly_rate' => $user->hourly_rate,
+                    'experience' => $user->experience,
+                    'specialties' => $user->specialties,
+                    'selected_pet_types' => $user->selected_pet_types,
+                    'pet_breeds' => $user->pet_breeds,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ]
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Profile update error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update profile: ' . $e->getMessage()
+                'message' => 'Failed to update profile',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    private function buildUserProfile(User $user)
+    /**
+     * Upload profile image
+     */
+    public function uploadImage(Request $request)
     {
-        // Ensure first_name and last_name are populated from name if they're empty
-        $firstName = $user->first_name;
-        $lastName = $user->last_name;
+        $user = Auth::user();
         
-        if (empty($firstName) && empty($lastName) && !empty($user->name)) {
-            $nameParts = explode(' ', trim($user->name));
-            $firstName = $nameParts[0] ?? '';
-            $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
-        }
-        
-        // Base profile fields for all users
-        $profile = [
-            'id' => $user->id,
-            'name' => $user->name,
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'email' => $user->email,
-            'role' => $user->role,
-            'status' => $user->status,
-            'phone' => $user->phone,
-            'address' => $user->address,
-            'gender' => $user->gender,
-            'age' => $user->age,
-            'bio' => $user->bio,
-            'profile_image' => $user->profile_image,
-            'email_verified' => $user->email_verified_at !== null,
-            'phone_verified' => $user->phone_verified_at !== null,
-        ];
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
 
-        // Add role-specific fields
-        if ($user->role === 'pet_sitter') {
-            // Pet sitter specific fields
-            $profile['experience'] = $user->experience;
-            $profile['hourly_rate'] = $user->hourly_rate;
-            $profile['specialties'] = $user->specialties;
-            $profile['selected_pet_types'] = $user->selected_pet_types;
-            $profile['pet_breeds'] = $user->pet_breeds;
-        } else {
-            // Pet owner specific fields (no sitter-specific fields)
-            $profile['pet_breeds'] = $user->pet_breeds; // Pet owners can have pet breeds they own
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
         }
 
-        return $profile;
-    }
-
-    public function uploadProfileImage(Request $request)
-    {
         try {
-            $user = Auth::user();
-            
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated'
-                ], 401);
-            }
-
-            $request->validate([
-                'profile_image' => 'required|image|mimes:jpeg,png,jpg|max:5120',
-            ]);
-
-            $file = $request->file('profile_image');
-            $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('profile_images', $filename, 'public');
-            $profileImageUrl = '/storage/' . $path;
-            
             // Delete old profile image if exists
-            if ($user->profile_image) {
-                $oldPath = str_replace('/storage/', '', $user->profile_image);
-                Storage::disk('public')->delete($oldPath);
+            if ($user->profile_image && Storage::disk('public')->exists($user->profile_image)) {
+                Storage::disk('public')->delete($user->profile_image);
             }
-            
-            $user->profile_image = $profileImageUrl;
-            $user->save();
 
-            Log::info('📸 Profile image uploaded for user ' . $user->id . ': ' . $filename);
+            // Store new image
+            $imagePath = $request->file('image')->store('profile_images', 'public');
+            
+            // Update user profile image
+            $user->profile_image = $imagePath;
+            $user->save();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Profile image uploaded successfully',
-                'profile_image' => $profileImageUrl
+                'profile_image' => $imagePath,
+                'full_url' => asset('storage/' . $imagePath)
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Profile image upload error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload profile image: ' . $e->getMessage()
+                'message' => 'Failed to upload image',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

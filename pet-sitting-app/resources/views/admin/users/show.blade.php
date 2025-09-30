@@ -24,7 +24,7 @@
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Profile Picture</h3>
                 <div class="flex items-center space-x-4">
                     @if($user->profile_image)
-                        <img src="{{ $user->profile_image }}" alt="Profile Image" class="w-16 h-16 rounded-full object-cover border-2 border-gray-200" 
+                        <img src="{{ asset('storage/' . $user->profile_image) }}" alt="Profile Image" class="w-16 h-16 rounded-full object-cover border-2 border-gray-200" 
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                         <div class="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300" style="display:none;">
                             <svg class="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
