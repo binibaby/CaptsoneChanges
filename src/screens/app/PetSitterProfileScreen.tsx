@@ -3,20 +3,20 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { useAuth } from '../../contexts/AuthContext';
 import CertificateAlbum from '../../components/CertificateAlbum';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PetSitterProfileScreen = () => {
   const router = useRouter();
@@ -264,6 +264,13 @@ const PetSitterProfileScreen = () => {
       setIsUploadingImage(true);
       setImageError(false);
       
+      // Check if user has a valid token
+      if (!user?.token) {
+        console.error('No authentication token available');
+        Alert.alert('Error', 'Please log in again to upload images');
+        return;
+      }
+      
       const formData = new FormData();
       formData.append('image', {
         uri: imageUri,
@@ -275,7 +282,8 @@ const PetSitterProfileScreen = () => {
       const response = await makeApiCall('/api/profile/upload-image', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${user?.token || ''}`,
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'multipart/form-data',
         },
         body: formData,
       });

@@ -384,7 +384,7 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
           </View>
         </View>
       </View>
-    </Modal>
+      </Modal>
 
       {/* Certificate Viewer Modal */}
       <CertificateViewer

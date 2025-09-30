@@ -233,6 +233,13 @@ const PetOwnerProfileScreen = () => {
       setIsUploadingImage(true);
       setImageError(false);
       
+      // Check if user has a valid token
+      if (!user?.token) {
+        console.error('No authentication token available');
+        Alert.alert('Error', 'Please log in again to upload images');
+        return;
+      }
+      
       const formData = new FormData();
       formData.append('image', {
         uri: imageUri,
@@ -244,7 +251,8 @@ const PetOwnerProfileScreen = () => {
       const response = await makeApiCall('/api/profile/upload-image', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${user?.token || ''}`,
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'multipart/form-data',
         },
         body: formData,
       });
