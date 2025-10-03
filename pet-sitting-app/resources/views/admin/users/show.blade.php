@@ -298,30 +298,24 @@
                                 @endif
                             </dd>
                         </div>
-                        @if($user->id_verified_at)
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Verified At</dt>
-                            <dd class="text-sm text-gray-900">{{ $user->id_verified_at->format('M d, Y H:i') }}</dd>
-                        </div>
-                        @endif
                     </dl>
                 </div>
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Latest Verification</h3>
-                    @if($stats['verification_status'])
+                    @if($stats['latest_verification'])
                         <dl class="space-y-3">
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Document Type</dt>
-                                <dd class="text-sm text-gray-900">{{ ucwords(str_replace('_', ' ', $stats['verification_status']->document_type)) }}</dd>
+                                <dd class="text-sm text-gray-900">{{ ucwords(str_replace('_', ' ', $stats['latest_verification']->document_type)) }}</dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Status</dt>
                                 <dd class="text-sm text-gray-900">
-                                    @if($stats['verification_status']->status === 'approved')
+                                    @if($stats['latest_verification']->status === 'approved')
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                                             ✅ Veriff Approved
                                         </span>
-                                    @elseif($stats['verification_status']->status === 'rejected')
+                                    @elseif($stats['latest_verification']->status === 'rejected')
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                                             ❌ Veriff Rejected
                                         </span>
@@ -332,14 +326,10 @@
                                     @endif
                                 </dd>
                             </div>
-                            <div>
-                                <dt class="text-sm font-medium text-gray-500">Submitted</dt>
-                                <dd class="text-sm text-gray-900">{{ $stats['verification_status']->created_at->format('M d, Y H:i') }}</dd>
-                            </div>
-                            @if($stats['verification_status']->verification_score)
+                            @if($stats['latest_verification']->verification_score)
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Verification Score</dt>
-                                <dd class="text-sm text-gray-900">{{ $stats['verification_status']->verification_score }}%</dd>
+                                <dd class="text-sm text-gray-900">{{ $stats['latest_verification']->verification_score }}%</dd>
                             </div>
                             @endif
                         </dl>
@@ -350,25 +340,25 @@
             </div>
             
             <!-- Verification Notes Section -->
-            @if($stats['verification_status'])
+            @if($stats['latest_verification'])
             <div class="mt-6 p-4 bg-gray-50 rounded-lg">
                 <h4 class="text-sm font-medium text-gray-700 mb-2">Verification Notes</h4>
-                @if($stats['verification_status']->status === 'skipped')
+                @if($stats['latest_verification']->status === 'skipped')
                     <div class="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
                         <strong>⚠️ ID Verification Skipped:</strong> User chose to skip ID verification during registration. 
                         They can complete this later through their profile.
                     </div>
                 @endif
                 
-                @if($stats['verification_status']->notes)
+                @if($stats['latest_verification']->notes)
                     <div class="text-sm text-gray-700 mt-2">
-                        <strong>Notes:</strong> {{ $stats['verification_status']->notes }}
+                        <strong>Notes:</strong> {{ $stats['latest_verification']->notes }}
                     </div>
                 @endif
                 
-                @if($stats['verification_status']->extracted_data)
+                @if($stats['latest_verification']->extracted_data)
                     @php
-                        $extractedData = json_decode($stats['verification_status']->extracted_data, true);
+                        $extractedData = json_decode($stats['latest_verification']->extracted_data, true);
                     @endphp
                     @if(isset($extractedData['skip_reason']))
                         <div class="text-sm text-gray-700 mt-2">
@@ -435,84 +425,6 @@
         </div>
     </div>
 
-    <!-- Security Information Section (Admin Only) -->
-    <div class="bg-white shadow rounded-lg mt-6">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-900">Security Information</h2>
-        </div>
-        <div class="px-6 py-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Account Security</h3>
-                    <dl class="space-y-3">
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Password Hash</dt>
-                            <dd class="text-sm text-gray-900 font-mono break-all">
-                                {{ $user->password ? substr($user->password, 0, 50) . '...' : 'No password set' }}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Email Verified</dt>
-                            <dd class="text-sm text-gray-900">
-                                @if($user->email_verified_at)
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                        ✅ {{ $user->email_verified_at->format('M d, Y H:i') }}
-                                    </span>
-                                @else
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                                        ❌ Not Verified
-                                    </span>
-                                @endif
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Account Created</dt>
-                            <dd class="text-sm text-gray-900">{{ $user->created_at->format('M d, Y H:i') }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
-                            <dd class="text-sm text-gray-900">{{ $user->updated_at->format('M d, Y H:i') }}</dd>
-                        </div>
-                    </dl>
-                </div>
-                <div>
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Location & Activity</h3>
-                    <dl class="space-y-3">
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Country/Region</dt>
-                            <dd class="text-sm text-gray-900">
-                                @if($user->address)
-                                    @php
-                                        $addressParts = explode(',', $user->address);
-                                        $country = end($addressParts);
-                                    @endphp
-                                    {{ trim($country) ?: 'Not specified' }}
-                                @else
-                                    Not specified
-                                @endif
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Last Active</dt>
-                            <dd class="text-sm text-gray-900">
-                                @if($user->last_active_at)
-                                    {{ $user->last_active_at->format('M d, Y H:i') }}
-                                @else
-                                    Never
-                                @endif
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Remember Token</dt>
-                            <dd class="text-sm text-gray-900 font-mono break-all">
-                                {{ $user->remember_token ? substr($user->remember_token, 0, 30) . '...' : 'None' }}
-                            </dd>
-                        </div>
-                    </dl>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>

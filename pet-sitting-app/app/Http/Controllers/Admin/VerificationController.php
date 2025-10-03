@@ -7,6 +7,7 @@ use App\Models\Verification;
 use App\Models\User;
 use App\Models\Notification;
 use App\Models\VerificationAuditLog;
+use App\Events\IdVerificationStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -26,7 +27,7 @@ class VerificationController extends Controller
      */
     private function getAuthId(): ?int
     {
-        return $this->getAuthId();
+        return Auth::id();
     }
 
     /**
@@ -62,7 +63,7 @@ class VerificationController extends Controller
 
         // Filter by status
         if ($status !== 'all') {
-            $query->where('status', $status);
+            $query->where('verification_status', $status);
         }
 
         // Search functionality
@@ -117,9 +118,43 @@ class VerificationController extends Controller
     }
 
     /**
-     * Get single verification details
+     * Display verification details page
      */
     public function show($id)
+    {
+        $verification = Verification::with(['user', 'verifiedBy', 'auditLogs.admin'])->find($id);
+
+        if (!$verification) {
+            abort(404, 'Verification not found.');
+        }
+
+        // Calculate minutes ago using Carbon (works with SQLite)
+        $minutesAgo = $verification->created_at->diffInMinutes(now());
+        $verification->minutes_ago = $minutesAgo;
+        $verification->time_ago = $this->formatTimeAgo($minutesAgo);
+        $verification->is_urgent = $minutesAgo > 60;
+        $verification->is_critical = $minutesAgo > 1440;
+
+        // Set review deadline if not set (for skipped verifications)
+        if (!$verification->review_deadline && $verification->verification_status === 'pending') {
+            $verification->review_deadline = $verification->created_at->addHours(24);
+            // Only save the review_deadline field, not the computed properties
+            $verification->save(['review_deadline']);
+        }
+
+        // Check if document image exists and is accessible
+        if ($verification->document_image) {
+            $verification->document_image_url = asset('storage/' . $verification->document_image);
+            $verification->document_exists = file_exists(public_path('storage/' . $verification->document_image));
+        }
+
+        return view('admin.verifications.enhanced-show', compact('verification'));
+    }
+
+    /**
+     * Get single verification details (API)
+     */
+    public function getVerificationDetails($id)
     {
         $verification = Verification::with(['user', 'verifiedBy', 'auditLogs.admin'])->find($id);
 
@@ -150,14 +185,30 @@ class VerificationController extends Controller
     }
 
     /**
+     * Display enhanced verification details page
+     */
+    public function enhancedShow($id)
+    {
+        $verification = Verification::with(['user', 'verifiedBy', 'auditLogs.admin'])->find($id);
+
+        if (!$verification) {
+            abort(404, 'Verification not found.');
+        }
+
+        return view('admin.verifications.enhanced-show', compact('verification'));
+    }
+
+    /**
      * Approve ID verification with comprehensive validation
      */
     public function approve(Request $request, $id)
     {
         $request->validate([
-            'admin_notes' => 'nullable|string|max:1000',
-            'confidence_level' => 'required|in:high,medium,low',
-            'verification_method' => 'required|in:manual,automated,hybrid'
+            'documents_clear' => 'nullable|boolean',
+            'face_match_verified' => 'nullable|boolean',
+            'address_match_verified' => 'nullable|boolean',
+            'confidence_level' => 'nullable|in:high,medium,low',
+            'verification_method' => 'nullable|in:manual,automated,hybrid'
         ]);
 
         DB::beginTransaction();
@@ -179,29 +230,78 @@ class VerificationController extends Controller
                 ], 400);
             }
 
-            // Check if document image exists
-            if (!Storage::exists($verification->document_image)) {
+            // Check if document image exists (check in public storage)
+            if (!Storage::disk('public')->exists($verification->document_image)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Document image not found. Cannot approve verification.'
                 ], 400);
             }
 
+            // Server-side validation: Ensure all criteria are set to "Yes"
+            $documentsClear = $request->documents_clear ?? true;
+            $faceMatchVerified = $request->face_match_verified ?? true;
+            $addressMatchVerified = $request->address_match_verified ?? true;
+
+            if (!$documentsClear || !$faceMatchVerified || !$addressMatchVerified) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Cannot approve verification. All criteria (Documents Clear, Face Match Verified, Address Match Verified) must be set to "Yes"'
+                ], 400);
+            }
+
             // Update verification
             $verification->update([
                 'status' => 'approved',
+                'verification_status' => 'approved',
+                'admin_decision' => 'approved',
                 'verified_at' => now(),
                 'verified_by' => $this->getAuthId(),
-                'admin_notes' => $request->admin_notes,
-                'confidence_level' => $request->confidence_level,
-                'verification_method' => $request->verification_method
+                'admin_reviewed_at' => now(),
+                'admin_reviewed_by' => $this->getAuthId(),
+                'documents_clear' => $request->documents_clear ?? true,
+                'face_match_verified' => $request->face_match_verified ?? true,
+                'address_match_verified' => $request->address_match_verified ?? true,
+                'is_legit_sitter' => true,
+                'confidence_level' => $request->confidence_level ?? 'high',
+                'verification_method' => $request->verification_method ?? 'manual',
+                'badges_earned' => json_encode([
+                    [
+                        'id' => 'legit_sitter',
+                        'name' => 'Legit Sitter',
+                        'description' => 'Verified pet sitter with approved ID verification',
+                        'icon' => 'shield-checkmark',
+                        'color' => '#10B981',
+                        'earned_at' => now()->toISOString(),
+                    ],
+                    [
+                        'id' => 'verified_identity',
+                        'name' => 'Verified ID',
+                        'description' => 'Government-issued ID verified',
+                        'icon' => 'card',
+                        'color' => '#3B82F6',
+                        'earned_at' => now()->toISOString(),
+                    ],
+                    [
+                        'id' => 'location_verified',
+                        'name' => 'Location Verified',
+                        'description' => 'Location verification completed',
+                        'icon' => 'location',
+                        'color' => '#3B82F6',
+                        'earned_at' => now()->toISOString(),
+                    ]
+                ])
             ]);
 
             // Update user status to active
             $verification->user->update([
                 'status' => 'active',
                 'approved_at' => now(),
-                'approved_by' => $this->getAuthId()
+                'approved_by' => $this->getAuthId(),
+                'id_verified' => true,
+                'id_verified_at' => now(),
+                'verification_status' => 'verified',
+                'can_accept_bookings' => true
             ]);
 
             // Create audit log
@@ -215,11 +315,28 @@ class VerificationController extends Controller
                 'confidence_level' => $request->confidence_level
             ]);
 
+            // Broadcast real-time update to user (with error handling)
+            try {
+                broadcast(new IdVerificationStatusUpdated(
+                    $verification,
+                    $verification->user,
+                    'approved',
+                    '🎉 Congratulations! Your ID verification has been approved! You are now a verified pet sitter.'
+                ));
+                Log::info('Real-time update broadcasted successfully', ['verification_id' => $verification->id]);
+            } catch (\Exception $broadcastError) {
+                Log::warning('Failed to broadcast real-time update', [
+                    'verification_id' => $verification->id,
+                    'error' => $broadcastError->getMessage()
+                ]);
+                // Continue with the approval process even if broadcasting fails
+            }
+
             // Notify user of approval
             Notification::create([
                 'user_id' => $verification->user_id,
                 'type' => 'verification',
-                'message' => 'Congratulations! Your ID verification has been approved. You now have full access to all platform features and can start booking pet sitting services.'
+                'message' => '🎉 Congratulations! Your enhanced ID verification has been approved and you are now marked as a legit sitter! You can now start accepting pet sitting jobs and have full access to all platform features.'
             ]);
 
             // Notify all admins
@@ -329,16 +446,33 @@ class VerificationController extends Controller
                 'rejection_category' => $request->rejection_category
             ]);
 
-            // Notify user of rejection
-            $message = "Your ID verification was rejected. Reason: {$request->reason}. ";
-            $message .= $request->allow_resubmission 
+            // Broadcast real-time update to user (with error handling)
+            $rejectionMessage = "Your ID verification was rejected. Reason: {$request->reason}. ";
+            $rejectionMessage .= $request->allow_resubmission 
                 ? "You may submit a new verification with correct documents." 
                 : "Please contact support for assistance.";
 
+            try {
+                broadcast(new IdVerificationStatusUpdated(
+                    $verification,
+                    $verification->user,
+                    'rejected',
+                    $rejectionMessage
+                ));
+                Log::info('Real-time rejection update broadcasted successfully', ['verification_id' => $verification->id]);
+            } catch (\Exception $broadcastError) {
+                Log::warning('Failed to broadcast real-time rejection update', [
+                    'verification_id' => $verification->id,
+                    'error' => $broadcastError->getMessage()
+                ]);
+                // Continue with the rejection process even if broadcasting fails
+            }
+
+            // Notify user of rejection
             Notification::create([
                 'user_id' => $verification->user_id,
                 'type' => 'verification',
-                'message' => $message
+                'message' => $rejectionMessage
             ]);
 
             // Notify all admins
@@ -397,17 +531,17 @@ class VerificationController extends Controller
     {
         $stats = [
             'total' => Verification::count(),
-            'pending' => Verification::where('status', 'pending')->count(),
-            'approved' => Verification::where('status', 'approved')->count(),
-            'rejected' => Verification::where('status', 'rejected')->count(),
+            'pending' => Verification::where('verification_status', 'pending')->count(),
+            'approved' => Verification::where('verification_status', 'approved')->count(),
+            'rejected' => Verification::where('verification_status', 'rejected')->count(),
         ];
 
         // Get urgent and critical counts
-        $stats['urgent'] = Verification::where('status', 'pending')
+        $stats['urgent'] = Verification::where('verification_status', 'pending')
             ->where('created_at', '<', Carbon::now()->subHour())
             ->count();
 
-        $stats['critical'] = Verification::where('status', 'pending')
+        $stats['critical'] = Verification::where('verification_status', 'pending')
             ->where('created_at', '<', Carbon::now()->subDay())
             ->count();
 

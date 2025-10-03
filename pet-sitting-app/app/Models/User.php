@@ -50,6 +50,10 @@ class User extends Authenticatable
         'phone_verification_code',
         'email_verified_at',
         'phone_verified_at',
+        'id_verified',
+        'id_verified_at',
+        'verification_status',
+        'can_accept_bookings',
     ];
 
     /**
@@ -81,6 +85,9 @@ class User extends Authenticatable
         'approved_at' => 'datetime',
         'last_active_at' => 'datetime',
         'is_admin' => 'boolean',
+        'id_verified' => 'boolean',
+        'id_verified_at' => 'datetime',
+        'can_accept_bookings' => 'boolean',
     ];
 
     // Relationships
@@ -175,7 +182,7 @@ class User extends Authenticatable
 
     public function hasVerifiedId()
     {
-        return $this->verifications()->where('status', 'approved')->exists();
+        return $this->verifications()->where('verification_status', 'approved')->exists();
     }
 
     public function canAcceptBookings()
@@ -188,7 +195,7 @@ class User extends Authenticatable
 
     public function getVerificationBadges()
     {
-        $verification = $this->verifications()->where('status', 'approved')->first();
+        $verification = $this->verifications()->where('verification_status', 'approved')->first();
         
         if ($verification && $verification->badges_earned) {
             return json_decode($verification->badges_earned, true);
