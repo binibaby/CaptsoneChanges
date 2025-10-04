@@ -8,6 +8,7 @@ use App\Http\Controllers\API\LocationController;
 use App\Http\Controllers\API\BookingController;
 use App\Http\Controllers\API\MessageController;
 use App\Http\Controllers\API\VerificationController;
+use App\Http\Controllers\API\PetController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -63,6 +64,10 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
+// Token management routes (no auth required for token refresh/generation)
+Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
+Route::post('/generate-token', [AuthController::class, 'generateToken']);
+
 // Phone verification routes (no auth required)
 Route::post('/send-verification-code', [AuthController::class, 'sendPhoneVerificationCode']);
 Route::post('/verify-phone', [AuthController::class, 'verifyPhone']);
@@ -76,6 +81,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile/upload-certificate-image', [ProfileController::class, 'uploadCertificateImage']);
     Route::post('/profile/save-certificates', [ProfileController::class, 'saveCertificates']);
     Route::get('/profile/certificates', [ProfileController::class, 'getCertificates']);
+    
+    // Profile update request routes
+    Route::post('/profile/update-request', [App\Http\Controllers\API\ProfileUpdateRequestController::class, 'submitRequest']);
+    Route::get('/profile/update-requests', [App\Http\Controllers\API\ProfileUpdateRequestController::class, 'getUserRequests']);
+    Route::get('/profile/update-request/check-pending', [App\Http\Controllers\API\ProfileUpdateRequestController::class, 'checkPendingRequest']);
 });
 
 // Location routes
@@ -108,17 +118,57 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/messages/start-conversation', [MessageController::class, 'startConversation']);
 });
 
-// Verification routes
+// Pet routes
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/verification/submit', [VerificationController::class, 'submitVerification']);
-    Route::post('/verification/submit-simple', [VerificationController::class, 'submitVerificationSimple']);
-    Route::get('/verification/status', [VerificationController::class, 'getVerificationStatus']);
-    Route::get('/verification/session-status', [VerificationController::class, 'getVerificationSessionStatus']);
-    Route::post('/verification/skip', [VerificationController::class, 'skipVerification']);
-    Route::post('/verification/upload-document', [VerificationController::class, 'uploadDocument']);
-    Route::get('/verification/philippine-ids', [VerificationController::class, 'getPhilippineIdTypes']);
+    Route::get('/pets', [PetController::class, 'index']);
+    Route::post('/pets', [PetController::class, 'store']);
+    Route::get('/pets/{id}', [PetController::class, 'show']);
+    Route::put('/pets/{id}', [PetController::class, 'update']);
+    Route::delete('/pets/{id}', [PetController::class, 'destroy']);
 });
 
-// Public verification routes (no auth required)
+// Verification routes
+Route::middleware('auth:sanctum')->group(function () {
+    // Enhanced ID verification with real-time updates
+    Route::post('/verification/submit-enhanced', [VerificationController::class, 'submitEnhancedVerification']);
+    Route::get('/verification/status', [VerificationController::class, 'getVerificationStatus']);
+    Route::post('/verification/upload-document', [VerificationController::class, 'uploadDocument']);
+    Route::get('/verification/philippine-id-types', [VerificationController::class, 'getPhilippineIdTypes']);
+    
+    // Legacy verification endpoints
+    Route::post('/verification/submit', [VerificationController::class, 'submitVerification']);
+    Route::post('/verification/submit-simple', [VerificationController::class, 'submitVerificationSimple']);
+    Route::post('/verification/skip', [VerificationController::class, 'skipVerification']);
+    
+    // Veriff integration
+    Route::get('/verification/session-status', [VerificationController::class, 'getVerificationSessionStatus']);
+});
+
+// Public verification endpoints (for webhooks and public access)
+Route::post('/verification/veriff-webhook', [VerificationController::class, 'handleVeriffWebhook']);
 Route::post('/verification/skip-public', [VerificationController::class, 'skipVerificationPublic']);
-Route::post('/verification/webhook', [VerificationController::class, 'handleVeriffWebhook']);
+
+// Notifications API routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/notifications/', [App\Http\Controllers\API\NotificationController::class, 'index']);
+    Route::post('/notifications/{id}/mark-read', [App\Http\Controllers\API\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [App\Http\Controllers\API\NotificationController::class, 'markAllAsRead']);
+});
+
+// Admin routes for profile change requests
+Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::get('/admin/profile-change-requests', [App\Http\Controllers\API\ProfileChangeRequestController::class, 'getAllRequests']);
+    Route::post('/admin/profile-change-requests/{id}/approve', [App\Http\Controllers\API\ProfileChangeRequestController::class, 'approveRequest']);
+    Route::post('/admin/profile-change-requests/{id}/reject', [App\Http\Controllers\API\ProfileChangeRequestController::class, 'rejectRequest']);
+});
+
+// Admin verification routes (API endpoints for admin panel)
+// Use web authentication for admin panel (session-based)
+Route::middleware(['web', 'auth:web', 'admin', 'throttle:admin'])->group(function () {
+    Route::post('/admin/verifications/{id}/approve', [App\Http\Controllers\Admin\VerificationController::class, 'approve']);
+    Route::post('/admin/verifications/{id}/reject', [App\Http\Controllers\Admin\VerificationController::class, 'reject']);
+    Route::get('/admin/verifications/{id}/details', [App\Http\Controllers\Admin\VerificationController::class, 'getVerificationDetails']);
+    Route::get('/admin/verifications/status-updates', [App\Http\Controllers\Admin\VerificationController::class, 'getStatusUpdates']);
+    Route::post('/admin/verifications/bulk-action', [App\Http\Controllers\Admin\VerificationController::class, 'bulkAction']);
+    Route::get('/admin/verifications/{id}/audit-logs', [App\Http\Controllers\Admin\VerificationController::class, 'getAuditLogs']);
+});

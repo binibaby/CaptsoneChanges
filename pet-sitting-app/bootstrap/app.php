@@ -17,11 +17,24 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
         
-        // Add CORS middleware to API routes
+        // Add CORS and Sanctum middleware to API routes
         $middleware->group('api', [
             \Illuminate\Http\Middleware\HandleCors::class,
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        ]);
+        
+        // Ensure web middleware is available for API routes that need session support
+        $middleware->web([
+            \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
         ]);
     })
+    ->withProviders([
+        \App\Providers\RateLimiterServiceProvider::class,
+    ])
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

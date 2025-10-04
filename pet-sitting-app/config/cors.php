@@ -19,7 +19,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [
+        '*', // Allow all origins for development
+        'http://172.20.10.2:8000',     // Mobile data IP (primary)
+        'http://172.20.10.1:8000',     // Mobile hotspot gateway
+        'http://192.168.100.192:8000', // WiFi IP (fallback)
+        'http://localhost:8000',        // Local development
+        'http://127.0.0.1:8000',       // Local development
+    ],
 
     'allowed_origins_patterns' => [],
 

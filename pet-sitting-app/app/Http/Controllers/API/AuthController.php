@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Verification;
+use App\Services\SemaphoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +31,7 @@ class AuthController extends Controller
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:8|confirmed',
                 'role' => 'required|in:pet_owner,pet_sitter',
-                'phone' => 'nullable|string|max:20',
+                'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
                 'address' => 'nullable|string|max:500',
                 'gender' => 'nullable|in:male,female,other',
                 'age' => 'nullable|integer|min:1|max:120',
@@ -47,6 +48,13 @@ class AuthController extends Controller
             ]);
 
             \Log::info('✅ Validation passed successfully');
+
+            // Format phone number to standard format
+            $formattedPhone = $this->formatPhoneNumber($request->phone);
+            \Log::info('📱 Phone number formatted:', [
+                'original' => $request->phone,
+                'formatted' => $formattedPhone
+            ]);
 
             // Generate phone verification code only
             $phoneVerificationCode = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
@@ -72,7 +80,7 @@ class AuthController extends Controller
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
                 'status' => $request->role === 'pet_sitter' ? 'pending_verification' : 'pending',
-                'phone' => $request->phone,
+                'phone' => $formattedPhone,
                 'address' => $request->address,
                 'gender' => $request->gender,
                 'age' => $request->age,
@@ -122,6 +130,35 @@ class AuthController extends Controller
             // Handle ID verification for pet sitters
             if ($request->role === 'pet_sitter' && $request->filled(['id_type', 'id_number']) && $request->hasFile('id_image')) {
                 $this->submitIdVerification($request, $user);
+            } else {
+                // Create verification record for all users
+                $documentType = $request->role === 'pet_sitter' ? 'skipped' : 'not_required';
+                $verificationStatus = $request->role === 'pet_sitter' ? 'pending' : 'approved';
+                $status = $request->role === 'pet_sitter' ? 'skipped' : 'approved';
+                $verificationMethod = $request->role === 'pet_sitter' ? 'manual_skip' : 'not_required';
+                $notes = $request->role === 'pet_sitter' 
+                    ? 'User needs to complete ID verification to become active.'
+                    : 'Pet owner - ID verification not required.';
+                
+                Verification::create([
+                    'user_id' => $user->id,
+                    'document_type' => $documentType,
+                    'document_number' => null,
+                    'document_image' => null,
+                    'status' => $status,
+                    'verification_status' => $verificationStatus,
+                    'is_philippine_id' => false,
+                    'verification_method' => $verificationMethod,
+                    'verification_score' => null,
+                    'extracted_data' => json_encode([
+                        'created_at' => now()->toISOString(),
+                        'reason' => $request->role === 'pet_sitter' 
+                            ? 'User needs to complete ID verification' 
+                            : 'Pet owners do not require ID verification',
+                        'can_complete_later' => $request->role === 'pet_sitter'
+                    ]),
+                    'notes' => $notes
+                ]);
             }
 
             // Phone verification is handled separately in the new flow
@@ -349,7 +386,7 @@ class AuthController extends Controller
             $hasPhoneVerified = $user->phone_verified_at !== null || empty($user->phone);
             
             $idVerification = Verification::where('user_id', $user->id)
-                ->where('status', 'approved')
+                ->where('verification_status', 'approved')
                 ->first();
             
             if ($hasPhoneVerified && $idVerification) {
@@ -594,14 +631,24 @@ class AuthController extends Controller
         }
         
         $request->validate([
-            'phone' => 'required|string|max:20',
+            'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
         ]);
 
-        $phone = $request->phone;
+        $phone = $this->formatPhoneNumber($request->phone);
+        
+        // Verify the phone number matches the user's registered phone
+        $user = $request->user();
+        if ($user && $user->phone !== $phone) {
+            \Log::warning("📱 PHONE MISMATCH - User phone: {$user->phone}, Requested phone: {$phone}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Phone number does not match your registered phone number.',
+            ], 400);
+        }
         $timestamp = now()->format('Y-m-d H:i:s');
         
-        // Enhanced logging for phone verification simulation
-        \Log::info("🔔 PHONE VERIFICATION SIMULATION STARTED");
+        // Enhanced logging for phone verification
+        \Log::info("🔔 PHONE VERIFICATION PROCESS STARTED");
         \Log::info("📱 SEND SMS - Received phone verification request for: " . $phone);
         \Log::info("⏰ Timestamp: " . $timestamp);
         \Log::info("🌐 Request IP: " . $request->ip());
@@ -621,10 +668,14 @@ class AuthController extends Controller
         \Log::info("⏳ Cache expiration: 10 minutes from now");
         
         // Make the verification code very visible in logs
+        \Log::info("🔢 ========================================");
         \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
         \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
         \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
+        \Log::info("🔢 ========================================");
         \Log::info("📱 Use this code to verify phone: {$phone}");
+        \Log::info("⏰ Code expires in 10 minutes");
+        \Log::info("🔑 Cache key: {$cacheKey}");
         
         // Log to dedicated verification codes file
         \Log::channel('verification')->info("🔢 VERIFICATION CODE FOR {$phone}: {$verificationCode}");
@@ -639,35 +690,49 @@ class AuthController extends Controller
         \Log::info("📞 Original phone: {$phone}");
         \Log::info("📞 Formatted phone: {$formattedPhone}");
         
-        // Send SMS using simulation mode only
+        // Check if simulation mode is enabled
+        $simulationMode = $this->isSimulationMode();
+        
+        if ($simulationMode) {
+            return $this->simulateSMS($phone, $verificationCode, $timestamp);
+        }
+
+        // Send SMS using Semaphore service
         try {
-            // Simulate SMS sending with a small delay
-            usleep(500000); // 0.5 second delay to simulate SMS processing
+            $semaphoreService = new SemaphoreService();
+            $message = "Petsit Connect code: {$verificationCode}. Valid for 10 mins.";
             
-            \Log::info("🎭 SMS SIMULATION to {$phone}: Your Petsit Connect verification code is: {$verificationCode}");
-            \Log::info("✅ SMS SIMULATION COMPLETED SUCCESSFULLY");
+            \Log::info("📱 SEMAPHORE SMS - Attempting to send SMS via Semaphore");
+            \Log::info("📱 SEMAPHORE SMS - Phone: {$phone}");
+            \Log::info("📱 SEMAPHORE SMS - Message: {$message}");
             
-            return response()->json([
-                'success' => true,
-                'message' => 'Verification code sent successfully!',
-                'debug_code' => $verificationCode,
-                'note' => 'Using simulation mode for development',
-                'simulation_mode' => true,
-                'timestamp' => $timestamp,
-            ]);
+            $smsResult = $semaphoreService->sendSMS($phone, $message);
+            
+            if ($smsResult['success']) {
+                \Log::info("✅ SEMAPHORE SMS - Message sent successfully via Semaphore");
+                \Log::info("📊 SEMAPHORE SMS - Response: " . json_encode($smsResult['response']));
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Verification code sent successfully via SMS!',
+                    'provider' => 'semaphore',
+                    'timestamp' => $timestamp,
+                ]);
+            } else {
+                \Log::error("❌ SEMAPHORE SMS - Failed to send via Semaphore");
+                \Log::error("❌ SEMAPHORE SMS - Error: " . ($smsResult['error'] ?? 'Unknown error'));
+                
+                // Fallback to simulation mode if Semaphore fails
+                \Log::info("🔄 SEMAPHORE SMS - Falling back to simulation mode");
+                return $this->simulateSMS($phone, $verificationCode, $timestamp);
+            }
         } catch (\Exception $e) {
-            \Log::info("🎭 SMS SIMULATION (fallback) to {$phone}: Your Petsit Connect verification code is: {$verificationCode}");
-            \Log::info("✅ SMS SIMULATION COMPLETED SUCCESSFULLY");
+            \Log::error("❌ SEMAPHORE SMS - Exception occurred: " . $e->getMessage());
+            \Log::error("❌ SEMAPHORE SMS - Stack trace: " . $e->getTraceAsString());
             
-            // Return success with simulation mode
-            return response()->json([
-                'success' => true,
-                'message' => 'Verification code sent successfully! (Development mode)',
-                'debug_code' => $verificationCode,
-                'note' => 'SMS service unavailable - using simulation mode',
-                'simulation_mode' => true,
-                'timestamp' => $timestamp,
-            ]);
+            // Fallback to simulation mode if Semaphore fails
+            \Log::info("🔄 SEMAPHORE SMS - Falling back to simulation mode due to exception");
+            return $this->simulateSMS($phone, $verificationCode, $timestamp);
         }
     }
 
@@ -685,12 +750,22 @@ class AuthController extends Controller
         }
         
         $request->validate([
-            'phone' => 'required|string|max:20',
+            'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
             'code' => 'required|string|size:6',
         ]);
 
-        $phone = $request->phone;
+        $phone = $this->formatPhoneNumber($request->phone);
         $code = $request->code;
+        
+        // Verify the phone number matches the user's registered phone
+        $user = $request->user();
+        if ($user && $user->phone !== $phone) {
+            \Log::warning("📱 PHONE MISMATCH - User phone: {$user->phone}, Requested phone: {$phone}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Phone number does not match your registered phone number.',
+            ], 400);
+        }
         $timestamp = now()->format('Y-m-d H:i:s');
         
         // Enhanced logging for phone verification simulation
@@ -712,10 +787,17 @@ class AuthController extends Controller
         if (!$storedCode) {
             \Log::error("❌ VERIFY SMS - No stored code found for phone: {$phone}");
             \Log::error("🔍 Possible reasons: Code expired, wrong phone number, or cache cleared");
+            
+            // In simulation mode, provide helpful debugging info
+            if ($this->isSimulationMode()) {
+                \Log::info("🎭 SIMULATION MODE - Check the logs above for the generated code");
+                \Log::info("🎭 SIMULATION MODE - Make sure you're using the correct phone number format");
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Verification code expired or not found.',
-                'simulation_mode' => true,
+                'simulation_mode' => $this->isSimulationMode(),
                 'timestamp' => $timestamp,
             ], 400);
         }
@@ -723,10 +805,18 @@ class AuthController extends Controller
         if ($storedCode !== $code) {
             \Log::error("❌ VERIFY SMS - Code mismatch. Expected: {$storedCode}, Received: {$code}");
             \Log::error("🔍 Verification failed - codes do not match");
+            
+            // In simulation mode, provide helpful debugging info
+            if ($this->isSimulationMode()) {
+                \Log::info("🎭 SIMULATION MODE - Expected code: {$storedCode}");
+                \Log::info("🎭 SIMULATION MODE - Received code: {$code}");
+                \Log::info("🎭 SIMULATION MODE - Check the logs above for the correct code");
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid verification code.',
-                'simulation_mode' => true,
+                'simulation_mode' => $this->isSimulationMode(),
                 'timestamp' => $timestamp,
             ], 400);
         }
@@ -749,6 +839,92 @@ class AuthController extends Controller
         $phone = preg_replace('/[^0-9+]/', '', $phone);
         
         // Ensure it starts with +
+        if (!str_starts_with($phone, '+')) {
+            $phone = '+' . $phone;
+        }
+        
+        return $phone;
+    }
+
+    /**
+     * Check if simulation mode is enabled
+     */
+    private function isSimulationMode(): bool
+    {
+        // Check environment variable or config for simulation mode
+        $simulationMode = env('SMS_SIMULATION_MODE', true); // Default to true for development
+        $semaphoreEnabled = env('SEMAPHORE_ENABLED', false); // Default to false until approved
+        
+        // Enable simulation if explicitly set or if Semaphore is not enabled
+        return $simulationMode || !$semaphoreEnabled;
+    }
+
+    /**
+     * Simulate SMS sending for development/testing
+     */
+    private function simulateSMS($phone, $verificationCode, $timestamp)
+    {
+        \Log::info("🎭 SMS SIMULATION MODE ENABLED");
+        \Log::info("📱 SIMULATION - Phone: {$phone}");
+        \Log::info("🔢 SIMULATION - Code: {$verificationCode}");
+        \Log::info("⏰ SIMULATION - Timestamp: {$timestamp}");
+        
+        // Make the verification code very visible in simulation logs
+        \Log::info("🎭 ========================================");
+        \Log::info("🎭 SMS SIMULATION - VERIFICATION CODE");
+        \Log::info("🎭 ========================================");
+        \Log::info("🎭 Phone: {$phone}");
+        \Log::info("🎭 Code: {$verificationCode}");
+        \Log::info("🎭 Code: {$verificationCode}");
+        \Log::info("🎭 Code: {$verificationCode}");
+        \Log::info("🎭 Message: Petsit Connect code: {$verificationCode}. Valid for 10 mins.");
+        \Log::info("🎭 ========================================");
+        \Log::info("🎭 COPY THIS CODE: {$verificationCode}");
+        \Log::info("🎭 ========================================");
+        
+        // Log to dedicated verification codes file
+        \Log::channel('verification')->info("🎭 SIMULATION SMS FOR {$phone}: {$verificationCode}");
+        \Log::channel('verification')->info("⏰ Generated at: {$timestamp}");
+        \Log::channel('verification')->info("📱 Phone: {$phone}");
+        \Log::channel('verification')->info("🎭 Mode: SIMULATION");
+        \Log::channel('verification')->info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        return response()->json([
+            'success' => true,
+            'message' => '🎭 SIMULATION: Verification code generated successfully! Check the logs for the code.',
+            'provider' => 'simulation',
+            'simulation_mode' => true,
+            'verification_code' => $verificationCode, // Include code in response for testing
+            'timestamp' => $timestamp,
+        ]);
+    }
+
+    /**
+     * Format phone number to standard +63XXXXXXXXXX format
+     */
+    private function formatPhoneNumber($phone)
+    {
+        // Remove any non-digit characters except +
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        
+        // For Philippine numbers, ensure proper format
+        if (str_starts_with($phone, '+63')) {
+            // Already properly formatted
+            return $phone;
+        } elseif (str_starts_with($phone, '63')) {
+            // Add + prefix
+            return '+' . $phone;
+        } elseif (str_starts_with($phone, '0')) {
+            // Remove leading 0 and add +63
+            $phone = substr($phone, 1);
+            return '+63' . $phone;
+        } elseif (str_starts_with($phone, '+0')) {
+            // Handle +0 prefix (like +09639283365)
+            $phone = substr($phone, 2); // Remove +0
+            return '+63' . $phone;
+        }
+        
+        // Ensure it starts with + if not already
         if (!str_starts_with($phone, '+')) {
             $phone = '+' . $phone;
         }
@@ -798,5 +974,83 @@ class AuthController extends Controller
             // Otherwise, return the original value (it might already be a readable name)
             return $breed;
         }, $breeds);
+    }
+
+    /**
+     * Refresh user token
+     */
+    public function refreshToken(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
+
+        // Check if user account is active
+        if ($user->status === 'banned') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account has been suspended. Please contact support.',
+            ], 403);
+        }
+
+        // Revoke all existing tokens for this user
+        $user->tokens()->delete();
+
+        // Create a new token
+        $token = $user->createToken('mobile-app')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Token refreshed successfully!',
+            'token' => $token,
+        ]);
+    }
+
+    /**
+     * Generate new token for user
+     */
+    public function generateToken(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
+
+        // Check if user account is active
+        if ($user->status === 'banned') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account has been suspended. Please contact support.',
+            ], 403);
+        }
+
+        // Revoke all existing tokens for this user
+        $user->tokens()->delete();
+
+        // Create a new token
+        $token = $user->createToken('mobile-app')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'New token generated successfully!',
+            'token' => $token,
+        ]);
     }
 } 

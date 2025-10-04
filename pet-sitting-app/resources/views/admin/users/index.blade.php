@@ -18,23 +18,24 @@
     <div class="bg-white shadow rounded-lg p-6">
         <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700">Search</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Name, email, phone..." class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <label for="search" class="block text-sm font-medium text-gray-700">Search</label>
+                <input type="text" id="search" name="search" value="{{ request('search') }}" placeholder="Name, email, phone..." class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">Role</label>
-                <select name="role" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
+                <select id="role" name="role" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="">All Roles</option>
                     <option value="pet_owner" {{ request('role') == 'pet_owner' ? 'selected' : '' }}>Pet Owner</option>
                     <option value="pet_sitter" {{ request('role') == 'pet_sitter' ? 'selected' : '' }}>Pet Sitter</option>
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">Status</label>
-                <select name="status" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                <select id="status" name="status" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="">All Status</option>
                     <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
                     <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                    <option value="pending_verification" {{ request('status') == 'pending_verification' ? 'selected' : '' }}>Pending Verification</option>
                     <option value="suspended" {{ request('status') == 'suspended' ? 'selected' : '' }}>Suspended</option>
                 </select>
             </div>
@@ -146,8 +147,9 @@
                                 <div class="text-sm text-gray-500 mt-1">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
                                         {{ $user->status === 'active' ? 'bg-green-100 text-green-800' : 
-                                           ($user->status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
-                                        {{ ucfirst($user->status) }}
+                                           ($user->status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                           ($user->status === 'pending_verification' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800')) }}">
+                                        {{ ucfirst(str_replace('_', ' ', $user->status)) }}
                                     </span>
                                 </div>
                             </td>

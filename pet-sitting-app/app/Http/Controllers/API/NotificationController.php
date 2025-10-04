@@ -16,9 +16,12 @@ class NotificationController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
         
+        // Filter notifications based on user role
+        $filteredNotifications = $this->filterNotificationsByRole($notifications, $user);
+        
         return response()->json([
             'success' => true,
-            'notifications' => $notifications->map(function($notification) {
+            'notifications' => $filteredNotifications->map(function($notification) {
                 return [
                     'id' => $notification->id,
                     'type' => $notification->type,
@@ -29,7 +32,7 @@ class NotificationController extends Controller
                     'data' => $notification->data ? json_decode($notification->data, true) : null
                 ];
             }),
-            'unread_count' => $notifications->where('read_at', null)->count()
+            'unread_count' => $filteredNotifications->where('read_at', null)->count()
         ]);
     }
 
@@ -82,6 +85,51 @@ class NotificationController extends Controller
             'success' => true,
             'unread_count' => $count
         ]);
+    }
+
+    /**
+     * Filter notifications based on user role
+     */
+    private function filterNotificationsByRole($notifications, $user)
+    {
+        $isPetSitter = $user->role === 'pet_sitter';
+        
+        return $notifications->filter(function($notification) use ($isPetSitter) {
+            if ($isPetSitter) {
+                // Pet sitters see: booking requests, messages, reviews, system notifications, profile updates, ID verification
+                return in_array($notification->type, [
+                    'booking',
+                    'message', 
+                    'review',
+                    'system',
+                    'profile_update_approved',
+                    'profile_update_rejected',
+                    'id_verification_approved',
+                    'id_verification_rejected'
+                ]);
+            } else {
+                // Pet owners see: booking confirmations/cancellations, messages, system notifications, profile updates
+                // (NO ID verification notifications)
+                if (in_array($notification->type, ['id_verification_approved', 'id_verification_rejected'])) {
+                    return false;
+                }
+                
+                if ($notification->type === 'booking') {
+                    // Only show booking notifications with specific statuses
+                    $data = $notification->data ? json_decode($notification->data, true) : [];
+                    return isset($data['status']) && in_array($data['status'], ['confirmed', 'cancelled']) ||
+                           str_contains($notification->title ?? '', 'confirmed') ||
+                           str_contains($notification->title ?? '', 'cancelled');
+                }
+                
+                return in_array($notification->type, [
+                    'message',
+                    'system',
+                    'profile_update_approved',
+                    'profile_update_rejected'
+                ]);
+            }
+        });
     }
 }
 

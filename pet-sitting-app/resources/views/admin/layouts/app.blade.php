@@ -78,6 +78,30 @@
                     </a>
                 </div>
 
+                <!-- Name Updates -->
+                <div class="mb-4">
+                    <a href="{{ route('admin.name-updates.users') }}" 
+                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
+                              {{ request()->routeIs('admin.name-updates.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        <span id="nav-text">Name Updates</span>
+                    </a>
+                </div>
+
+                <!-- Profile Update Requests -->
+                <div class="mb-4">
+                    <a href="{{ route('admin.profile-update-requests.index') }}" 
+                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
+                              {{ request()->routeIs('admin.profile-update-requests*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span id="nav-text">Profile Requests</span>
+                    </a>
+                </div>
+
                 <!-- Bookings -->
                 <div class="mb-4">
                     <a href="{{ route('admin.bookings.index') }}" 
@@ -189,7 +213,7 @@
                         <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                         </svg>
-                        <span class="text-gray-900 font-medium">{{ ucfirst(request()->route()->getName() ?? 'Dashboard') }}</span>
+                        <span class="text-gray-900 font-medium">{{ ucfirst(request()->route()?->getName() ?? 'Dashboard') }}</span>
                     </div>
 
                     <!-- Right Side -->
@@ -264,6 +288,187 @@
             });
         });
     </script>
+
+    <!-- Enhanced Image Modal with Zoom -->
+    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-75 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative min-h-screen flex items-center justify-center p-4">
+            <div class="relative max-w-6xl max-h-full bg-white rounded-lg shadow-2xl">
+                <!-- Modal Header -->
+                <div class="flex justify-between items-center p-4 border-b border-gray-200">
+                    <h3 id="modalTitle" class="text-xl font-semibold text-gray-900"></h3>
+                    <div class="flex items-center space-x-2">
+                        <button id="zoomInBtn" onclick="zoomIn()" class="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                        </button>
+                        <button id="zoomOutBtn" onclick="zoomOut()" class="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6"></path>
+                            </svg>
+                        </button>
+                        <button id="resetZoomBtn" onclick="resetZoom()" class="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </button>
+                        <button onclick="closeImageModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Modal Body with Zoomable Image -->
+                <div class="p-4 overflow-auto max-h-[80vh]">
+                    <div id="imageContainer" class="text-center relative">
+                        <img id="modalImage" 
+                             src="" 
+                             alt="" 
+                             class="max-w-full h-auto rounded-lg shadow-lg cursor-zoom-in transition-transform duration-200"
+                             style="transform-origin: center;"
+                             onclick="toggleZoom()">
+                    </div>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="flex justify-between items-center p-4 border-t border-gray-200 bg-gray-50">
+                    <div class="text-sm text-gray-500">
+                        <span id="zoomLevel">100%</span> • Click image to zoom • Use buttons to control zoom
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="downloadImage()" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                            Download
+                        </button>
+                        <button onclick="closeImageModal()" class="px-3 py-1 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let currentZoom = 1;
+    const maxZoom = 5;
+    const minZoom = 0.5;
+    const zoomStep = 0.25;
+
+    function openImageModal(imageSrc, title) {
+        document.getElementById('modalImage').src = imageSrc;
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('imageModal').classList.remove('hidden');
+        resetZoom();
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    function closeImageModal() {
+        document.getElementById('imageModal').classList.add('hidden');
+        document.body.style.overflow = 'auto'; // Restore scrolling
+        resetZoom();
+    }
+
+    function zoomIn() {
+        if (currentZoom < maxZoom) {
+            currentZoom += zoomStep;
+            updateZoom();
+        }
+    }
+
+    function zoomOut() {
+        if (currentZoom > minZoom) {
+            currentZoom -= zoomStep;
+            updateZoom();
+        }
+    }
+
+    function resetZoom() {
+        currentZoom = 1;
+        updateZoom();
+    }
+
+    function toggleZoom() {
+        if (currentZoom === 1) {
+            currentZoom = 2;
+        } else {
+            currentZoom = 1;
+        }
+        updateZoom();
+    }
+
+    function updateZoom() {
+        const image = document.getElementById('modalImage');
+        const zoomLevel = document.getElementById('zoomLevel');
+        
+        image.style.transform = `scale(${currentZoom})`;
+        zoomLevel.textContent = Math.round(currentZoom * 100) + '%';
+        
+        // Update button states
+        document.getElementById('zoomInBtn').disabled = currentZoom >= maxZoom;
+        document.getElementById('zoomOutBtn').disabled = currentZoom <= minZoom;
+        
+        // Update cursor
+        if (currentZoom > 1) {
+            image.classList.remove('cursor-zoom-in');
+            image.classList.add('cursor-zoom-out');
+        } else {
+            image.classList.remove('cursor-zoom-out');
+            image.classList.add('cursor-zoom-in');
+        }
+    }
+
+    function downloadImage() {
+        const image = document.getElementById('modalImage');
+        const link = document.createElement('a');
+        link.href = image.src;
+        link.download = document.getElementById('modalTitle').textContent + '.jpg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('imageModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeImageModal();
+        }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (!document.getElementById('imageModal').classList.contains('hidden')) {
+            switch(e.key) {
+                case 'Escape':
+                    closeImageModal();
+                    break;
+                case '+':
+                case '=':
+                    e.preventDefault();
+                    zoomIn();
+                    break;
+                case '-':
+                    e.preventDefault();
+                    zoomOut();
+                    break;
+                case '0':
+                    e.preventDefault();
+                    resetZoom();
+                    break;
+            }
+        }
+    });
+
+    // Prevent image drag
+    document.addEventListener('dragstart', function(e) {
+        if (e.target.tagName === 'IMG') {
+            e.preventDefault();
+        }
+    });
+    </script>
+
+    @stack('scripts')
 </body>
 </html> 
  

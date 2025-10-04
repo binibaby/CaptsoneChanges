@@ -11,7 +11,7 @@ echo "🔔 Testing Veriff Webhook Integration\n";
 echo "====================================\n\n";
 
 // Get pending verifications
-$pendingVerifications = Verification::where('status', 'pending')->get();
+$pendingVerifications = Verification::where('verification_status', 'pending')->get();
 
 if ($pendingVerifications->isEmpty()) {
     echo "❌ No pending verifications found. Creating test verification...\n";

@@ -21,6 +21,282 @@ class VerificationController extends Controller
         $this->veriffService = $veriffService;
     }
 
+    public function submitEnhancedVerification(Request $request)
+    {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
+        \Log::info('🔔 ENHANCED ID VERIFICATION SUBMISSION STARTED');
+        
+        // Debug authentication
+        $user = $request->user();
+        $authHeader = $request->header('Authorization');
+        $bearerToken = $request->bearerToken();
+        
+        \Log::info('🔐 AUTH DEBUG - User from request:', ['user' => $user ? $user->toArray() : null]);
+        \Log::info('🔐 AUTH DEBUG - Authorization header:', ['header' => $authHeader]);
+        \Log::info('🔐 AUTH DEBUG - Bearer token present:', ['present' => $bearerToken ? 'YES' : 'NO']);
+        \Log::info('🔐 AUTH DEBUG - Bearer token (first 10 chars):', ['token' => $bearerToken ? substr($bearerToken, 0, 10) . '...' : 'NONE']);
+        \Log::info('🔐 AUTH DEBUG - All headers:', ['headers' => $request->headers->all()]);
+        
+        if (!$user) {
+            \Log::error('❌ AUTH ERROR - No authenticated user found');
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required. Please log in and try again.',
+                'error' => 'unauthenticated'
+            ], 401);
+        }
+        \Log::info('📄 ENHANCED VERIFICATION - Received enhanced verification request');
+        \Log::info('⏰ Timestamp: ' . now()->format('Y-m-d H:i:s'));
+        \Log::info('🌐 Request IP: ' . $request->ip());
+
+        $validDocumentTypes = [
+            'national_id', 'drivers_license', 'passport', 'other',
+            'ph_national_id', 'ph_drivers_license', 'sss_id', 'philhealth_id', 
+            'tin_id', 'postal_id', 'voters_id', 'prc_id', 'umid', 'owwa_id'
+        ];
+
+        $rules = [
+            'front_id_image' => 'required|string',
+            'back_id_image' => 'required|string',
+            'selfie_image' => 'required|string',
+            'selfie_latitude' => 'required|numeric|between:-90,90',
+            'selfie_longitude' => 'required|numeric|between:-180,180',
+            'selfie_address' => 'required|string|max:500',
+            'location_accuracy' => 'required|numeric|min:0',
+            'document_type' => 'required|string|in:' . implode(',', $validDocumentTypes),
+        ];
+
+        $request->validate($rules);
+
+        $user = $request->user();
+        
+        \Log::info('👤 User ID: ' . $user->id);
+        \Log::info('📄 Document Type: ' . $request->document_type);
+        \Log::info('📍 Location: ' . $request->selfie_address);
+        
+        // Check if user already has a pending verification (allow resubmission if approved or skipped)
+        $existingVerification = Verification::where('user_id', $user->id)
+            ->where(function($query) {
+                $query->whereIn('verification_status', ['pending', 'under_review'])
+                      ->orWhere('status', 'pending');
+            })
+            ->where('status', '!=', 'skipped') // Allow resubmission if previously skipped
+            ->first();
+            
+        if ($existingVerification) {
+            \Log::warning('⚠️ DUPLICATE ENHANCED VERIFICATION - User already has verification with status: ' . $existingVerification->verification_status);
+            return response()->json([
+                'success' => false,
+                'message' => 'You already have a verification request in progress.',
+                'status' => $existingVerification->verification_status
+            ], 400);
+        }
+
+        // Check if user has a skipped verification that we can update instead of creating new one
+        $skippedVerification = Verification::where('user_id', $user->id)
+            ->where('status', 'skipped')
+            ->where('document_type', 'skipped')
+            ->first();
+
+        // Check if this is a resubmission
+        $isResubmission = $request->input('is_resubmission', false);
+        $rejectedVerification = null;
+        
+        if ($isResubmission) {
+            $rejectedVerification = Verification::where('user_id', $user->id)
+                ->where('status', 'rejected')
+                ->where('allow_resubmission', true)
+                ->orderBy('created_at', 'desc')
+                ->first();
+                
+            if (!$rejectedVerification) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No rejected verification found that allows resubmission.',
+                    'error_code' => 'NO_RESUBMISSION_ALLOWED'
+                ], 400);
+            }
+        }
+
+        // Handle file uploads (convert base64 to files)
+        $frontIdPath = $this->saveBase64Image($request->front_id_image, 'front_id_' . $user->id);
+        $backIdPath = $this->saveBase64Image($request->back_id_image, 'back_id_' . $user->id);
+        $selfiePath = $this->saveBase64Image($request->selfie_image, 'selfie_' . $user->id);
+
+        if (!$frontIdPath || !$backIdPath || !$selfiePath) {
+            \Log::error('❌ IMAGE SAVE FAILED - Could not save verification images');
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save verification images. Please try again.',
+                'error_code' => 'IMAGE_SAVE_FAILED'
+            ], 500);
+        }
+
+        // Calculate review deadline (24 hours from now)
+        $reviewDeadline = now()->addHours(24);
+
+        // Create or update verification record
+        if ($isResubmission && $rejectedVerification) {
+            // Update existing rejected verification for resubmission
+            \Log::info('🔄 RESUBMISSION - Updating rejected verification for resubmission');
+            $verification = $rejectedVerification;
+            $verification->update([
+                'document_type' => $request->document_type,
+                'front_id_image' => $frontIdPath,
+                'back_id_image' => $backIdPath,
+                'selfie_image' => $selfiePath,
+                'selfie_latitude' => $request->selfie_latitude,
+                'selfie_longitude' => $request->selfie_longitude,
+                'selfie_address' => $request->selfie_address,
+                'location_accuracy' => $request->location_accuracy,
+                'verification_status' => 'pending',
+                'review_deadline' => $reviewDeadline,
+                'status' => 'pending',
+                'is_philippine_id' => in_array($request->document_type, [
+                    'ph_national_id', 'ph_drivers_license', 'sss_id', 'philhealth_id', 
+                    'tin_id', 'postal_id', 'voters_id', 'prc_id', 'umid', 'owwa_id'
+                ]),
+                'verification_method' => 'enhanced_manual',
+                'notes' => 'Resubmission: Enhanced verification with front ID, back ID, selfie, and location verification',
+                'rejection_reason' => null, // Clear previous rejection reason
+                'rejection_category' => null, // Clear previous rejection category
+                'allow_resubmission' => null, // Clear resubmission flag
+            ]);
+        } elseif ($skippedVerification) {
+            // Update existing skipped verification instead of creating new one
+            \Log::info('🔄 UPDATING SKIPPED VERIFICATION - Converting skipped verification to real submission');
+            $verification = $skippedVerification;
+            $verification->update([
+                'document_type' => $request->document_type,
+                'front_id_image' => $frontIdPath,
+                'back_id_image' => $backIdPath,
+                'selfie_image' => $selfiePath,
+                'selfie_latitude' => $request->selfie_latitude,
+                'selfie_longitude' => $request->selfie_longitude,
+                'selfie_address' => $request->selfie_address,
+                'location_accuracy' => $request->location_accuracy,
+                'verification_status' => 'pending',
+                'review_deadline' => $reviewDeadline,
+                'status' => 'pending',
+                'is_philippine_id' => in_array($request->document_type, [
+                    'ph_national_id', 'ph_drivers_license', 'sss_id', 'philhealth_id', 
+                    'tin_id', 'postal_id', 'voters_id', 'prc_id', 'umid', 'owwa_id'
+                ]),
+                'verification_method' => 'enhanced_manual',
+                'notes' => 'Enhanced verification with front ID, back ID, selfie, and location verification',
+            ]);
+        } else {
+            // Create new verification record
+            $verification = Verification::create([
+                'user_id' => $user->id,
+                'document_type' => $request->document_type,
+                'front_id_image' => $frontIdPath,
+                'back_id_image' => $backIdPath,
+                'selfie_image' => $selfiePath,
+                'selfie_latitude' => $request->selfie_latitude,
+                'selfie_longitude' => $request->selfie_longitude,
+                'selfie_address' => $request->selfie_address,
+                'location_accuracy' => $request->location_accuracy,
+                'verification_status' => 'pending',
+                'review_deadline' => $reviewDeadline,
+                'status' => 'pending',
+                'is_philippine_id' => in_array($request->document_type, [
+                    'ph_national_id', 'ph_drivers_license', 'sss_id', 'philhealth_id', 
+                    'tin_id', 'postal_id', 'voters_id', 'prc_id', 'umid', 'owwa_id'
+                ]),
+                'verification_method' => 'enhanced_manual',
+                'notes' => 'Enhanced verification with front ID, back ID, selfie, and location verification',
+            ]);
+        }
+
+        // Create notification for user
+        $notificationMessage = $isResubmission 
+            ? 'Your ID verification resubmission has been submitted and is under review. You will be notified within 24 hours of the admin\'s decision.'
+            : 'Your enhanced ID verification has been submitted and is under review. You will be notified within 24 hours of the admin\'s decision. You cannot start jobs until your verification is approved.';
+            
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'verification',
+            'message' => $notificationMessage,
+        ]);
+
+        // Notify all admins
+        $adminMessage = $isResubmission 
+            ? "ID verification resubmission by {$user->name} ({$user->email}). Review deadline: {$reviewDeadline->format('M d, Y H:i')}"
+            : "New enhanced verification submitted by {$user->name} ({$user->email}). Review deadline: {$reviewDeadline->format('M d, Y H:i')}";
+            
+        $admins = User::where('is_admin', true)->get();
+        foreach ($admins as $admin) {
+            Notification::create([
+                'user_id' => $admin->id,
+                'type' => 'admin',
+                'message' => $adminMessage,
+            ]);
+        }
+
+        \Log::info('✅ ENHANCED VERIFICATION CREATED - ID: ' . $verification->id);
+        \Log::info('⏰ Review Deadline: ' . $reviewDeadline->format('Y-m-d H:i:s'));
+
+        $responseMessage = $isResubmission 
+            ? 'ID verification resubmission submitted successfully. You will be notified within 24 hours of the admin\'s decision.'
+            : 'Enhanced verification submitted successfully. You will be notified within 24 hours of the admin\'s decision.';
+            
+        return response()->json([
+            'success' => true,
+            'message' => $responseMessage,
+            'verification' => [
+                'id' => $verification->id,
+                'status' => $verification->verification_status,
+                'review_deadline' => $reviewDeadline->format('Y-m-d H:i:s'),
+            ],
+            'review_deadline' => $reviewDeadline->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function saveBase64Image($base64String, $filename)
+    {
+        try {
+            // Remove data URL prefix if present
+            if (strpos($base64String, 'data:image') === 0) {
+                $base64String = substr($base64String, strpos($base64String, ',') + 1);
+            }
+
+            // Decode base64
+            $imageData = base64_decode($base64String);
+            if ($imageData === false) {
+                \Log::error('❌ BASE64 DECODE FAILED for ' . $filename);
+                return null;
+            }
+
+            // Generate unique filename
+            $extension = 'jpg'; // Default to jpg
+            $fullFilename = $filename . '_' . time() . '.' . $extension;
+            $path = 'verifications/' . $fullFilename;
+
+            // Save to public storage
+            if (Storage::disk('public')->put($path, $imageData)) {
+                \Log::info('✅ IMAGE SAVED: ' . $path);
+                return $path;
+            } else {
+                \Log::error('❌ STORAGE PUT FAILED for ' . $path);
+                return null;
+            }
+        } catch (\Exception $e) {
+            \Log::error('❌ IMAGE SAVE EXCEPTION: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function submitVerification(Request $request)
     {
         // Add CORS headers
@@ -80,9 +356,10 @@ class VerificationController extends Controller
             }
         }
         
-        // Check if user already has a pending or approved verification
+        // Check if user already has a pending verification (allow resubmission if approved or skipped)
         $existingVerification = Verification::where('user_id', $user->id)
-            ->whereIn('status', ['pending', 'approved'])
+            ->whereIn('status', ['pending'])
+            ->where('status', '!=', 'skipped') // Allow resubmission if previously skipped
             ->first();
             
         if ($existingVerification) {
@@ -274,77 +551,188 @@ class VerificationController extends Controller
             return response()->json(['success' => true], 200);
         }
 
-        // Enhanced logging for Veriff simulation
-        \Log::info('🔔 VERIFF ID VERIFICATION SIMULATION STARTED');
-        \Log::info('📄 ID VERIFICATION - Received verification request');
+        \Log::info('🔔 SIMPLE VERIFICATION SUBMISSION STARTED');
+        \Log::info('📄 SIMPLE VERIFICATION - Received verification request');
         \Log::info('⏰ Timestamp: ' . now()->format('Y-m-d H:i:s'));
         \Log::info('🌐 Request IP: ' . $request->ip());
         \Log::info('👤 User Agent: ' . $request->userAgent());
+        
+        // Debug authentication
+        $user = $request->user();
+        \Log::info('🔐 AUTH DEBUG - User from request:', ['user' => $user ? $user->toArray() : null]);
+        \Log::info('🔐 AUTH DEBUG - Authorization header:', ['header' => $request->header('Authorization')]);
+        \Log::info('🔐 AUTH DEBUG - Bearer token present:', ['present' => $request->bearerToken() ? 'YES' : 'NO']);
+        
+        if (!$user) {
+            \Log::error('❌ AUTH ERROR - No authenticated user found');
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required. Please log in and try again.',
+                'error' => 'unauthenticated'
+            ], 401);
+        }
 
         $request->validate([
             'document_type' => 'required|string',
-            'document_image' => 'required|string', // Base64 or URL
+            'document_image' => 'nullable|string', // Base64 image - made optional
             'first_name' => 'required|string',
             'last_name' => 'required|string',
             'phone' => 'required|string',
+            'front_image' => 'required|string', // Base64 image - made required (this is the main document)
+            'back_image' => 'required|string', // Base64 image - made required
+            'selfie_image' => 'required|string', // Base64 image - made required
+            'selfie_latitude' => 'nullable|numeric|between:-90,90',
+            'selfie_longitude' => 'nullable|numeric|between:-180,180',
+            'selfie_address' => 'nullable|string|max:500',
+            'location_accuracy' => 'nullable|numeric|min:0',
         ]);
 
         \Log::info('📄 Document Type: ' . $request->document_type);
-        \Log::info('📸 Image provided: ' . ($request->document_image ? 'Yes' : 'No'));
+        \Log::info('📸 Document Image provided: ' . ($request->document_image ? 'Yes' : 'No'));
+        \Log::info('📸 Front Image provided: ' . ($request->front_image ? 'Yes' : 'No'));
+        \Log::info('📸 Back Image provided: ' . ($request->back_image ? 'Yes' : 'No'));
+        \Log::info('📸 Selfie Image provided: ' . ($request->selfie_image ? 'Yes' : 'No'));
+        \Log::info('📍 Location provided: ' . ($request->selfie_address ? 'Yes' : 'No'));
         \Log::info('👤 User: ' . $request->first_name . ' ' . $request->last_name);
         \Log::info('📱 Phone: ' . $request->phone);
 
-        // Simulate Veriff API call
-        \Log::info('🎭 VERIFF SIMULATION - Creating session...');
-        sleep(2); // Simulate API delay
-        
-        // Simulate Veriff response (90% success rate for demo)
-        $veriffSuccess = rand(1, 100) <= 90;
-        
-        if (!$veriffSuccess) {
-            \Log::error('❌ VERIFF SIMULATION FAILED - Document verification rejected');
+        // Check if user already has a pending verification (allow resubmission if approved or skipped)
+        $existingVerification = Verification::where('user_id', $user->id)
+            ->where(function($query) {
+                $query->whereIn('verification_status', ['pending', 'under_review'])
+                      ->orWhere('status', 'pending');
+            })
+            ->where('status', '!=', 'skipped') // Allow resubmission if previously skipped
+            ->first();
+            
+        if ($existingVerification) {
+            \Log::warning('⚠️ DUPLICATE VERIFICATION - User already has verification with status: ' . $existingVerification->verification_status);
             return response()->json([
                 'success' => false,
-                'message' => 'ID verification failed. Please ensure your document is clear and valid.',
-                'error_code' => 'VERIFF_REJECTED',
-                'simulation_mode' => true,
-                'timestamp' => now()->format('Y-m-d H:i:s'),
-                'document_type' => $request->document_type
+                'message' => 'You already have a verification request in progress.',
+                'status' => $existingVerification->verification_status
             ], 400);
         }
 
-        \Log::info('✅ VERIFF SIMULATION SUCCESS - Document verified successfully');
+        // Handle file uploads (convert base64 to files)
+        $documentImagePath = null;
+        $frontIdPath = null;
+        $backIdPath = null;
+        $selfiePath = null;
 
-        // Create a mock verification record
-        $verificationId = time();
-        $verificationScore = rand(85, 100);
+        // Save document image (use front_image as document if no separate document_image provided)
+        $documentImagePath = null;
+        if ($request->document_image) {
+            $documentImagePath = $this->saveBase64Image($request->document_image, 'document_' . $user->id);
+            if (!$documentImagePath) {
+                \Log::error('❌ DOCUMENT IMAGE SAVE FAILED');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to save document image. Please try again.',
+                    'error_code' => 'DOCUMENT_IMAGE_SAVE_FAILED'
+                ], 500);
+            }
+        } else {
+            // Use front_image as the document image
+            \Log::info('📸 Using front_image as document_image');
+        }
 
-        \Log::info('💾 VERIFICATION RECORD CREATED - ID: ' . $verificationId);
-        \Log::info('📊 Verification Score: ' . $verificationScore);
-        \Log::info('🎉 ID VERIFICATION COMPLETED SUCCESSFULLY');
+        // Save front ID image
+        if ($request->front_image) {
+            $frontIdPath = $this->saveBase64Image($request->front_image, 'front_id_' . $user->id);
+            if (!$frontIdPath) {
+                \Log::error('❌ FRONT ID IMAGE SAVE FAILED');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to save front ID image. Please try again.',
+                    'error_code' => 'FRONT_ID_IMAGE_SAVE_FAILED'
+                ], 500);
+            }
+        }
+
+        // Save back ID image
+        if ($request->back_image) {
+            $backIdPath = $this->saveBase64Image($request->back_image, 'back_id_' . $user->id);
+            if (!$backIdPath) {
+                \Log::error('❌ BACK ID IMAGE SAVE FAILED');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to save back ID image. Please try again.',
+                    'error_code' => 'BACK_ID_IMAGE_SAVE_FAILED'
+                ], 500);
+            }
+        }
+
+        // Save selfie image
+        if ($request->selfie_image) {
+            $selfiePath = $this->saveBase64Image($request->selfie_image, 'selfie_' . $user->id);
+            if (!$selfiePath) {
+                \Log::error('❌ SELFIE IMAGE SAVE FAILED');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to save selfie image. Please try again.',
+                    'error_code' => 'SELFIE_IMAGE_SAVE_FAILED'
+                ], 500);
+            }
+        }
+
+        // Calculate review deadline (24 hours from now)
+        $reviewDeadline = now()->addHours(24);
+
+        // Create verification record with all data
+        $verification = Verification::create([
+            'user_id' => $user->id,
+            'document_type' => $request->document_type,
+            'document_number' => $request->document_number ?? null,
+            'document_image' => $documentImagePath ?: $frontIdPath, // Use front_image as document if no separate document
+            'front_id_image' => $frontIdPath,
+            'back_id_image' => $backIdPath,
+            'selfie_image' => $selfiePath,
+            'selfie_latitude' => $request->selfie_latitude,
+            'selfie_longitude' => $request->selfie_longitude,
+            'selfie_address' => $request->selfie_address,
+            'location_accuracy' => $request->location_accuracy,
+            'verification_status' => 'pending',
+            'review_deadline' => $reviewDeadline,
+            'status' => 'pending',
+            'is_philippine_id' => strpos($request->document_type, 'ph_') === 0,
+            'verification_method' => 'simple_manual',
+            'notes' => 'Simple verification with document, front ID, back ID, selfie, and location data',
+        ]);
+
+        \Log::info('✅ VERIFICATION RECORD CREATED - ID: ' . $verification->id);
+        \Log::info('📸 Images saved - Document: ' . ($documentImagePath ? 'Yes' : 'No') . 
+                   ', Front: ' . ($frontIdPath ? 'Yes' : 'No') . 
+                   ', Back: ' . ($backIdPath ? 'Yes' : 'No') . 
+                   ', Selfie: ' . ($selfiePath ? 'Yes' : 'No'));
+        \Log::info('📍 Location saved - Address: ' . ($request->selfie_address ? 'Yes' : 'No') . 
+                   ', Lat/Lng: ' . ($request->selfie_latitude ? 'Yes' : 'No'));
 
         return response()->json([
             'success' => true,
-            'message' => 'ID and face verified successfully!',
+            'message' => 'Verification submitted successfully! An admin will review it within 24 hours.',
             'verification' => [
-                'id' => $verificationId,
-                'status' => 'approved',
+                'id' => $verification->id,
+                'status' => 'pending',
+                'verification_status' => 'pending',
                 'document_type' => $request->document_type,
                 'is_philippine_id' => strpos($request->document_type, 'ph_') === 0,
-                'verification_score' => $verificationScore,
-                'submitted_at' => now()->format('Y-m-d H:i:s')
+                'submitted_at' => now()->format('Y-m-d H:i:s'),
+                'review_deadline' => $reviewDeadline->format('Y-m-d H:i:s'),
+                'has_images' => [
+                    'document' => !is_null($documentImagePath),
+                    'front_id' => !is_null($frontIdPath),
+                    'back_id' => !is_null($backIdPath),
+                    'selfie' => !is_null($selfiePath),
+                ],
+                'has_location' => !is_null($request->selfie_address),
             ],
             'user' => [
                 'first_name' => $request->first_name,
                 'last_name' => $request->last_name,
                 'phone' => $request->phone,
-                'age' => $request->age ?? '',
-                'gender' => $request->gender ?? '',
-                'address' => $request->address ?? '',
             ],
-            'simulation_mode' => true,
-            'timestamp' => now()->format('Y-m-d H:i:s'),
-            'veriff_api_key_present' => false
+            'timestamp' => now()->format('Y-m-d H:i:s')
         ], 201);
     }
 
@@ -373,13 +761,16 @@ class VerificationController extends Controller
             'verification' => [
                 'id' => $verification->id,
                 'status' => $verification->status,
+                'verification_status' => $verification->verification_status,
                 'document_type' => $verification->document_type,
                 'document_number' => $verification->document_number,
                 'document_image' => $verification->document_image,
                 'is_philippine_id' => $verification->is_philippine_id,
+                'is_legit_sitter' => $verification->is_legit_sitter,
                 'verification_score' => $verification->verification_score,
                 'submitted_at' => $verification->created_at->format('Y-m-d H:i:s'),
                 'verified_at' => $verification->verified_at ? $verification->verified_at->format('Y-m-d H:i:s') : null,
+                'review_deadline' => $verification->review_deadline ? $verification->review_deadline->format('Y-m-d H:i:s') : null,
                 'rejection_reason' => $verification->rejection_reason,
                 'notes' => $verification->notes
             ],

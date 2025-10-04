@@ -181,6 +181,12 @@ class LocationController extends Controller
                     'user_name' => $user ? $user->name : 'N/A'
                 ]);
                 
+                // Get verification status for the sitter
+                $verification = $user ? $user->verifications()->where('verification_status', 'approved')->first() : null;
+                $isVerified = $verification ? true : false;
+                $verificationStatus = $verification ? $verification->verification_status : 'pending';
+                $isLegitSitter = $verification ? $verification->is_legit_sitter : false;
+
                 // Use database data if available, otherwise fallback to cached data
                 $sitterInfo = $user ? [
                     'id' => $sitterData['user_id'],
@@ -212,7 +218,11 @@ class LocationController extends Controller
                     'images' => $user->profile_image ? [$user->profile_image] : null,
                     'certificates' => $user->certificates ? json_decode($user->certificates, true) : [],
                     'followers' => $user->followers ?? 0,
-                    'following' => $user->following ?? 0
+                    'following' => $user->following ?? 0,
+                    // Verification status
+                    'isVerified' => $isVerified,
+                    'verificationStatus' => $verificationStatus,
+                    'isLegitSitter' => $isLegitSitter
                 ] : [
                     'id' => $sitterData['user_id'],
                     'userId' => $sitterData['user_id'],
@@ -238,7 +248,11 @@ class LocationController extends Controller
                     'images' => null,
                     'certificates' => [],
                     'followers' => 0,
-                    'following' => 0
+                    'following' => 0,
+                    // Verification status - default to not verified for cached data
+                    'isVerified' => false,
+                    'verificationStatus' => 'pending',
+                    'isLegitSitter' => false
                 ];
 
                 $nearbySitters[] = $sitterInfo;

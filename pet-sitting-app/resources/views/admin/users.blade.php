@@ -50,7 +50,7 @@
                 </td>
                 <td>{{ ucfirst(str_replace('_', ' ', $user->role)) }}</td>
                 <td>
-                    <span class="badge badge-{{ $user->status === 'active' ? 'success' : ($user->status === 'pending' ? 'warning' : 'danger') }}">
+                    <span class="badge badge-{{ $user->status === 'active' ? 'success' : ($user->status === 'pending' ? 'warning' : ($user->status === 'pending_verification' ? 'warning' : 'danger')) }}">
                         {{ ucfirst($user->status) }}
                     </span>
                 </td>

@@ -11,3 +11,8 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
     $userIds = explode('_', $conversationId);
     return in_array($user->id, $userIds);
 });
+
+// Channel for user-specific verification updates
+Broadcast::channel('user.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});

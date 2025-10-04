@@ -138,9 +138,13 @@ class UserController extends Controller
         
         if ($latestVerification->status === 'approved') {
             $summary .= " | Score: {$latestVerification->verification_score}%";
-            $summary .= " | Verified: " . $latestVerification->verified_at->format('M d, Y');
+            if ($latestVerification->verified_at) {
+                $summary .= " | Verified: " . $latestVerification->verified_at->format('M d, Y');
+            } else {
+                $summary .= " | Verified: Date not available";
+            }
         } elseif ($latestVerification->status === 'rejected') {
-            $summary .= " | Rejected: " . $latestVerification->rejection_reason;
+            $summary .= " | Rejected: " . ($latestVerification->rejection_reason ?? 'No reason provided');
         } else {
             $summary .= " | Status: Pending";
         }

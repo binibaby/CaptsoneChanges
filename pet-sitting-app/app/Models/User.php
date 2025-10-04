@@ -44,6 +44,9 @@ class User extends Authenticatable
         'admin_permissions',
         'approved_at',
         'approved_by',
+        'denied_at',
+        'denied_by',
+        'denial_reason',
         'rejection_reason',
         'last_active_at',
         'email_verification_code',
@@ -130,6 +133,11 @@ class User extends Authenticatable
     public function pets()
     {
         return $this->hasMany(Pet::class);
+    }
+
+    public function nameUpdateRequests()
+    {
+        return $this->hasMany(NameUpdateRequest::class);
     }
 
     public function approvedBy()

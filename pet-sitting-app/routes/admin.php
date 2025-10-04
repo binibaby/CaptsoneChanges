@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\VerificationController;
 use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\NameUpdateController;
 
 // Handle admin redirect for unauthenticated users
 Route::get('/admin', function () {
@@ -19,7 +20,12 @@ Route::get('/admin', function () {
     return redirect()->route('admin.login');
 })->name('admin.redirect');
 
-Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+// CSRF token endpoint
+Route::get('/admin/csrf-token', function () {
+    return response()->json(['csrf_token' => csrf_token()]);
+})->middleware(['web', 'auth']);
+
+Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(function () {
     
     // Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -50,6 +56,30 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/api/{user}/status', [UserController::class, 'updateStatus'])->name('api.update-status');
     });
 
+    // Name Update Management
+    Route::prefix('name-updates')->name('name-updates.')->group(function () {
+        Route::get('/users', [NameUpdateController::class, 'index'])->name('users');
+        Route::post('/update-user-name', [NameUpdateController::class, 'updateUserName'])->name('update-user-name');
+        Route::get('/requests', [NameUpdateController::class, 'getNameUpdateRequests'])->name('requests');
+        Route::post('/requests/{id}/approve', [NameUpdateController::class, 'approveRequest'])->name('approve-request');
+        Route::post('/requests/{id}/reject', [NameUpdateController::class, 'rejectRequest'])->name('reject-request');
+    });
+
+    // Profile Update Requests Management
+    Route::prefix('profile-update-requests')->name('profile-update-requests.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'index'])->name('index');
+        Route::get('/{id}', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'show'])->name('show');
+        Route::post('/{id}/approve', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'reject'])->name('reject');
+        Route::get('/stats', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'getStats'])->name('stats');
+    });
+
+    // Admin API routes
+    Route::prefix('api')->name('api.')->group(function () {
+        Route::get('/profile-update-requests', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'index'])->name('profile-update-requests');
+        Route::get('/profile-update-requests/stats', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'getStats'])->name('profile-update-requests.stats');
+    });
+
     // Payment Management
     Route::prefix('payments')->name('payments.')->group(function () {
         Route::get('/', [PaymentController::class, 'index'])->name('index');
@@ -64,6 +94,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::prefix('verifications')->name('verifications.')->group(function () {
         Route::get('/', [VerificationController::class, 'index'])->name('index');
         Route::get('/{verification}', [VerificationController::class, 'show'])->name('show');
+        Route::get('/{verification}/enhanced', [VerificationController::class, 'enhancedShow'])->name('enhanced-show');
         Route::post('/{verification}/approve', [VerificationController::class, 'approve'])->name('approve');
         Route::post('/{verification}/reject', [VerificationController::class, 'reject'])->name('reject');
         Route::get('/analytics', [VerificationController::class, 'analytics'])->name('analytics');
@@ -73,7 +104,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // ID Verification API Routes (AJAX) - REAL-TIME SYSTEM
     Route::prefix('api/verifications')->name('api.verifications.')->group(function () {
         Route::get('/', [VerificationController::class, 'getVerifications'])->name('list');
-        Route::get('/{id}', [VerificationController::class, 'show'])->name('show');
+        Route::get('/{id}/details', [VerificationController::class, 'getVerificationDetails'])->name('details');
         Route::get('/status-updates', [VerificationController::class, 'getStatusUpdates'])->name('status-updates');
         Route::post('/bulk-action', [VerificationController::class, 'bulkAction'])->name('bulk');
         Route::get('/{id}/audit-logs', [VerificationController::class, 'getAuditLogs'])->name('audit_logs');
@@ -204,5 +235,20 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         // Notifications
         Route::post('/notifications/send', [NotificationController::class, 'send'])->name('notifications.send');
         Route::post('/notifications/bulk-send', [NotificationController::class, 'bulkSend'])->name('notifications.bulk-send');
+        
+        // Name Update Management
+        Route::get('/users', [NameUpdateController::class, 'getUsers'])->name('users');
+        Route::post('/update-user-name', [NameUpdateController::class, 'updateUserName'])->name('update-user-name');
+        Route::get('/name-update-requests', [NameUpdateController::class, 'getNameUpdateRequests'])->name('name-update-requests');
+        Route::post('/name-update-requests/{id}/approve', [NameUpdateController::class, 'approveRequest'])->name('name-update-requests.approve');
+        Route::post('/name-update-requests/{id}/reject', [NameUpdateController::class, 'rejectRequest'])->name('name-update-requests.reject');
+        
+        // Profile Update Requests Management
+        Route::get('/profile-update-requests', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'index'])->name('profile-update-requests');
+        Route::get('/profile-update-requests/{id}', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'show'])->name('profile-update-requests.show');
+        Route::post('/profile-update-requests/{id}/approve', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'approve'])->name('profile-update-requests.approve');
+        Route::post('/profile-update-requests/{id}/reject', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'reject'])->name('profile-update-requests.reject');
+        Route::get('/profile-update-requests/stats', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'getStats'])->name('profile-update-requests.stats');
+        
     });
 });
