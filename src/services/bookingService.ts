@@ -12,7 +12,7 @@ export interface Booking {
   startTime: string;
   endTime: string;
   hourlyRate: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'active';
   petName?: string;
   petImage?: string;
   specialInstructions?: string;
@@ -22,6 +22,7 @@ export interface Booking {
   startDate?: string;
   endDate?: string;
   totalAmount?: number;
+  duration?: number;
 }
 
 export interface WeeklyBooking {
@@ -127,7 +128,7 @@ class BookingService {
       console.log('✅ Booking confirmed successfully:', result);
       
       // Notify listeners about the booking update
-      this.notifyListeners();
+      this.notifyListeners([]);
       
       return true;
     } catch (error) {
@@ -179,7 +180,7 @@ class BookingService {
       console.log('✅ Booking cancelled successfully:', result);
       
       // Notify listeners about the booking update
-      this.notifyListeners();
+      this.notifyListeners([]);
       
       return true;
     } catch (error) {
@@ -264,6 +265,10 @@ class BookingService {
           token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
         } else if (user.id === '21') {
           token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
+        } else if (user.id === '120') {
+          token = '7bc9a143a60b74b47e37f717ecf37f8d08d72f89809bc5718431a8dd65cab9ff';
+        } else if (user.id === '121') {
+          token = '616|Mh2WHZIp1aFUXtMKiilSU84KTP3Snege7zRjE2bM00a52108';
         } else {
           console.log('❌ No token available for user:', user.id);
           return [];
@@ -314,10 +319,38 @@ class BookingService {
         // Convert API format to local format
         const bookings: Booking[] = data.bookings.map((apiBooking: any) => {
           const hourlyRate = parseFloat(apiBooking.hourly_rate) || parseFloat(apiBooking.hourlyRate) || 0;
-          console.log(`💰 Booking ${apiBooking.id} hourly rate:`, {
+          const totalAmount = parseFloat(apiBooking.total_amount) || 0;
+          const duration = parseInt(apiBooking.duration) || 3;
+          
+          // Calculate start and end times
+          let startTime = '09:00';
+          let endTime = '17:00';
+          
+          if (apiBooking.start_time && apiBooking.end_time) {
+            // Use provided start/end times
+            startTime = apiBooking.start_time;
+            endTime = apiBooking.end_time;
+          } else if (apiBooking.time) {
+            // Parse from time field (format: "2025-10-08 07:00:00")
+            const timeDate = new Date(apiBooking.time);
+            const hours = timeDate.getHours().toString().padStart(2, '0');
+            const minutes = timeDate.getMinutes().toString().padStart(2, '0');
+            startTime = `${hours}:${minutes}`;
+            
+            // Calculate end time based on duration
+            const endDate = new Date(timeDate.getTime() + (duration * 60 * 60 * 1000));
+            const endHours = endDate.getHours().toString().padStart(2, '0');
+            const endMinutes = endDate.getMinutes().toString().padStart(2, '0');
+            endTime = `${endHours}:${endMinutes}`;
+          }
+          
+          console.log(`💰 Booking ${apiBooking.id} details:`, {
             hourly_rate: apiBooking.hourly_rate,
-            hourlyRate: apiBooking.hourlyRate,
-            parsed: hourlyRate
+            total_amount: apiBooking.total_amount,
+            duration: apiBooking.duration,
+            startTime,
+            endTime,
+            calculatedEarnings: duration * hourlyRate
           });
           
           return {
@@ -327,15 +360,15 @@ class BookingService {
             petOwnerId: apiBooking.pet_owner.id.toString(),
             petOwnerName: apiBooking.pet_owner.name,
             date: apiBooking.date,
-            startTime: apiBooking.time.split(' - ')[0] || '09:00',
-            endTime: apiBooking.time.split(' - ')[1] || '17:00',
-            hourlyRate: hourlyRate, // Use actual rate from API
+            startTime,
+            endTime,
+            hourlyRate: hourlyRate,
             status: apiBooking.status,
             createdAt: apiBooking.created_at,
             updatedAt: apiBooking.created_at,
             petName: apiBooking.pet_name,
-            totalAmount: parseFloat(apiBooking.total_amount) || 0,
-            duration: apiBooking.duration,
+            totalAmount: totalAmount,
+            duration: duration,
             isWeekly: apiBooking.is_weekly || false,
             startDate: apiBooking.start_date,
             endDate: apiBooking.end_date,
@@ -805,7 +838,8 @@ class BookingService {
   // Get completed bookings for a sitter
   async getCompletedSitterBookings(sitterId: string): Promise<Booking[]> {
     const sitterBookings = await this.getSitterBookings(sitterId);
-    return sitterBookings.filter(b => b.status === 'completed');
+    // Include both 'completed' and 'active' bookings since active bookings are paid
+    return sitterBookings.filter(b => b.status === 'completed' || b.status === 'active');
   }
 
   // Calculate total earnings for a sitter
@@ -816,6 +850,10 @@ class BookingService {
     completedJobs: number;
   }> {
     const completedBookings = await this.getCompletedSitterBookings(sitterId);
+    console.log('💰 getSitterEarnings - Found completed/active bookings:', completedBookings.length);
+    completedBookings.forEach(booking => {
+      console.log(`  - Booking ${booking.id}: Status=${booking.status}, Amount=${booking.totalAmount || 'N/A'}, HourlyRate=${booking.hourlyRate}`);
+    });
     
     const now = new Date();
     const startOfWeek = new Date(now);
@@ -835,11 +873,12 @@ class BookingService {
     });
 
     const calculateEarnings = (bookings: Booking[]) => {
+      console.log('💰 calculateEarnings - Processing bookings:', bookings.length);
       return bookings.reduce((total, booking) => {
-        const startTime = new Date(`2000-01-01 ${booking.startTime}`);
-        const endTime = new Date(`2000-01-01 ${booking.endTime}`);
-        const hours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-        return total + (hours * booking.hourlyRate);
+        // Use totalAmount if available, otherwise calculate from duration × hourlyRate
+        const bookingEarnings = booking.totalAmount || ((booking.duration || 3) * booking.hourlyRate);
+        console.log(`  - Booking ${booking.id}: Status=${booking.status}, TotalAmount=${booking.totalAmount}, Duration=${booking.duration || 3}, HourlyRate=${booking.hourlyRate}, Earnings=${bookingEarnings}`);
+        return total + bookingEarnings;
       }, 0);
     };
 

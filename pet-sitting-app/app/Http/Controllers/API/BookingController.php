@@ -34,6 +34,18 @@ class BookingController extends Controller
                     'date' => $booking->date,
                     'time' => $booking->time,
                     'status' => $booking->status,
+                    'hourly_rate' => $booking->hourly_rate,
+                    'total_amount' => $booking->total_amount,
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                    'duration' => $booking->duration,
+                    'pet_name' => $booking->pet_name,
+                    'pet_type' => $booking->pet_type,
+                    'service_type' => $booking->service_type,
+                    'description' => $booking->description,
+                    'is_weekly' => $booking->is_weekly,
+                    'start_date' => $booking->start_date,
+                    'end_date' => $booking->end_date,
                     'pet_owner' => [
                         'id' => $booking->user->id,
                         'name' => $booking->user->name,
@@ -95,6 +107,14 @@ class BookingController extends Controller
             $totalAmount = $request->total_amount;
         } elseif ($request->rate_per_hour && $request->duration) {
             $totalAmount = $request->rate_per_hour * $request->duration;
+        }
+
+        // Validate that we have a valid total amount
+        if ($totalAmount <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid booking amount. Please provide valid rate and duration.'
+            ], 400);
         }
 
         // Create the booking

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Verification Functions Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #10B981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #059669;
+        }
+        .test-button.danger {
+            background: #EF4444;
+        }
+        .test-button.danger:hover {
+            background: #DC2626;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #10B981;
+        }
+        .status.error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #EF4444;
+        }
+        .status.info {
+            background: #DBEAFE;
+            color: #1E40AF;
+            border: 1px solid #3B82F6;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input[type="radio"] {
+            margin-right: 10px;
+        }
+        .form-group label.radio-label {
+            display: inline;
+            font-weight: normal;
+            margin-right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin Verification Functions Test</h1>
+    
+    <div class="test-container">
+        <h2>Function Availability Test</h2>
+        <button class="test-button" onclick="testFunctionAvailability()">Test Function Availability</button>
+        <div id="functionStatus" class="status info">Click the button to test function availability</div>
+    </div>
+
+    <div class="test-container">
+        <h2>Mock Verification Form</h2>
+        <form id="verificationReviewForm">
+            <div class="form-group">
+                <label>Documents Clear:</label>
+                <label class="radio-label">
+                    <input type="radio" name="documents_clear" value="1"> Yes
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="documents_clear" value="0"> No
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label>Face Match Verified:</label>
+                <label class="radio-label">
+                    <input type="radio" name="face_match_verified" value="1"> Yes
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="face_match_verified" value="0"> No
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label>Address Match Verified:</label>
+                <label class="radio-label">
+                    <input type="radio" name="address_match_verified" value="1"> Yes
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="address_match_verified" value="0"> No
+                </label>
+            </div>
+        </form>
+    </div>
+
+    <div class="test-container">
+        <h2>Function Tests</h2>
+        <button class="test-button" onclick="testApproveFunction()">Test Approve Function</button>
+        <button class="test-button danger" onclick="testRejectFunction()">Test Reject Function</button>
+        <div id="testResults" class="status info">Click a button to test the functions</div>
+    </div>
+
+    <script>
+        // Mock CSRF token function
+        async function refreshCSRFToken() {
+            return 'mock-csrf-token-12345';
+        }
+
+        // Mock approveVerification function (simplified version)
+        window.approveVerification = async function approveVerification() {
+            console.log('approveVerification called');
+            
+            // Validate that all criteria are set to "Yes"
+            const documentsClear = document.querySelector('input[name="documents_clear"]:checked');
+            const faceMatchVerified = document.querySelector('input[name="face_match_verified"]:checked');
+            const addressMatchVerified = document.querySelector('input[name="address_match_verified"]:checked');
+            
+            // Check if any criteria is not selected or set to "No"
+            const issues = [];
+            
+            if (!documentsClear || documentsClear.value === '0') {
+                issues.push('Documents Clear must be set to "Yes"');
+            }
+            
+            if (!faceMatchVerified || faceMatchVerified.value === '0') {
+                issues.push('Face Match Verified must be set to "Yes"');
+            }
+            
+            if (!addressMatchVerified || addressMatchVerified.value === '0') {
+                issues.push('Address Match Verified must be set to "Yes"');
+            }
+            
+            // If there are issues, show alert and prevent approval
+            if (issues.length > 0) {
+                alert('⚠️ Cannot approve verification. Please ensure all criteria are set to "Yes":\n\n' + issues.join('\n'));
+                return;
+            }
+            
+            // If all criteria are "Yes", proceed with confirmation
+            if (confirm('Are you sure you want to approve this verification and mark the sitter as legit?')) {
+                // Test API call (replace with actual verification ID)
+                const verificationId = 1; // Replace with actual ID
+                const apiUrl = `/api/admin/verifications/${verificationId}/approve`;
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('documents_clear', 'yes');
+                    formData.append('face_match_verified', 'yes');
+                    formData.append('address_match_verified', 'yes');
+                    formData.append('confidence_level', 'high');
+                    formData.append('verification_method', 'manual');
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('✅ Verification approved successfully!');
+                        document.getElementById('testResults').innerHTML = '✅ Approve function works correctly! API returned: ' + JSON.stringify(data);
+                        document.getElementById('testResults').className = 'status success';
+                    } else {
+                        alert('❌ API Error: ' + (data.message || 'Unknown error'));
+                        document.getElementById('testResults').innerHTML = '❌ API Error: ' + (data.message || 'Unknown error');
+                        document.getElementById('testResults').className = 'status error';
+                    }
+                } catch (error) {
+                    alert('❌ Network Error: ' + error.message);
+                    document.getElementById('testResults').innerHTML = '❌ Network Error: ' + error.message;
+                    document.getElementById('testResults').className = 'status error';
+                }
+            }
+        };
+
+        // Mock rejectVerification function (simplified version)
+        window.rejectVerification = async function rejectVerification() {
+            console.log('rejectVerification called');
+            
+            const reason = prompt('Please provide a reason for rejection:');
+            if (reason && reason.trim() !== '') {
+                // Test API call (replace with actual verification ID)
+                const verificationId = 1; // Replace with actual ID
+                const apiUrl = `/api/admin/verifications/${verificationId}/reject`;
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('reason', reason);
+                    formData.append('rejection_category', 'other');
+                    formData.append('allow_resubmission', '1');
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('✅ Verification rejected successfully!');
+                        document.getElementById('testResults').innerHTML = '✅ Reject function works correctly! API returned: ' + JSON.stringify(data);
+                        document.getElementById('testResults').className = 'status success';
+                    } else {
+                        alert('❌ API Error: ' + (data.message || 'Unknown error'));
+                        document.getElementById('testResults').innerHTML = '❌ API Error: ' + (data.message || 'Unknown error');
+                        document.getElementById('testResults').className = 'status error';
+                    }
+                } catch (error) {
+                    alert('❌ Network Error: ' + error.message);
+                    document.getElementById('testResults').innerHTML = '❌ Network Error: ' + error.message;
+                    document.getElementById('testResults').className = 'status error';
+                }
+            }
+        };
+
+        // Test function availability
+        function testFunctionAvailability() {
+            const statusDiv = document.getElementById('functionStatus');
+            let status = '';
+            
+            if (typeof window.approveVerification === 'function') {
+                status += '✅ approveVerification is available<br>';
+            } else {
+                status += '❌ approveVerification is NOT available<br>';
+            }
+            
+            if (typeof window.rejectVerification === 'function') {
+                status += '✅ rejectVerification is available<br>';
+            } else {
+                status += '❌ rejectVerification is NOT available<br>';
+            }
+            
+            if (status.includes('❌')) {
+                statusDiv.className = 'status error';
+            } else {
+                statusDiv.className = 'status success';
+            }
+            
+            statusDiv.innerHTML = status;
+        }
+
+        // Test approve function
+        function testApproveFunction() {
+            try {
+                // Set all criteria to "Yes" for testing
+                document.querySelector('input[name="documents_clear"][value="1"]').checked = true;
+                document.querySelector('input[name="face_match_verified"][value="1"]').checked = true;
+                document.querySelector('input[name="address_match_verified"][value="1"]').checked = true;
+                
+                window.approveVerification();
+            } catch (error) {
+                document.getElementById('testResults').innerHTML = '❌ Error testing approve function: ' + error.message;
+                document.getElementById('testResults').className = 'status error';
+            }
+        }
+
+        // Test reject function
+        function testRejectFunction() {
+            try {
+                window.rejectVerification();
+            } catch (error) {
+                document.getElementById('testResults').innerHTML = '❌ Error testing reject function: ' + error.message;
+                document.getElementById('testResults').className = 'status error';
+            }
+        }
+
+        // Auto-test on page load
+        window.onload = function() {
+            testFunctionAvailability();
+        };
+    </script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 // Network detection utility for dual WiFi/mobile data support
 const getNetworkIP = () => {
   if (__DEV__) {
-    // Use WiFi IP for development (current connection)
-    return '192.168.100.192';
+    // Use current WiFi IP for development
+    return '192.168.100.197';
   }
   return 'https://your-production-domain.com';
 };
@@ -11,35 +11,51 @@ const getNetworkIP = () => {
 export const NETWORK_FALLBACK = {
   // Primary IPs to try in order - WiFi first for current connection
   PRIMARY_IPS: [
-    '192.168.100.192',  // Current WiFi IP (primary)
+    '192.168.100.197',  // Current WiFi IP (primary)
+    '127.0.0.1',        // Localhost fallback
     '172.20.10.2',      // Mobile data IP (fallback)
+    '172.20.10.1',      // Mobile hotspot gateway
   ],
   
   // Fallback IPs for different network scenarios
   FALLBACK_IPS: [
-    '192.168.100.192',  // Current WiFi IP (primary)
-    '172.20.10.2',      // Mobile data IP (fallback)
-    '172.20.10.1',      // Common mobile hotspot
+    '192.168.100.197',  // Current WiFi IP (primary)
+    '127.0.0.1',        // Localhost fallback
+    '192.168.100.192',  // Previous WiFi IP
     '192.168.100.184',  // Previous WiFi IP
     '192.168.100.179',  // Previous WiFi IP
     '192.168.1.100',    // Common home WiFi
     '192.168.0.100',    // Common home WiFi
+    '192.168.100.1',    // WiFi gateway (if server is on gateway)
+    '172.20.10.2',      // Mobile data IP (fallback)
+    '172.20.10.1',      // Mobile hotspot gateway
+    '172.20.10.3',      // Additional mobile data IP
+    '172.20.10.4',      // Additional mobile data IP
     '192.168.43.1',     // Android hotspot
     '192.168.137.1',    // Windows mobile hotspot
     '10.0.0.100',       // Corporate networks
   ],
   
-  // Connection test timeout (reduced for faster detection)
-  CONNECTION_TIMEOUT: 1000,
+  // Connection test timeout (optimized for WiFi)
+  CONNECTION_TIMEOUT: 2000, // 2 seconds for WiFi connection
   
   // Retry attempts
   MAX_RETRIES: 3,
+  
+  // Network type detection
+  NETWORK_TYPES: {
+    WIFI: ['192.168.', '10.0.0.', '172.16.', '172.17.', '172.18.', '172.19.'],
+    MOBILE: ['172.20.10.', '172.20.11.', '172.20.12.', '172.20.13.'],
+    HOTSPOT: ['192.168.43.', '192.168.137.', '172.20.10.'],
+  },
 };
 
 // API Configuration
+export const API_BASE_URL = getNetworkIP() + ':8000';
+
 export const API_CONFIG = {
   // Dynamic IP detection for both WiFi and mobile data
-  BASE_URL: getNetworkIP() + ':8000',
+  BASE_URL: API_BASE_URL,
   
   // API endpoints
   ENDPOINTS: {

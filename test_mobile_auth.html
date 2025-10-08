@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Authentication Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #10B981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #059669;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #10B981;
+        }
+        .status.error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #EF4444;
+        }
+        .status.info {
+            background: #DBEAFE;
+            color: #1E40AF;
+            border: 1px solid #3B82F6;
+        }
+        .token-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mobile Authentication Test</h1>
+    
+    <div class="test-container">
+        <h2>Test Token Authentication</h2>
+        <input type="text" id="tokenInput" class="token-input" placeholder="Enter your token (e.g., 480|TSLULSZ5ETh2hAQXVERGSkNhV3hmnlGGHuIEjT4B8fbce10b)">
+        <button class="test-button" onclick="testTokenAuth()">Test Token Authentication</button>
+        <div id="authStatus" class="status info">Enter a token and click the button to test</div>
+    </div>
+
+    <div class="test-container">
+        <h2>Test Verification API</h2>
+        <button class="test-button" onclick="testVerificationAPI()">Test Verification API</button>
+        <div id="verificationStatus" class="status info">Click the button to test verification API</div>
+    </div>
+
+    <script>
+        // Test token authentication
+        async function testTokenAuth() {
+            const token = document.getElementById('tokenInput').value.trim();
+            const statusDiv = document.getElementById('authStatus');
+            
+            if (!token) {
+                statusDiv.innerHTML = '❌ Please enter a token';
+                statusDiv.className = 'status error';
+                return;
+            }
+            
+            statusDiv.innerHTML = 'Testing token authentication...';
+            statusDiv.className = 'status info';
+            
+            try {
+                // Test with a simple API endpoint first
+                const response = await fetch('http://192.168.100.192:8000/api/health', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Health check response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = '✅ Token authentication successful! Health check passed.';
+                    statusDiv.className = 'status success';
+                } else {
+                    const errorData = await response.json();
+                    statusDiv.innerHTML = `❌ Token authentication failed. Status: ${response.status}, Error: ${errorData.message || 'Unknown error'}`;
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Network error: ${error.message}`;
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Test verification API
+        async function testVerificationAPI() {
+            const token = document.getElementById('tokenInput').value.trim();
+            const statusDiv = document.getElementById('verificationStatus');
+            
+            if (!token) {
+                statusDiv.innerHTML = '❌ Please enter a token first';
+                statusDiv.className = 'status error';
+                return;
+            }
+            
+            statusDiv.innerHTML = 'Testing verification API...';
+            statusDiv.className = 'status info';
+            
+            try {
+                // Test verification status endpoint
+                const response = await fetch('http://192.168.100.192:8000/api/verification/status', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Verification API response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = '✅ Verification API accessible! Response: ' + JSON.stringify(data);
+                    statusDiv.className = 'status success';
+                } else {
+                    const errorData = await response.json();
+                    statusDiv.innerHTML = `❌ Verification API failed. Status: ${response.status}, Error: ${errorData.message || 'Unknown error'}`;
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Network error: ${error.message}`;
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Auto-fill with example token
+        window.onload = function() {
+            document.getElementById('tokenInput').value = '480|TSLULSZ5ETh2hAQXVERGSkNhV3hmnlGGHuIEjT4B8fbce10b';
+        };
+    </script>
+</body>
+</html>

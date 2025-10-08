@@ -35,6 +35,10 @@ export interface RealtimeSitter {
     date: string;
     issuer: string;
   }[];
+  // Verification status
+  isVerified?: boolean;
+  verificationStatus?: 'pending' | 'approved' | 'rejected';
+  isLegitSitter?: boolean;
 }
 
 class RealtimeLocationService {
@@ -63,6 +67,12 @@ class RealtimeLocationService {
         return user.token;
       } else {
         console.warn('⚠️ No auth token found for user:', user?.email || 'unknown');
+        console.warn('⚠️ User details:', {
+          id: user?.id,
+          email: user?.email,
+          role: user?.role,
+          hasToken: !!user?.token
+        });
         return null;
       }
     } catch (error) {
@@ -211,9 +221,15 @@ class RealtimeLocationService {
 
     try {
       const token = await this.getAuthToken();
+      if (!token) {
+        console.warn('⚠️ No auth token available for nearby sitters API call');
+        console.log('🔄 Falling back to local calculation...');
+        return this.getSittersNearbyLocal(latitude, longitude, radiusKm);
+      }
+      
       const response = await makeApiCall(`/api/location/nearby-sitters?latitude=${latitude}&longitude=${longitude}&radius_km=${radiusKm}`, {
         method: 'GET',
-        headers: getAuthHeaders(token || undefined),
+        headers: getAuthHeaders(token),
       });
 
       const data = await response.json();

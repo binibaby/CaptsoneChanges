@@ -3,15 +3,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -39,7 +43,27 @@ const ProfileScreen = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageRetryCount, setImageRetryCount] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [cooldownInfo, setCooldownInfo] = useState<any>(null);
   const [newSpecialty, setNewSpecialty] = useState('');
+  const [requestData, setRequestData] = useState<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+    hourlyRate: string;
+    experience: string;
+    aboutMe: string;
+    reason: string;
+  }>({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    hourlyRate: '',
+    experience: '',
+    aboutMe: '',
+    reason: '',
+  });
   const [profileData, setProfileData] = useState<{
     firstName: string;
     lastName: string;
@@ -202,6 +226,26 @@ const ProfileScreen = () => {
     }
   }, [userAddress]);
 
+  // Initialize request data when editing starts
+  React.useEffect(() => {
+    if (isEditing && user) {
+      const userName = user.name || '';
+      const nameParts = userName ? userName.split(' ') : [];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      setRequestData({
+        firstName,
+        lastName,
+        phone: user.phone || '',
+        hourlyRate: user.hourlyRate || '',
+        experience: user.experience || '',
+        aboutMe: user.aboutMe || '',
+        reason: '',
+      });
+    }
+  }, [isEditing, user]);
+
   // Start location tracking when user logs in
   React.useEffect(() => {
     if (user && !currentLocation) {
@@ -209,6 +253,13 @@ const ProfileScreen = () => {
       startLocationTracking(1000);
     }
   }, [user, currentLocation, startLocationTracking]);
+
+  // Check cooldown status when component loads
+  React.useEffect(() => {
+    if (user?.token) {
+      checkCooldownStatus();
+    }
+  }, [user]);
 
   // Update profileData when user changes
   React.useEffect(() => {
@@ -325,6 +376,37 @@ const ProfileScreen = () => {
         },
       ]
     );
+  };
+
+  const handleProfileRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Refresh user data from the server
+      await refresh();
+      
+      // Update profile data with fresh user data
+      if (user) {
+        const nameParts = (user.name || '').split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        setProfileData({
+          firstName: firstName,
+          lastName: lastName,
+          email: user.email || '',
+          phone: user.phone || '',
+          address: user.address || '',
+          hourlyRate: user.hourlyRate || '',
+          experience: user.experience || '',
+          aboutMe: user.aboutMe || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+      Alert.alert('Error', 'Failed to refresh profile. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const pickProfileImage = async () => {
@@ -513,65 +595,93 @@ const ProfileScreen = () => {
     }
   };
 
-  const handleSaveProfile = async () => {
+  const checkCooldownStatus = async () => {
     try {
-      // Validate profileData exists and has required fields
-      if (!profileData) {
-        console.error('ProfileScreen: profileData is null or undefined');
-        Alert.alert('Error', 'Profile data is missing. Please try again.');
-        return;
-      }
-
-      // Validate required fields
-      if (!profileData.firstName || profileData.firstName.trim() === '') {
-        Alert.alert('Error', 'First name is required. Please enter your first name.');
-        return;
-      }
-      
-      if (!profileData.lastName || profileData.lastName.trim() === '') {
-        Alert.alert('Error', 'Last name is required. Please enter your last name.');
-        return;
-      }
-
-      // Ensure firstName and lastName have fallback values
-      const firstName = profileData.firstName.trim();
-      const lastName = profileData.lastName.trim();
-      
-      console.log('ProfileScreen: Saving profile with data:', {
-        firstName,
-        lastName,
-        email: profileData.email,
-        phone: profileData.phone,
-      });
-      
-      console.log('ProfileScreen: Current user object before update:', {
-        id: user?.id,
-        name: user?.name,
-        firstName: user?.firstName,
-        lastName: user?.lastName,
-        email: user?.email
+      const { makeApiCall } = await import('../../services/networkService');
+      const response = await makeApiCall('/api/profile/update-request/check-pending', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user?.token || ''}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      // Save the profile data to the auth context
-      await updateUserProfile({
-        firstName,
-        lastName,
-        email: profileData.email || '',
-        phone: profileData.phone || '',
-        age: profileData.age ? parseInt(profileData.age) : undefined,
-        gender: profileData.gender || '',
-        address: profileData.address || '',
-        experience: profileData.experience || '',
-        hourlyRate: profileData.hourlyRate || '',
-        aboutMe: profileData.aboutMe || '',
-        specialties: profileData.specialties || [],
-      });
-      
-      setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.cooldown_info) {
+          setCooldownInfo(data.cooldown_info);
+        }
+      }
     } catch (error) {
-      console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      console.error('Error checking cooldown status:', error);
+    }
+  };
+
+  const handleSubmitProfileRequest = async () => {
+    try {
+      setIsSubmittingRequest(true);
+      
+      // Validate required fields
+      if (!requestData.firstName.trim() || !requestData.lastName.trim()) {
+        Alert.alert('Validation Error', 'First name and last name are required');
+        return;
+      }
+      
+      if (!requestData.reason.trim()) {
+        Alert.alert('Validation Error', 'Please provide a reason for the changes');
+        return;
+      }
+      
+      console.log('ProfileScreen: Submitting profile update request:', requestData);
+      
+      const { submitProfileUpdateRequest } = await import('../../services/networkService');
+      const response = await submitProfileUpdateRequest({
+        firstName: requestData.firstName.trim(),
+        lastName: requestData.lastName.trim(),
+        phone: requestData.phone.trim(),
+        hourlyRate: requestData.hourlyRate.trim(),
+        experience: requestData.experience.trim(),
+        aboutMe: requestData.aboutMe.trim(),
+        reason: requestData.reason.trim(),
+      }, user?.token || '', user?.role || 'pet_owner');
+      
+      console.log('ProfileScreen: Profile update request response:', response);
+      
+      if (response.success) {
+        Alert.alert(
+          'Request Submitted', 
+          'Your update request has been submitted. Please wait for the admin to examine and approve your changes.',
+          [{ text: 'OK', onPress: () => setIsEditing(false) }]
+        );
+        // Reset form
+        setRequestData({
+          firstName: '',
+          lastName: '',
+          phone: '',
+          hourlyRate: '',
+          experience: '',
+          aboutMe: '',
+          reason: '',
+        });
+        // Refresh cooldown status
+        await checkCooldownStatus();
+      } else {
+        // Check if it's a cooldown error
+        if (response.cooldown_info && response.cooldown_info.in_cooldown) {
+          Alert.alert(
+            'Profile Update Cooldown',
+            response.message,
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Error', response.message || 'Failed to submit request. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('ProfileScreen: Error submitting profile update request:', error);
+      Alert.alert('Error', 'Failed to submit request. Please try again.');
+    } finally {
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -580,6 +690,11 @@ const ProfileScreen = () => {
       icon: 'person-outline',
       title: 'Edit Profile',
       onPress: () => setIsEditing(true),
+    },
+    {
+      icon: 'create-outline',
+      title: 'Request Profile Update',
+      onPress: () => router.push('/profile-update-request'),
     },
     {
       icon: 'settings-outline',
@@ -622,7 +737,24 @@ const ProfileScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleProfileRefresh}
+              colors={['#3B82F6']}
+              tintColor="#3B82F6"
+            />
+          }
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <TouchableOpacity onPress={pickProfileImage} disabled={isUploadingImage}>
@@ -792,53 +924,153 @@ const ProfileScreen = () => {
 
         {/* Personal Information Section */}
         <View style={styles.infoSection}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            {isEditing && (
+              <View style={styles.editingIndicator}>
+                <Ionicons name="create-outline" size={16} color="#F59E0B" />
+                <Text style={styles.editingText}>Request Update</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Cooldown Notice */}
+          {cooldownInfo && cooldownInfo.in_cooldown && (
+            <View style={styles.cooldownNotice}>
+              <Ionicons name="time-outline" size={20} color="#F59E0B" />
+              <View style={styles.cooldownTextContainer}>
+                <Text style={styles.cooldownTitle}>Profile Update Cooldown</Text>
+                <Text style={styles.cooldownMessage}>
+                  You cannot request profile changes for {cooldownInfo.days_remaining} more days. 
+                  You can request changes again after {cooldownInfo.cooldown_ends_at}.
+                </Text>
+              </View>
+            </View>
+          )}
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>First Name</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profileData.firstName}
-              onChangeText={(text) => setProfileData({...profileData, firstName: text})}
-              editable={isEditing}
-              placeholder="Enter your first name"
-            />
-          </View>
+          {!isEditing ? (
+            // Display current profile information
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>First Name</Text>
+                <Text style={styles.infoValue}>{profileData.firstName || 'Not set'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Last Name</Text>
+                <Text style={styles.infoValue}>{profileData.lastName || 'Not set'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Email</Text>
+                <Text style={styles.infoValue}>{profileData.email || 'Not set'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Phone</Text>
+                <Text style={styles.infoValue}>{profileData.phone || 'Not set'}</Text>
+              </View>
+              {user?.role === 'pet_sitter' && (
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Hourly Rate</Text>
+                    <Text style={styles.infoValue}>{profileData.hourlyRate ? `₱${profileData.hourlyRate}` : 'Not set'}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Experience</Text>
+                    <Text style={styles.infoValue}>{profileData.experience ? `${profileData.experience} years` : 'Not set'}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>About Me</Text>
+                    <Text style={styles.infoValue}>{profileData.aboutMe || 'Not set'}</Text>
+                  </View>
+                </>
+              )}
+            </>
+          ) : (
+            // Profile update request form
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>First Name *</Text>
+                <TextInput
+                  style={[styles.input, styles.inputEditing]}
+                  value={requestData.firstName}
+                  onChangeText={(text) => setRequestData({...requestData, firstName: text})}
+                  placeholder="Enter your first name"
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Last Name *</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profileData.lastName}
-              onChangeText={(text) => setProfileData({...profileData, lastName: text})}
-              editable={isEditing}
-              placeholder="Enter your last name (required)"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Last Name *</Text>
+                <TextInput
+                  style={[styles.input, styles.inputEditing]}
+                  value={requestData.lastName}
+                  onChangeText={(text) => setRequestData({...requestData, lastName: text})}
+                  placeholder="Enter your last name"
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profileData.email}
-              onChangeText={(text) => setProfileData({...profileData, email: text})}
-              editable={isEditing}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  style={[styles.input, styles.inputEditing]}
+                  value={requestData.phone}
+                  onChangeText={(text) => setRequestData({...requestData, phone: text})}
+                  placeholder="Enter your phone number"
+                  keyboardType="phone-pad"
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Phone</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.disabledInput]}
-              value={profileData.phone}
-              onChangeText={(text) => setProfileData({...profileData, phone: text})}
-              editable={isEditing}
-              placeholder="Enter your phone number"
-              keyboardType="phone-pad"
-            />
-          </View>
+              {user?.role === 'pet_sitter' && (
+                <>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Hourly Rate (₱)</Text>
+                    <TextInput
+                      style={[styles.input, styles.inputEditing]}
+                      value={requestData.hourlyRate}
+                      onChangeText={(text) => setRequestData({...requestData, hourlyRate: text})}
+                      placeholder="Enter your hourly rate"
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Years of Experience</Text>
+                    <TextInput
+                      style={[styles.input, styles.inputEditing]}
+                      value={requestData.experience}
+                      onChangeText={(text) => setRequestData({...requestData, experience: text})}
+                      placeholder="e.g., 3, 1.5, 0.5"
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>About Me</Text>
+                    <TextInput
+                      style={[styles.textArea, styles.textAreaEditing]}
+                      value={requestData.aboutMe}
+                      onChangeText={(text) => setRequestData({...requestData, aboutMe: text})}
+                      placeholder="Tell us about yourself..."
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+                  </View>
+                </>
+              )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Reason for Changes *</Text>
+                <TextInput
+                  style={[styles.textArea, styles.textAreaEditing]}
+                  value={requestData.reason}
+                  onChangeText={(text) => setRequestData({...requestData, reason: text})}
+                  placeholder="Please explain why you want to update your profile information..."
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+            </>
+          )}
 
           <View style={styles.inputGroup}>
             <View style={styles.locationInputHeader}>
@@ -859,146 +1091,24 @@ const ProfileScreen = () => {
               placeholder={userAddress ? "Location auto-detected" : "Getting your location..."}
             />
           </View>
-
-          {user?.role === 'pet_sitter' && (
-            <>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Years of Experience</Text>
-                <TextInput
-                  style={[styles.input, !isEditing && styles.disabledInput]}
-                  value={profileData.experience}
-                  onChangeText={(text) => setProfileData({...profileData, experience: text})}
-                  editable={isEditing}
-                  placeholder="e.g., 3, 1.5, 0.5"
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Hourly Rate (₱)</Text>
-                <TextInput
-                  style={[styles.input, !isEditing && styles.disabledInput]}
-                  value={profileData.hourlyRate}
-                  onChangeText={(text) => setProfileData({...profileData, hourlyRate: text})}
-                  editable={isEditing}
-                  placeholder="e.g., 25"
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>About Me</Text>
-                <TextInput
-                  style={[styles.textArea, !isEditing && styles.disabledInput]}
-                  value={profileData.aboutMe}
-                  onChangeText={(text) => setProfileData({...profileData, aboutMe: text})}
-                  editable={isEditing}
-                  placeholder="Tell us about yourself..."
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Specialties</Text>
-                {isEditing ? (
-                  <>
-                    <View style={styles.specialtiesContainer}>
-                      {profileData.specialties?.map((specialty, index) => (
-                        <View key={index} style={styles.specialtyTag}>
-                          <Text style={styles.specialtyText}>{specialty}</Text>
-                          <TouchableOpacity
-                            style={styles.removeSpecialtyButton}
-                            onPress={() => setProfileData({
-                              ...profileData, 
-                              specialties: profileData.specialties?.filter((_, i) => i !== index) || []
-                            })}
-                          >
-                            <Ionicons name="close" size={16} color="#666" />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </View>
-                    <View style={styles.addSpecialtyContainer}>
-                      <TextInput
-                        style={styles.specialtyInput}
-                        placeholder="Add a specialty (e.g., Dog training, Cat care)"
-                        placeholderTextColor="#999"
-                        value={newSpecialty}
-                        onChangeText={setNewSpecialty}
-                        onSubmitEditing={() => {
-                          if (newSpecialty.trim()) {
-                            setProfileData({
-                              ...profileData, 
-                              specialties: [...(profileData.specialties || []), newSpecialty.trim()]
-                            });
-                            setNewSpecialty('');
-                          }
-                        }}
-                      />
-                      <TouchableOpacity
-                        style={[styles.addSpecialtyButton, !newSpecialty.trim() && styles.disabledAddButton]}
-                        onPress={() => {
-                          if (newSpecialty.trim()) {
-                            setProfileData({
-                              ...profileData, 
-                              specialties: [...(profileData.specialties || []), newSpecialty.trim()]
-                            });
-                            setNewSpecialty('');
-                          }
-                        }}
-                        disabled={!newSpecialty.trim()}
-                      >
-                        <Ionicons name="add" size={20} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    {profileData.specialties && profileData.specialties.length > 0 ? (
-                      <View style={styles.specialtiesContainer}>
-                        {profileData.specialties?.map((specialty, index) => (
-                          <View key={index} style={styles.specialtyTag}>
-                            <Text style={styles.specialtyText}>{specialty}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    ) : (
-                      <Text style={styles.emptyText}>No specialties added yet</Text>
-                    )}
-                  </>
-                )}
-              </View>
-            </>
-          )}
-
-          {user?.role === 'pet_owner' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Preferred Pet Breeds</Text>
-              {profileData.petBreeds.length > 0 ? (
-                <View style={styles.specialtiesContainer}>
-                  {profileData.petBreeds.map((breed, index) => (
-                    <View key={index} style={styles.specialtyTag}>
-                      <Text style={styles.specialtyText}>{breed}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.emptyText}>No pet breeds selected yet</Text>
-              )}
-            </View>
-          )}
         </View>
 
-        {/* Save/Cancel Buttons when editing */}
+        {/* Submit/Cancel Buttons when editing */}
         {isEditing && (
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={styles.saveButton} 
-              onPress={handleSaveProfile}
+              style={[styles.saveButton, isSubmittingRequest && styles.disabledButton]} 
+              onPress={handleSubmitProfileRequest}
+              disabled={isSubmittingRequest}
             >
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              {isSubmittingRequest ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.saveButtonText}>Submitting...</Text>
+                </View>
+              ) : (
+                <Text style={styles.saveButtonText}>Submit Request</Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.cancelButton} 
@@ -1036,7 +1146,8 @@ const ProfileScreen = () => {
         <View style={styles.versionSection}>
           <Text style={styles.versionText}>Petsit Connect v1.0.0</Text>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -1208,6 +1319,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
+  inputEditing: {
+    borderColor: '#F59E0B',
+    borderWidth: 2,
+    backgroundColor: '#FFFBEB',
+  },
   textArea: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -1219,9 +1335,87 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
+  textAreaEditing: {
+    borderColor: '#F59E0B',
+    borderWidth: 2,
+    backgroundColor: '#FFFBEB',
+  },
   disabledInput: {
     backgroundColor: '#f8f8f8',
     color: '#666',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  editingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  editingText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  cooldownNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  cooldownTextContainer: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  cooldownTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  cooldownMessage: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  infoLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    flex: 1,
+  },
+  infoValue: {
+    fontSize: 16,
+    color: '#666',
+    flex: 2,
+    textAlign: 'right',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   specialtiesContainer: {
     flexDirection: 'row',

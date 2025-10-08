@@ -35,6 +35,8 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
   const [codeSent, setCodeSent] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [simulationMode, setSimulationMode] = useState(false);
+  const [simulationCode, setSimulationCode] = useState<string | null>(null);
 
   const sendVerificationCode = async () => {
     if (!phoneNumber) {
@@ -120,19 +122,22 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       if (response.ok) {
         setCodeSent(true);
         
-        // Show the verification code in the alert for easy access
-        const code = data.debug_code || 'Check logs for code';
+        // Check if simulation mode is active
+        if (data.simulation_mode && data.verification_code) {
+          setSimulationMode(true);
+          setSimulationCode(data.verification_code);
+          console.log('🎭 SIMULATION MODE: Code is', data.verification_code);
+        }
+        
+        // Show success message
+        const alertMessage = data.simulation_mode 
+          ? `🎭 SIMULATION MODE: Verification code is ${data.verification_code}\n\nCheck the logs for the code.`
+          : 'Please check your SMS messages for the verification code.';
+        
         Alert.alert(
-          'Verification Code Sent', 
-          `Code: ${code}\n\nUse this code to verify your phone number`,
+          data.simulation_mode ? 'Simulation Mode' : 'Verification Code Sent', 
+          alertMessage,
           [
-            {
-              text: 'Copy Code',
-              onPress: () => {
-                // In a real app, you would copy to clipboard
-                Alert.alert('Code Copied', `Code ${code} copied to clipboard`);
-              }
-            },
             {
               text: 'OK',
               style: 'cancel'
@@ -325,6 +330,13 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
           <Text style={styles.subtitle}>
             We'll send a verification code to your phone number
           </Text>
+          {simulationMode && (
+            <View style={styles.simulationBanner}>
+              <Text style={styles.simulationText}>
+                🎭 Simulation Mode Active - Check logs for verification code
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.form}>
@@ -566,6 +578,20 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 5,
     textAlign: 'left',
+  },
+  simulationBanner: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFEAA7',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  simulationText: {
+    color: '#856404',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
 

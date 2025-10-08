@@ -57,30 +57,35 @@ export class NetworkService {
     }
   }
 
-  // Detect which IP address is currently working (optimized for speed)
+  // Detect which IP address is currently working (optimized for WiFi connection)
   public async detectWorkingIP(): Promise<string> {
-    console.log('🔍 Detecting working IP address...');
+    console.log('🔍 Detecting working IP address for WiFi connection...');
 
-    // Try the most likely IPs first (prioritize WiFi for current connection)
+    // Try the most likely IPs first (prioritize WiFi)
     const priorityIPs = [
-      '192.168.100.192',  // Current WiFi IP (most likely)
-      '172.20.10.2',      // Mobile data IP (fallback)
-      'localhost',         // Local development
+      '192.168.100.197',  // Current WiFi IP (most likely)
       '127.0.0.1',        // Local development
+      'localhost',         // Local development
+      '172.20.10.2',      // Mobile data IP (fallback)
+      '172.20.10.1',      // Mobile hotspot gateway
     ];
 
-    // Try priority IPs first
-    for (const ip of priorityIPs) {
-      console.log(`🌐 Testing IP: ${ip}:8000`);
+    // Try priority IPs first with parallel testing for faster detection
+    const priorityPromises = priorityIPs.map(async (ip) => {
+      console.log(`🌐 Testing priority IP: ${ip}:8000`);
       const isWorking = await this.testIPConnection(ip);
-      if (isWorking) {
-        this.currentBaseUrl = `http://${ip}:8000`;
-        this.isConnected = true;
-        console.log(`✅ Connected to: ${this.currentBaseUrl}`);
-        return this.currentBaseUrl;
-      } else {
-        console.log(`❌ Failed to connect to: ${ip}:8000`);
-      }
+      return { ip, isWorking };
+    });
+
+    const priorityResults = await Promise.all(priorityPromises);
+    
+    // Find first working IP
+    const workingIP = priorityResults.find(result => result.isWorking);
+    if (workingIP) {
+      this.currentBaseUrl = `http://${workingIP.ip}:8000`;
+      this.isConnected = true;
+      console.log(`✅ Connected to: ${this.currentBaseUrl} (${this.getNetworkType(workingIP.ip)})`);
+      return this.currentBaseUrl;
     }
 
     // If priority IPs fail, try all possible IPs from config
@@ -92,25 +97,41 @@ export class NetworkService {
     // Remove duplicates and priority IPs
     const uniqueIPs = Array.from(new Set(allIPs)).filter(ip => !priorityIPs.includes(ip));
     
+    console.log(`🔄 Trying ${uniqueIPs.length} additional IPs...`);
+    
     for (const ip of uniqueIPs) {
       console.log(`🌐 Testing IP: ${ip}:8000`);
       const isWorking = await this.testIPConnection(ip);
       if (isWorking) {
         this.currentBaseUrl = `http://${ip}:8000`;
         this.isConnected = true;
-        console.log(`✅ Connected to: ${this.currentBaseUrl}`);
+        console.log(`✅ Connected to: ${this.currentBaseUrl} (${this.getNetworkType(ip)})`);
         return this.currentBaseUrl;
       } else {
         console.log(`❌ Failed to connect to: ${ip}:8000`);
       }
     }
 
-    // If all fail, use the current WiFi IP as default but mark as disconnected
-    this.currentBaseUrl = `http://192.168.100.192:8000`;
+    // If all fail, use the mobile data IP as default but mark as disconnected
+    this.currentBaseUrl = `http://172.20.10.2:8000`;
     this.isConnected = false;
     console.log(`⚠️ All IPs failed. Using default IP: ${this.currentBaseUrl}`);
-    console.log(`⚠️ Please ensure your server is running and accessible`);
+    console.log(`⚠️ Please ensure your server is running and accessible on both WiFi and mobile data`);
     return this.currentBaseUrl;
+  }
+
+  // Helper method to determine network type
+  private getNetworkType(ip: string): string {
+    if (ip.includes('192.168.') || ip.includes('10.0.0.') || ip.includes('172.16.') || ip.includes('172.17.') || ip.includes('172.18.') || ip.includes('172.19.')) {
+      return 'WiFi';
+    } else if (ip.includes('172.20.10.') || ip.includes('172.20.11.') || ip.includes('172.20.12.') || ip.includes('172.20.13.')) {
+      return 'Mobile Data';
+    } else if (ip.includes('192.168.43.') || ip.includes('192.168.137.')) {
+      return 'Hotspot';
+    } else if (ip === 'localhost' || ip === '127.0.0.1') {
+      return 'Local Development';
+    }
+    return 'Unknown';
   }
 
   // Get current working base URL
@@ -172,35 +193,92 @@ export const networkService = NetworkService.getInstance();
 // Helper function to get API URL with automatic network detection
 export const getApiUrl = async (endpoint: string): Promise<string> => {
   const baseUrl = networkService.getBaseUrl();
-  return `${baseUrl}${endpoint}`;
+  // Ensure endpoint starts with /api if it doesn't already
+  const apiEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+  return `${baseUrl}${apiEndpoint}`;
 };
 
-// Helper function for making API calls with automatic retry (optimized for speed)
+// Helper function for making API calls with automatic retry and token refresh
 export const makeApiCall = async (
   endpoint: string,
   options: RequestInit = {},
-  retryCount: number = 0
+  retryCount: number = 0,
+  hasTriedTokenRefresh: boolean = false
 ): Promise<Response> => {
   try {
     const url = await getApiUrl(endpoint);
     console.log(`🌐 Making API call to: ${url}`);
     
+    // Get user token if no Authorization header is provided
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+    
+    if (!headers['Authorization'] && !headers['authorization']) {
+      try {
+        const { default: authService } = await import('./authService');
+        const user = await authService.getCurrentUser();
+        console.log('🔍 makeApiCall - User from authService:', user);
+        console.log('🔍 makeApiCall - User ID:', user?.id);
+        console.log('🔍 makeApiCall - User token available:', !!user?.token);
+        if (user?.token) {
+          headers['Authorization'] = `Bearer ${user.token}`;
+          console.log(`🔑 Added auth token for user: ${user.id}`);
+        } else {
+          console.log('⚠️ No user token available for API call');
+        }
+      } catch (error) {
+        console.log('⚠️ Could not get user token:', error);
+      }
+    }
+    
     const response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers,
-      },
+      headers,
     });
 
     console.log(`📡 API response status: ${response.status} for ${url}`);
+
+    // Handle 401 Unauthorized - try to refresh token and retry
+    if (response.status === 401 && !hasTriedTokenRefresh) {
+      console.log('🔄 401 Unauthorized - attempting token refresh');
+      try {
+        const { default: authService } = await import('./authService');
+        await authService.refreshUserToken();
+        
+        // Get updated user data with new token
+        const refreshedUser = await authService.getCurrentUser();
+        if (refreshedUser?.token) {
+          console.log('✅ Token refreshed successfully, retrying API call');
+          
+          // Update headers with new token
+          const newOptions = {
+            ...options,
+            headers: {
+              ...options.headers,
+              'Authorization': `Bearer ${refreshedUser.token}`,
+            },
+          };
+          
+          // Retry with new token
+          return makeApiCall(endpoint, newOptions, retryCount, true);
+        } else {
+          console.error('❌ Token refresh failed - no new token available');
+          throw new Error('Authentication failed: Token refresh unsuccessful');
+        }
+      } catch (refreshError) {
+        console.error('❌ Token refresh failed:', refreshError);
+        throw new Error('Authentication failed: Please log in again');
+      }
+    }
 
     if (!response.ok && retryCount < 1) {
       console.log(`⚠️ API call failed (${response.status}), retrying... (${retryCount + 1}/1)`);
       // Force network re-detection on failure
       await networkService.forceReconnect();
-      return makeApiCall(endpoint, options, retryCount + 1);
+      return makeApiCall(endpoint, options, retryCount + 1, hasTriedTokenRefresh);
     }
 
     return response;
@@ -211,10 +289,55 @@ export const makeApiCall = async (
       console.log(`⚠️ Network error, retrying with fresh IP detection... (${retryCount + 1}/1)`);
       // Force network re-detection on error
       await networkService.forceReconnect();
-      return makeApiCall(endpoint, options, retryCount + 1);
+      return makeApiCall(endpoint, options, retryCount + 1, hasTriedTokenRefresh);
     }
     
     console.error(`❌ All retries failed for ${endpoint}. Network service status:`, networkService.getNetworkStatus());
+    throw error;
+  }
+};
+
+// API Methods
+export const submitProfileUpdateRequest = async (data: {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  hourlyRate: string;
+  experience: string;
+  aboutMe: string;
+  reason: string;
+}, token: string, userRole?: string) => {
+  try {
+    console.log('submitProfileUpdateRequest: Token received:', token);
+    console.log('submitProfileUpdateRequest: Data:', data);
+    console.log('submitProfileUpdateRequest: User role:', userRole);
+    
+    // Build the request body based on user role
+    const requestBody: any = {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      phone: data.phone,
+      reason: data.reason,
+    };
+    
+    // Only include hourly_rate for pet sitters and if it's not empty
+    if (userRole === 'pet_sitter' && data.hourlyRate && data.hourlyRate.trim() !== '') {
+      requestBody.hourly_rate = parseFloat(data.hourlyRate);
+    }
+    
+    const response = await makeApiCall('/api/profile/update-request', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Error submitting profile update request:', error);
     throw error;
   }
 };

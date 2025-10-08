@@ -39,6 +39,26 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const { user } = useAuth();
 
+  // Helper function to get proper image source using network service
+  const getImageSource = (imagePath: string) => {
+    if (!imagePath) return null;
+    
+    // If it's a URL (starts with http), use it directly
+    if (imagePath.startsWith('http')) {
+      return { uri: imagePath };
+    }
+    
+    // If it's a storage path (starts with /storage/), construct full URL using network service
+    if (imagePath.startsWith('/storage/')) {
+      const { networkService } = require('../services/networkService');
+      const fullUrl = networkService.getImageUrl(imagePath);
+      return { uri: fullUrl };
+    }
+    
+    // For any other string, treat as URI
+    return { uri: imagePath };
+  };
+
   const pickImage = async () => {
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -186,7 +206,7 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
 
   const renderCertificate = ({ item }: { item: Certificate }) => (
     <View style={styles.certificateItem}>
-      <Image source={{ uri: item.image }} style={styles.certificateImage} />
+      <Image source={getImageSource(item.image)} style={styles.certificateImage} />
       <View style={styles.certificateInfo}>
         <Text style={styles.certificateName} numberOfLines={2}>
           {item.name}

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
 // @ts-ignore
@@ -26,15 +26,7 @@ interface Booking {
   time: string;
 }
 
-const upcomingBookings: Booking[] = [
-  // New users start with no bookings
-];
-
-const ownerStats = {
-  totalSpent: '₱0', // New users start with ₱0 spent
-  activeBookings: 0, // New users start with 0 active bookings
-  thisWeek: '₱0', // New users start with ₱0 spent this week
-};
+// These will be replaced with dynamic state
 
 const quickActions = [
   { title: 'Find Sitter', icon: FindIcon, color: '#A7F3D0', route: '/find-sitter-map' },
@@ -53,10 +45,156 @@ const PetOwnerDashboard = () => {
   const router = useRouter();
   const { user, profileUpdateTrigger } = useAuth();
   const [imageError, setImageError] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
+  const [ownerStats, setOwnerStats] = useState({
+    totalSpent: '₱0',
+    activeBookings: 0,
+    thisWeek: '₱0',
+  });
+  
+  console.log('💳 Current ownerStats state:', ownerStats);
+  
+  // Test: Force update the state to see if UI updates
+  useEffect(() => {
+    console.log('💳 ownerStats changed:', ownerStats);
+  }, [ownerStats]);
 
   useEffect(() => {
     checkAuthentication();
+    loadDashboardData();
   }, []);
+
+  // Load dashboard data
+  const loadDashboardData = async () => {
+    console.log('🚀 loadDashboardData function called!');
+    try {
+      console.log('📊 Loading dashboard data...');
+      console.log('🔍 Current user from context:', user);
+      console.log('🔍 User ID:', user?.id);
+      console.log('🔍 User role:', user?.role);
+      console.log('🔍 User token available:', !!user?.token);
+      console.log('🔍 User token (first 20 chars):', user?.token?.substring(0, 20));
+      
+      // Load bookings and payments data
+      const { makeApiCall } = await import('../../services/networkService');
+      
+      // Get user's bookings
+      console.log('💳 About to fetch bookings data...');
+      const bookingsResponse = await makeApiCall('/bookings', {
+        method: 'GET',
+      });
+      console.log('💳 Bookings response received, status:', bookingsResponse.status);
+      
+      if (bookingsResponse.ok) {
+        const bookingsData = await bookingsResponse.json();
+        console.log('📅 Bookings data:', bookingsData);
+        
+        // Process bookings data
+        console.log('💳 Processing bookings data...');
+        const activeBookings = bookingsData.bookings?.filter((booking: any) => 
+          booking.status === 'active' || booking.status === 'confirmed'
+        ) || [];
+        console.log('💳 Active bookings found:', activeBookings.length);
+        
+        const upcomingBookingsData = bookingsData.bookings?.filter((booking: any) => 
+          booking.status === 'pending' || booking.status === 'confirmed'
+        ) || [];
+        
+        console.log('💳 Setting upcoming bookings:', upcomingBookingsData.length);
+        setUpcomingBookings(upcomingBookingsData);
+        console.log('💳 About to fetch payments data...');
+        
+        // Get payments data
+        const paymentsResponse = await makeApiCall('/payments/history', {
+          method: 'GET',
+        });
+        console.log('💳 Payments response received');
+        
+        console.log('💳 Payments API response status:', paymentsResponse.status);
+        console.log('💳 Payments API response ok:', paymentsResponse.ok);
+        
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          console.log('💳 Payments data:', paymentsData);
+          
+          // Handle paginated response - payments are in 'data' array
+          const payments = paymentsData.data || paymentsData.payments || [];
+          console.log('💳 Found payments:', payments.length);
+          console.log('💳 Payments array:', payments);
+          
+          // Calculate total spent
+          const totalSpent = payments.reduce((total: number, payment: any) => {
+            console.log(`💳 Processing payment ${payment.id}:`, {
+              status: payment.status,
+              amount: payment.amount,
+              amountType: typeof payment.amount,
+              rawAmount: payment.amount
+            });
+            if (payment.status === 'completed') {
+              // Convert amount to number - handle string format like "300000.00"
+              const amount = parseFloat(payment.amount || 0);
+              console.log(`💳 Payment ${payment.id}: Status=${payment.status}, RawAmount="${payment.amount}", ParsedAmount=${amount}, Running total: ${total + amount}`);
+              return total + amount;
+            }
+            console.log(`💳 Payment ${payment.id}: Status=${payment.status}, Skipping (not completed)`);
+            return total;
+          }, 0);
+          
+          // Calculate this week's spending
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          
+          const thisWeekSpent = payments.reduce((total: number, payment: any) => {
+            if (payment.status === 'completed' && payment.processed_at) {
+              const paymentDate = new Date(payment.processed_at);
+              if (paymentDate >= oneWeekAgo) {
+                const amount = parseFloat(payment.amount || 0);
+                console.log(`💳 This week payment ${payment.id}: Amount=${amount}`);
+                return total + amount;
+              }
+            }
+            return total;
+          }, 0);
+          
+          console.log('💳 Calculated totals:', { totalSpent, thisWeekSpent });
+          
+          const newOwnerStats = {
+            totalSpent: `₱${totalSpent.toLocaleString()}`,
+            activeBookings: activeBookings.length,
+            thisWeek: `₱${thisWeekSpent.toLocaleString()}`,
+          };
+          console.log('💳 Setting owner stats:', newOwnerStats);
+          console.log('💳 Calculated values:', { totalSpent, thisWeekSpent, activeBookings: activeBookings.length });
+          
+          // Use calculated values (should be correct now)
+          console.log('💳 Setting owner stats:', newOwnerStats);
+          setOwnerStats(newOwnerStats);
+        } else {
+          console.log('💳 Payments API response not ok:', paymentsResponse.status);
+        }
+      } else {
+        console.log('💳 Bookings API response not ok');
+      }
+    } catch (error) {
+      console.error('❌ Error loading dashboard data:', error);
+    }
+    console.log('💳 loadDashboardData function completed');
+  };
+
+  // Handle pull to refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    console.log('🔄 Refreshing dashboard data...');
+    
+    try {
+      await loadDashboardData();
+    } catch (error) {
+      console.error('❌ Error refreshing dashboard data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user?.token]);
 
   // Check authentication status
   const checkAuthentication = async () => {
@@ -95,9 +233,10 @@ const PetOwnerDashboard = () => {
   // Refresh user data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('📱 PetOwnerDashboard: Screen focused, checking authentication');
+      console.log('📱 PetOwnerDashboard: Screen focused, checking authentication and refreshing data');
       checkAuthentication();
-    }, [])
+      loadDashboardData();
+    }, [user?.token])
   );
 
 
@@ -110,21 +249,26 @@ const PetOwnerDashboard = () => {
     return isValid;
   };
 
-  // Helper function to get full image URL
+  // Helper function to get full image URL using network service
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
+    
+    // Import network service dynamically to avoid circular dependencies
+    const { networkService } = require('../../services/networkService');
+    const baseUrl = networkService.getBaseUrl();
+    
     if (uri.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.192:8000${uri}`;
+      const fullUrl = `${baseUrl}${uri}`;
       console.log('🔗 PetOwnerDashboard: Generated URL for /storage/ path:', fullUrl);
       return fullUrl;
     }
     if (uri.startsWith('profile_images/')) {
-      const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+      const fullUrl = `${baseUrl}/storage/${uri}`;
       console.log('🔗 PetOwnerDashboard: Generated URL for profile_images/ path:', fullUrl);
       return fullUrl;
     }
-    const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+    const fullUrl = `${baseUrl}/storage/${uri}`;
     console.log('🔗 PetOwnerDashboard: Generated URL for fallback path:', fullUrl);
     return fullUrl;
   };
@@ -147,12 +291,31 @@ const PetOwnerDashboard = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#10B981', '#8B5CF6', '#F97316']} // Android
+            tintColor="#10B981" // iOS
+            title="Refreshing dashboard..." // iOS
+            titleColor="#666" // iOS
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.headerCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image source={require('../../assets/images/logo.png')} style={{ width: 28, height: 28, marginRight: 8 }} />
             <Text style={styles.headerTitle}>Pet Owner Dashboard</Text>
+            {refreshing && (
+              <ActivityIndicator 
+                size="small" 
+                color="#10B981" 
+                style={{ marginLeft: 8 }} 
+              />
+            )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={() => router.push('/pet-owner-notifications')} style={{ marginRight: 16 }}>
@@ -202,7 +365,13 @@ const PetOwnerDashboard = () => {
         {/* Spending Summary (mirrors Total Income card) */}
         <LinearGradient colors={['#10B981', '#8B5CF6', '#F97316']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.totalIncomeSection}>
           <Text style={styles.totalIncomeLabel}>Total Spent</Text>
-          <Text style={styles.totalIncomeAmount}>{ownerStats.totalSpent}</Text>
+          <Text style={styles.totalIncomeAmount}>
+            {(() => {
+              console.log('💳 Rendering total spent:', ownerStats.totalSpent);
+              console.log('💳 Owner stats object:', ownerStats);
+              return ownerStats.totalSpent || '₱0.00';
+            })()}
+          </Text>
         </LinearGradient>
 
         {/* Stats Cards (mirrors sitter) */}
@@ -211,7 +380,12 @@ const PetOwnerDashboard = () => {
             <View style={styles.statsIcon}>
               <Ionicons name="briefcase" size={24} color="#fff" />
             </View>
-            <Text style={styles.statsValueWhite}>{ownerStats.activeBookings}</Text>
+            <Text style={styles.statsValueWhite}>
+              {(() => {
+                console.log('💳 Rendering active bookings:', ownerStats.activeBookings);
+                return ownerStats.activeBookings || 0;
+              })()}
+            </Text>
             <Text style={styles.statsLabelWhite}>Active Bookings</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.bookings }]} />
           </View>
@@ -229,7 +403,12 @@ const PetOwnerDashboard = () => {
             <View style={styles.statsIcon}>
               <Ionicons name="trending-up" size={24} color="#fff" />
             </View>
-            <Text style={styles.statsValueWhite}>{ownerStats.thisWeek}</Text>
+            <Text style={styles.statsValueWhite}>
+              {(() => {
+                console.log('💳 Rendering this week:', ownerStats.thisWeek);
+                return ownerStats.thisWeek || '₱0.00';
+              })()}
+            </Text>
             <Text style={styles.statsLabelWhite}>This Week</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.week }]} />
           </View>

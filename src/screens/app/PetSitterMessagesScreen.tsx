@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
@@ -43,6 +43,7 @@ interface SupportMessage {
 
 const PetSitterMessagesScreen = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [conversations, setConversations] = useState<ReverbConversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ReverbConversation | null>(null);
   const [messages, setMessages] = useState<ReverbMessage[]>([]);
@@ -54,6 +55,7 @@ const PetSitterMessagesScreen = () => {
   const [supportTicketId, setSupportTicketId] = useState<string | null>(null);
   const [supportMessage, setSupportMessage] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [hasAutoOpenedConversation, setHasAutoOpenedConversation] = useState(false);
 
   // Load conversations
   const loadConversations = useCallback(async () => {
@@ -170,6 +172,41 @@ const PetSitterMessagesScreen = () => {
       reverbMessagingService.connect();
     }
   }, [loadConversations, selectedConversation]);
+
+  // Handle opening specific conversation when conversations are loaded
+  useEffect(() => {
+    if (params.conversationId && !hasAutoOpenedConversation) {
+      console.log('💬 PetSitter: Auto-opening conversation with ID:', params.conversationId);
+      console.log('💬 PetSitter: Available conversations:', conversations.map(c => c.conversation_id));
+      
+      const conversation = conversations.find(c => c.conversation_id === params.conversationId);
+      if (conversation) {
+        console.log('💬 PetSitter: Found existing conversation, opening chat:', conversation.other_user.name);
+        handleChatPress(conversation);
+        setHasAutoOpenedConversation(true);
+      } else {
+        console.log('💬 PetSitter: Conversation not found in list, creating new one');
+        // If conversation doesn't exist, create it and open it
+        const otherUserId = params.otherUserId;
+        if (otherUserId) {
+          const newConversation: ReverbConversation = {
+            conversation_id: params.conversationId,
+            other_user: {
+              id: otherUserId,
+              name: params.otherUserName || `Pet Owner ${otherUserId}`,
+              profile_image: params.otherUserImage || null
+            },
+            last_message: null,
+            unread_count: 0,
+            updated_at: new Date().toISOString()
+          };
+          console.log('💬 PetSitter: Created new conversation:', newConversation);
+          handleChatPress(newConversation);
+          setHasAutoOpenedConversation(true);
+        }
+      }
+    }
+  }, [conversations, params.conversationId, params.otherUserId, params.otherUserName, params.otherUserImage, hasAutoOpenedConversation]);
 
   const handleSupportChat = async () => {
     setShowSupportChat(true);
@@ -513,7 +550,14 @@ const PetSitterMessagesScreen = () => {
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
             <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptySubtitle}>When pet owners message you, they'll appear here.</Text>
+            <Text style={styles.emptySubtitle}>When pet owners book your services, you can message them here.</Text>
+            <TouchableOpacity 
+              style={styles.setAvailabilityButton}
+              onPress={() => router.push('/pet-sitter-availability')}
+            >
+              <Ionicons name="calendar" size={20} color="#fff" />
+              <Text style={styles.setAvailabilityButtonText}>Set Availability</Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -778,6 +822,21 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'center',
     paddingHorizontal: 40,
+    marginBottom: 20,
+  },
+  setAvailabilityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+  },
+  setAvailabilityButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   conversationItem: {
     flexDirection: 'row',

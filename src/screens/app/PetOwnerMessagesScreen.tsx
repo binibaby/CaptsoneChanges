@@ -178,9 +178,12 @@ const PetOwnerMessagesScreen = () => {
     }
   }, [loadConversations]); // Removed selectedConversation from dependencies
 
+  // Skip auto conversation creation to avoid 422 errors with non-existent users
+  // Users will need to find sitters through the Find Sitter feature first
+
   // Handle opening specific conversation when conversations are loaded
   useEffect(() => {
-    if (params.conversationId && !hasAutoOpenedConversation && conversations.length > 0) {
+    if (params.conversationId && !hasAutoOpenedConversation) {
       console.log('💬 Auto-opening conversation with ID:', params.conversationId);
       console.log('💬 Available conversations:', conversations.map(c => c.conversation_id));
       
@@ -588,7 +591,14 @@ const PetOwnerMessagesScreen = () => {
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
             <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptySubtitle}>When you book with pet sitters, you can message them here.</Text>
+            <Text style={styles.emptySubtitle}>Find pet sitters and book services to start messaging them here.</Text>
+            <TouchableOpacity 
+              style={styles.findSitterButton}
+              onPress={() => router.push('/find-sitter-map')}
+            >
+              <Ionicons name="search" size={20} color="#fff" />
+              <Text style={styles.findSitterButtonText}>Find Pet Sitters</Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -853,6 +863,21 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'center',
     paddingHorizontal: 40,
+    marginBottom: 20,
+  },
+  findSitterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+  },
+  findSitterButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   conversationItem: {
     flexDirection: 'row',

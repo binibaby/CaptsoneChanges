@@ -537,7 +537,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Fetch latest user data from backend
       const { makeApiCall } = await import('../services/networkService');
       
-      const response = await makeApiCall('/api/user/profile', {
+      const response = await makeApiCall('/api/profile', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${currentUser.token}`,

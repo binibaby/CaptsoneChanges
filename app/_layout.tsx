@@ -33,7 +33,9 @@ function NavigationWrapper() {
       <Stack.Screen name="pet-owner-jobs" />
       <Stack.Screen name="pet-owner-messages" />
       
+      {/* Admin Routes */}
       <Stack.Screen name="admin" />
+      <Stack.Screen name="admin-name-update-profile" />
     </Stack>
   );
 }

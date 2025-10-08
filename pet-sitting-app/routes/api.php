@@ -9,6 +9,8 @@ use App\Http\Controllers\API\BookingController;
 use App\Http\Controllers\API\MessageController;
 use App\Http\Controllers\API\VerificationController;
 use App\Http\Controllers\API\PetController;
+use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\WalletController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -94,6 +96,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/location/sitters', [LocationController::class, 'getNearbySitters']);
     Route::get('/location/nearby-sitters', [LocationController::class, 'getNearbySitters']); // Alias for compatibility
     Route::post('/location/status', [LocationController::class, 'updateStatus']);
+    
+    // Sitter availability routes
+    Route::get('/sitters/{sitterId}/availability', [LocationController::class, 'getSitterAvailability']);
+    Route::post('/sitters/availability', [LocationController::class, 'saveSitterAvailability']);
+    Route::get('/sitters/{sitterId}/availability-status', [LocationController::class, 'getSitterAvailabilityStatus']);
+    Route::post('/sitters/availability/restore', [LocationController::class, 'restoreAvailabilityData']);
+    
+    // Weekly availability routes
+    Route::get('/sitters/{sitterId}/weekly-availability', [LocationController::class, 'getWeeklyAvailability']);
+    Route::post('/sitters/weekly-availability', [LocationController::class, 'saveWeeklyAvailability']);
 });
 
 // Booking routes
@@ -161,6 +173,26 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::post('/admin/profile-change-requests/{id}/approve', [App\Http\Controllers\API\ProfileChangeRequestController::class, 'approveRequest']);
     Route::post('/admin/profile-change-requests/{id}/reject', [App\Http\Controllers\API\ProfileChangeRequestController::class, 'rejectRequest']);
 });
+
+// Payment routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/payments/create-invoice', [PaymentController::class, 'createInvoice']);
+    Route::get('/payments/{id}/status', [PaymentController::class, 'getPaymentStatus']);
+    Route::get('/payments/history', [PaymentController::class, 'getPaymentHistory']);
+    Route::post('/payments/{id}/complete-mock', [PaymentController::class, 'completeMockPayment']);
+});
+
+// Wallet routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/wallet', [WalletController::class, 'getWallet']);
+    Route::get('/wallet/transactions', [WalletController::class, 'getTransactionHistory']);
+    Route::post('/wallet/cash-out', [WalletController::class, 'cashOut']);
+    Route::get('/wallet/banks', [WalletController::class, 'getAvailableBanks']);
+});
+
+// Webhook routes (no auth required)
+Route::post('/webhooks/xendit/payment', [PaymentController::class, 'webhook']);
+Route::post('/webhooks/xendit/disbursement', [WalletController::class, 'disbursementWebhook']);
 
 // Admin verification routes (API endpoints for admin panel)
 // Use web authentication for admin panel (session-based)

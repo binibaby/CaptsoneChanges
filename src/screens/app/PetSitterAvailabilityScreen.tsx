@@ -208,15 +208,30 @@ const PetSitterAvailabilityScreen = () => {
         console.log('✅ Availability data also saved to local storage for persistence');
       } else {
         console.error('❌ Failed to save availability to backend:', response.status);
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
         
-        // Try to parse error as JSON for better error handling
+        // Try to parse error response for better debugging
         try {
-          const errorData = JSON.parse(errorText);
-          console.error('❌ Parsed error data:', errorData);
-        } catch (parseError) {
-          console.error('❌ Could not parse error response as JSON');
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
+          
+          // Try to parse error as JSON for better error handling
+          try {
+            const errorData = JSON.parse(errorText);
+            console.error('❌ Parsed error data:', errorData);
+            
+            // Provide more specific error messages based on the parsed data
+            if (errorData.message) {
+              console.error('❌ Error message:', errorData.message);
+            }
+            if (errorData.errors) {
+              console.error('❌ Validation errors:', errorData.errors);
+            }
+          } catch (parseError) {
+            console.error('❌ Could not parse error response as JSON');
+            console.error('❌ Raw error text:', errorText);
+          }
+        } catch (textError) {
+          console.error('❌ Could not read error response text:', textError);
         }
       }
     } catch (error) {
@@ -289,8 +304,31 @@ const PetSitterAvailabilityScreen = () => {
         console.log('✅ Weekly availability data saved to backend successfully:', responseData);
       } else {
         console.error('❌ Failed to save weekly availability to backend:', response.status);
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
+        
+        // Try to parse error response for better debugging
+        try {
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
+          
+          // Try to parse error as JSON for better error handling
+          try {
+            const errorData = JSON.parse(errorText);
+            console.error('❌ Parsed error data:', errorData);
+            
+            // Provide more specific error messages based on the parsed data
+            if (errorData.message) {
+              console.error('❌ Error message:', errorData.message);
+            }
+            if (errorData.errors) {
+              console.error('❌ Validation errors:', errorData.errors);
+            }
+          } catch (parseError) {
+            console.error('❌ Could not parse error response as JSON');
+            console.error('❌ Raw error text:', errorText);
+          }
+        } catch (textError) {
+          console.error('❌ Could not read error response text:', textError);
+        }
       }
     } catch (error) {
       console.error('❌ Error saving weekly availability to backend:', error);
@@ -386,6 +424,25 @@ const PetSitterAvailabilityScreen = () => {
           console.log('✅ Availability data synced to local storage');
         }
       } else {
+        console.log('⚠️ API call failed (404), retrying... (1/1)');
+        console.log('🔄 Forcing network re-detection...');
+        
+        // Try to parse error response for better debugging
+        try {
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
+          
+          // Try to parse error as JSON for better error handling
+          try {
+            const errorData = JSON.parse(errorText);
+            console.error('❌ Parsed error data:', errorData);
+          } catch (parseError) {
+            console.error('❌ Could not parse error response as JSON');
+          }
+        } catch (textError) {
+          console.error('❌ Could not read error response text:', textError);
+        }
+        
         console.log('⚠️ No backend availability data found for user:', userId);
       }
     } catch (error) {

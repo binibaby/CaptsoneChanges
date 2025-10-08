@@ -137,11 +137,42 @@ const UpcomingJobsScreen = () => {
   };
 
   const handleAcceptJob = async (job: Booking) => {
+    // Check verification status first
+    const isVerified = await checkVerificationStatus();
+    
+    if (!isVerified) {
+      Alert.alert(
+        'Verification Required',
+        'You must complete ID verification before accepting jobs. Please complete your verification in your profile.',
+        [
+          { text: 'OK', onPress: () => router.push('/pet-sitter-profile') }
+        ]
+      );
+      return;
+    }
+
     try {
       await bookingService.updateBookingStatus(job.id, 'confirmed');
       console.log('Job accepted:', job.id);
     } catch (error) {
       console.error('Error accepting job:', error);
+    }
+  };
+
+  const checkVerificationStatus = async (): Promise<boolean> => {
+    try {
+      // In a real app, this would call your API to check verification status
+      // For now, we'll simulate the check
+      const verificationStatus = {
+        isVerified: true, // This would come from API
+        isLegitSitter: true, // This would come from API
+        verificationStatus: 'approved', // This would come from API
+      };
+      
+      return verificationStatus.isVerified && verificationStatus.isLegitSitter;
+    } catch (error) {
+      console.error('Error checking verification status:', error);
+      return false;
     }
   };
 

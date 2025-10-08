@@ -3,22 +3,28 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 const PetOwnerProfileScreen = () => {
   const router = useRouter();
-  const { user, logout, updateUserProfile } = useAuth();
+  const { user, logout, updateUserProfile, refresh } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [cooldownInfo, setCooldownInfo] = useState<any>(null);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
   const [imageError, setImageError] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -30,6 +36,17 @@ const PetOwnerProfileScreen = () => {
     phone: '',
     address: '',
     bio: '',
+  });
+  const [requestData, setRequestData] = useState<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+    reason: string;
+  }>({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    reason: '',
   });
 
   // Update profile data when user changes
@@ -52,32 +69,98 @@ const PetOwnerProfileScreen = () => {
     }
   }, [user]);
 
+  // Initialize request data when editing starts
+  useEffect(() => {
+    if (isEditing && user) {
+      const nameParts = (user.name || '').split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      setRequestData({
+        firstName,
+        lastName,
+        phone: user.phone || '',
+        reason: '',
+      });
+    }
+  }, [isEditing, user]);
+
+  // Check cooldown status when component loads
+  useEffect(() => {
+    if (user?.token) {
+      checkCooldownStatus();
+    }
+  }, [user]);
+
 
   const handleBack = () => {
     router.back();
   };
 
-  const handleSave = async () => {
+  const handleSubmitProfileRequest = async () => {
     try {
-      // Combine firstName and lastName into full name
-      const fullName = `${profile.firstName} ${profile.lastName}`.trim();
+      setIsSubmittingRequest(true);
       
-      // Update the user profile with the new data
-      await updateUserProfile({
-        name: fullName,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        email: profile.email,
-        phone: profile.phone,
-        address: profile.address,
-        aboutMe: profile.bio,
-      });
+      // Validate required fields
+      if (!requestData.firstName.trim() || !requestData.lastName.trim()) {
+        Alert.alert('Validation Error', 'First name and last name are required');
+        return;
+      }
       
-      setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      if (!requestData.reason.trim()) {
+        Alert.alert('Validation Error', 'Please provide a reason for the changes');
+        return;
+      }
+      
+      console.log('PetOwnerProfileScreen: Submitting profile update request:', requestData);
+      console.log('PetOwnerProfileScreen: User token:', user?.token);
+      console.log('PetOwnerProfileScreen: User object:', user);
+      
+      const { submitProfileUpdateRequest } = await import('../../services/networkService');
+      const response = await submitProfileUpdateRequest({
+        firstName: requestData.firstName.trim(),
+        lastName: requestData.lastName.trim(),
+        phone: requestData.phone.trim(),
+        hourlyRate: '',
+        experience: '',
+        aboutMe: '',
+        reason: requestData.reason.trim(),
+      }, user?.token || '', user?.role || 'pet_owner');
+      
+      console.log('PetOwnerProfileScreen: Profile update request response:', response);
+      
+          if (response.success) {
+            Alert.alert(
+              'Request Submitted', 
+              'Your update request has been submitted. Please wait for the admin to examine and approve your changes.',
+              [{ text: 'OK', onPress: () => setIsEditing(false) }]
+            );
+            // Reset form
+            setRequestData({
+              firstName: '',
+              lastName: '',
+              phone: '',
+              reason: '',
+            });
+            // Refresh cooldown status
+            await checkCooldownStatus();
+          } else {
+            // Check if it's a cooldown error
+            if (response.cooldown_info && response.cooldown_info.in_cooldown) {
+              Alert.alert(
+                'Profile Update Cooldown',
+                response.message,
+                [{ text: 'OK' }]
+              );
+            } else {
+              Alert.alert('Error', response.message || 'Failed to submit request. Please try again.');
+            }
+          }
     } catch (error) {
-      console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      console.error('PetOwnerProfileScreen: Error submitting profile update request:', error);
+      Alert.alert('Error', 'Failed to submit request. Please try again.');
+    } finally {
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -87,6 +170,57 @@ const PetOwnerProfileScreen = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
+  };
+
+  const checkCooldownStatus = async () => {
+    try {
+      const { makeApiCall } = await import('../../services/networkService');
+      const response = await makeApiCall('/api/profile/update-request/check-pending', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user?.token || ''}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.cooldown_info) {
+          setCooldownInfo(data.cooldown_info);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking cooldown status:', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Refresh user data from the server
+      await refresh();
+      
+      // Update profile data with fresh user data
+      if (user) {
+        const nameParts = (user.name || '').split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        setProfile({
+          firstName: firstName,
+          lastName: lastName,
+          email: user.email || '',
+          phone: user.phone || '',
+          address: user.address || '',
+          bio: user.aboutMe || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+      Alert.alert('Error', 'Failed to refresh profile. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleLogout = () => {
@@ -322,7 +456,25 @@ const PetOwnerProfileScreen = () => {
           <Ionicons name="log-out-outline" size={24} color="#FF4444" />
         </TouchableOpacity>
       </View>
-      <ScrollView style={styles.content}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={['#3B82F6']}
+              tintColor="#3B82F6"
+            />
+          }
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickImage} style={styles.profileImageContainer}>
@@ -354,8 +506,14 @@ const PetOwnerProfileScreen = () => {
               <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Save</Text>
+              <TouchableOpacity 
+                style={[styles.saveButton, isSubmittingRequest && styles.disabledButton]} 
+                onPress={handleSubmitProfileRequest}
+                disabled={isSubmittingRequest}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSubmittingRequest ? 'Submitting...' : 'Submit Request'}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -367,61 +525,89 @@ const PetOwnerProfileScreen = () => {
         {/* Personal Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>First Name</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.firstName}
-                onChangeText={(text) => setProfile({...profile, firstName: text})}
-                placeholder="Enter your first name"
-              />
-            ) : (
-              <Text style={[styles.input, styles.disabledInput]}>{profile.firstName}</Text>
-            )}
-          </View>
+          
+          {/* Cooldown Notice */}
+          {cooldownInfo && cooldownInfo.in_cooldown && (
+            <View style={styles.cooldownNotice}>
+              <Ionicons name="time-outline" size={20} color="#F59E0B" />
+              <View style={styles.cooldownTextContainer}>
+                <Text style={styles.cooldownTitle}>Profile Update Cooldown</Text>
+                <Text style={styles.cooldownMessage}>
+                  You cannot request profile changes for {cooldownInfo.days_remaining} more days. 
+                  You can request changes again after {cooldownInfo.cooldown_ends_at}.
+                </Text>
+              </View>
+            </View>
+          )}
+          {!isEditing ? (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>First Name</Text>
+                <Text style={[styles.input, styles.disabledInput]}>{profile.firstName}</Text>
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Last Name </Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.lastName}
-                onChangeText={(text) => setProfile({...profile, lastName: text})}
-                placeholder="Enter your last name (required)"
-              />
-            ) : (
-              <Text style={[styles.input, styles.disabledInput]}>{profile.lastName}</Text>
-            )}
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.email}
-                onChangeText={(text) => setProfile({...profile, email: text})}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-              />
-            ) : (
-              <Text style={[styles.input, styles.disabledInput]}>{profile.email}</Text>
-            )}
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Phone</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.phone}
-                onChangeText={(text) => setProfile({...profile, phone: text})}
-                placeholder="Enter your phone number"
-                keyboardType="phone-pad"
-              />
-            ) : (
-              <Text style={[styles.input, styles.disabledInput]}>{profile.phone}</Text>
-            )}
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Last Name</Text>
+                <Text style={[styles.input, styles.disabledInput]}>{profile.lastName}</Text>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <Text style={[styles.input, styles.disabledInput]}>{profile.email}</Text>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone</Text>
+                <Text style={[styles.input, styles.disabledInput]}>{profile.phone}</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>First Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={requestData.firstName}
+                  onChangeText={(text) => setRequestData({...requestData, firstName: text})}
+                  placeholder="Enter your first name"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Last Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={requestData.lastName}
+                  onChangeText={(text) => setRequestData({...requestData, lastName: text})}
+                  placeholder="Enter your last name"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  style={styles.input}
+                  value={requestData.phone}
+                  onChangeText={(text) => setRequestData({...requestData, phone: text})}
+                  placeholder="Enter your phone number"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Reason for Changes *</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={requestData.reason}
+                  onChangeText={(text) => setRequestData({...requestData, reason: text})}
+                  placeholder="Please explain why you want to update your profile information..."
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+            </>
+          )}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Address</Text>
             <TextInput
@@ -478,7 +664,8 @@ const PetOwnerProfileScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
     </SafeAreaView>
   );
@@ -604,6 +791,39 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 12,
+  },
+  cooldownNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  cooldownTextContainer: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  cooldownTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  cooldownMessage: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
   },
   section: {
     backgroundColor: '#fff',

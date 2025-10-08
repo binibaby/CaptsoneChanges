@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validation Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #10B981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #059669;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #10B981;
+        }
+        .status.error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #EF4444;
+        }
+        .status.info {
+            background: #DBEAFE;
+            color: #1E40AF;
+            border: 1px solid #3B82F6;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input[type="radio"] {
+            margin-right: 10px;
+        }
+        .form-group label.radio-label {
+            display: inline;
+            font-weight: normal;
+            margin-right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Validation Fix Test</h1>
+    
+    <div class="test-container">
+        <h2>Mock Verification Form</h2>
+        <form id="verificationReviewForm">
+            <div class="form-group">
+                <label>Documents Clear:</label>
+                <label class="radio-label">
+                    <input type="radio" name="documents_clear" value="1"> Yes
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="documents_clear" value="0"> No
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label>Face Match Verified:</label>
+                <label class="radio-label">
+                    <input type="radio" name="face_match_verified" value="1"> Yes
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="face_match_verified" value="0"> No
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label>Address Match Verified:</label>
+                <label class="radio-label">
+                    <input type="radio" name="address_match_verified" value="1"> Yes
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="address_match_verified" value="0"> No
+                </label>
+            </div>
+        </form>
+    </div>
+
+    <div class="test-container">
+        <h2>Validation Tests</h2>
+        <button class="test-button" onclick="testValidationWithYesValues()">Test with Yes Values (1)</button>
+        <button class="test-button" onclick="testValidationWithNoValues()">Test with No Values (0)</button>
+        <button class="test-button" onclick="testValidationMixed()">Test Mixed Values</button>
+        <div id="testResults" class="status info">Click a button to test validation</div>
+    </div>
+
+    <script>
+        // Test with all Yes values (1)
+        async function testValidationWithYesValues() {
+            // Set all criteria to "Yes" (value="1")
+            document.querySelector('input[name="documents_clear"][value="1"]').checked = true;
+            document.querySelector('input[name="face_match_verified"][value="1"]').checked = true;
+            document.querySelector('input[name="address_match_verified"][value="1"]').checked = true;
+            
+            const formData = new FormData(document.getElementById('verificationReviewForm'));
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            document.getElementById('testResults').innerHTML = '✅ All values set to Yes (1). Form data: ' + JSON.stringify(data);
+            document.getElementById('testResults').className = 'status success';
+        }
+
+        // Test with all No values (0)
+        async function testValidationWithNoValues() {
+            // Set all criteria to "No" (value="0")
+            document.querySelector('input[name="documents_clear"][value="0"]').checked = true;
+            document.querySelector('input[name="face_match_verified"][value="0"]').checked = true;
+            document.querySelector('input[name="address_match_verified"][value="0"]').checked = true;
+            
+            const formData = new FormData(document.getElementById('verificationReviewForm'));
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            document.getElementById('testResults').innerHTML = '❌ All values set to No (0). Form data: ' + JSON.stringify(data);
+            document.getElementById('testResults').className = 'status error';
+        }
+
+        // Test with mixed values
+        async function testValidationMixed() {
+            // Set mixed values
+            document.querySelector('input[name="documents_clear"][value="1"]').checked = true;
+            document.querySelector('input[name="face_match_verified"][value="0"]').checked = true;
+            document.querySelector('input[name="address_match_verified"][value="1"]').checked = true;
+            
+            const formData = new FormData(document.getElementById('verificationReviewForm'));
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            document.getElementById('testResults').innerHTML = '⚠️ Mixed values set. Form data: ' + JSON.stringify(data);
+            document.getElementById('testResults').className = 'status info';
+        }
+
+        // Auto-test on page load
+        window.onload = function() {
+            testValidationWithYesValues();
+        };
+    </script>
+</body>
+</html>

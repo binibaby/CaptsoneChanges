@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingService } from '../../services/bookingService';
 import { notificationService } from '../../services/notificationService';
+import { RealtimeNotificationData, realtimeNotificationService } from '../../services/realtimeNotificationService';
 
 interface Notification {
   id: string;
@@ -32,6 +33,7 @@ const PetSitterNotificationsScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   // Removed unread count for fresh start
 
   // Load notifications
@@ -44,6 +46,13 @@ const PetSitterNotificationsScreen: React.FC = () => {
       
       const fetchedNotifications = await notificationService.getNotifications();
       console.log('📱 Fetched notifications:', fetchedNotifications.length);
+      console.log('📋 Notification details:', fetchedNotifications.map(n => ({ 
+        id: n.id, 
+        type: n.type, 
+        title: n.title, 
+        message: n.message?.substring(0, 50) + '...', 
+        isRead: n.isRead 
+      })));
       
       setNotifications(fetchedNotifications);
       
@@ -131,70 +140,24 @@ const PetSitterNotificationsScreen: React.FC = () => {
     }
   };
 
-  // Handle notification action
-  const handleNotificationAction = (notification: Notification) => {
+  // Handle notification press (mark as read)
+  const handleNotificationPress = async (notification: Notification) => {
     console.log('🔔 Notification clicked:', {
       id: notification.id,
       title: notification.title,
-      action: notification.action,
+      type: notification.type,
       data: notification.data
     });
     
-    if (notification.action === 'View Request' || notification.action === 'View' || notification.type === 'booking') {
-      // Handle booking request
-      console.log('🔔 Processing booking notification:', notification);
-      
-      if (notification.data?.booking_id || notification.data?.bookingId) {
-        const bookingType = notification.data.booking_type || notification.data.bookingType || (notification.data.isWeekly ? 'Weekly' : 'Daily');
-        const dateInfo = notification.data.isWeekly 
-          ? `${notification.data.start_date || notification.data.startDate} to ${notification.data.end_date || notification.data.endDate}`
-          : notification.data.date;
-        const timeInfo = notification.data.formattedStartTime && notification.data.formattedEndTime
-          ? `${notification.data.formattedStartTime} - ${notification.data.formattedEndTime}`
-          : `${notification.data.start_time || notification.data.startTime} - ${notification.data.end_time || notification.data.endTime}`;
-
-    Alert.alert(
-          `${bookingType} Booking Request`,
-          `From: ${notification.data.pet_owner_name || notification.data.petOwnerName}\nDate: ${dateInfo}\nTime: ${timeInfo}\nRate: ₱${notification.data.hourly_rate || notification.data.hourlyRate}/hour`,
-      [
-            { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-              onPress: () => handleBookingAction(notification, 'decline')
-            },
-            { 
-              text: 'Confirm', 
-              onPress: () => handleBookingAction(notification, 'confirm')
-            }
-          ]
-        );
-      } else {
-        // Fallback for old booking notifications without data
-        console.log('🔔 Old booking notification without data, showing general message');
-        Alert.alert(
-          'Booking Request',
-          `${notification.message}\n\nNote: This is an older notification. Please create a new booking to test the confirm/decline functionality.`,
-          [
-            { text: 'OK', style: 'default' }
-          ]
-        );
-      }
-    } else {
-      // Fallback for any notification click
-      console.log('🔔 General notification click - no specific action');
-      Alert.alert(
-        'Notification',
-        `${notification.title}\n\n${notification.message}`,
-        [
-          { text: 'OK', style: 'default' }
-        ]
-      );
-    }
-    
-    // Mark as read when action is taken
+    // Mark as read when notification is pressed
     if (!notification.isRead) {
-      markAsRead(notification.id);
+      await markAsRead(notification.id);
+      // Update local state to immediately reflect the change
+      setNotifications(prev => 
+        prev.map(n => 
+          n.id === notification.id ? { ...n, isRead: true } : n
+        )
+      );
     }
   };
 
@@ -230,37 +193,49 @@ const PetSitterNotificationsScreen: React.FC = () => {
     }
   };
 
-  // Create test notification
-  const createTestNotification = async () => {
-    if (!user) {
-      Alert.alert('Error', 'No user found');
-      return;
-    }
 
-    try {
-    await notificationService.addNotificationForUser(user.id, {
-      type: 'booking',
-        title: 'Test Booking Request',
-      message: 'This is a test notification to verify the system is working.',
-        action: 'View Request',
-      data: {
-          bookingId: `test-${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
-          startTime: '10:00 AM',
-          endTime: '2:00 PM',
-          hourlyRate: 25,
-          petOwnerName: 'Test Owner',
-        test: true
+  // Initialize real-time notifications
+  useEffect(() => {
+    if (!user) return;
+
+    const initializeRealtime = async () => {
+      try {
+        console.log('🔔 Initializing real-time notifications for pet sitter:', user.id);
+        const token = user.token || '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507'; // Fallback token
+        const connected = await realtimeNotificationService.initialize(user.id, token);
+        setRealtimeConnected(connected);
+        
+        if (connected) {
+          console.log('✅ Real-time notifications connected for pet sitter');
+        } else {
+          console.warn('⚠️ Real-time notifications not available for pet sitter');
+        }
+      } catch (error) {
+        console.error('❌ Error initializing real-time notifications:', error);
+        setRealtimeConnected(false);
       }
+    };
+
+    initializeRealtime();
+
+    // Set up real-time notification listener
+    const unsubscribe = realtimeNotificationService.subscribe((notification: RealtimeNotificationData) => {
+      console.log('🔔 Real-time notification received in PetSitterNotificationsScreen:', notification);
+      
+      // Show immediate feedback to user
+      Alert.alert(
+        notification.title,
+        notification.message,
+        [
+          { text: 'OK', onPress: () => loadNotifications() }
+        ]
+      );
     });
 
-    Alert.alert('Test', 'Test notification created! Check your notifications.');
-      await loadNotifications(); // Reload to show new notification
-    } catch (error) {
-      console.error('❌ Error creating test notification:', error);
-      Alert.alert('Error', 'Failed to create test notification');
-    }
-  };
+    return () => {
+      unsubscribe();
+    };
+  }, [user, loadNotifications]);
 
   // Load notifications when screen focuses
   useFocusEffect(
@@ -280,7 +255,7 @@ const PetSitterNotificationsScreen: React.FC = () => {
       ]}
       onPress={() => {
         console.log('🔔 TouchableOpacity pressed for notification:', item.id);
-        handleNotificationAction(item);
+        handleNotificationPress(item);
       }}
     >
       <View style={styles.notificationContent}>
@@ -288,12 +263,6 @@ const PetSitterNotificationsScreen: React.FC = () => {
           <Text style={styles.notificationTitle}>{item.title}</Text>
           <View style={styles.notificationActions}>
             {!item.isRead && <View style={styles.unreadDot} />}
-            <TouchableOpacity
-              onPress={() => deleteNotification(item.id)}
-              style={styles.deleteButton}
-            >
-              <Ionicons name="trash-outline" size={16} color="#ff4444" />
-            </TouchableOpacity>
           </View>
         </View>
         
@@ -301,14 +270,6 @@ const PetSitterNotificationsScreen: React.FC = () => {
         
         <View style={styles.notificationFooter}>
           <Text style={styles.notificationTime}>{item.time}</Text>
-        {item.action && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleNotificationAction(item)}
-            >
-              <Text style={styles.actionButtonText}>{item.action}</Text>
-          </TouchableOpacity>
-        )}
         </View>
       </View>
     </TouchableOpacity>
@@ -346,24 +307,24 @@ const PetSitterNotificationsScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          {realtimeConnected && (
+            <View style={styles.realtimeIndicator}>
+              <Ionicons name="radio" size={12} color="#4CAF50" />
+              <Text style={styles.realtimeText}>Live</Text>
+            </View>
+          )}
+        </View>
         
         <View style={styles.headerActions}>
           <TouchableOpacity
-            onPress={createTestNotification}
-            style={styles.testButton}
+            onPress={onRefresh}
+            style={styles.refreshButton}
           >
-            <Ionicons name="flask-outline" size={20} color="#007AFF" />
+            <Ionicons name="refresh" size={20} color="#007AFF" />
           </TouchableOpacity>
           
-          {/* Removed mark all read button for fresh start */}
-          
-          <TouchableOpacity
-            onPress={() => Alert.alert('Delete All', 'This feature will be implemented')}
-            style={styles.deleteAllButton}
-          >
-            <Ionicons name="trash-outline" size={20} color="#ff4444" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -423,17 +384,32 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 8,
   },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+  },
+  realtimeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 4,
+  },
+  realtimeText: {
+    fontSize: 10,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  testButton: {
+  refreshButton: {
     padding: 8,
   },
   markAllButton: {
@@ -446,9 +422,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-  },
-  deleteAllButton: {
-    padding: 8,
   },
   unreadBanner: {
     backgroundColor: '#ff9500',
@@ -475,10 +448,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     minHeight: 60, // Ensure minimum touchable area
-  },
-  unreadNotification: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
   },
   notificationContent: {
     padding: 16,
@@ -507,8 +476,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#ff9500',
   },
-  deleteButton: {
-    padding: 4,
+  unreadNotification: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#007AFF',
   },
   notificationMessage: {
     fontSize: 14,
@@ -524,17 +494,6 @@ const styles = StyleSheet.create({
   notificationTime: {
     fontSize: 12,
     color: '#999',
-  },
-  actionButton: {
-    backgroundColor: '#ff9500',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
   },
   emptyState: {
     flex: 1,

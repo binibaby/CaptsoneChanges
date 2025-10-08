@@ -54,17 +54,26 @@ class NotificationService {
         const localNotifications = stored ? JSON.parse(stored) : [];
       console.log('📱 Local notifications:', localNotifications.length);
       
-      // Merge API and local notifications
-          const allNotifications = [...apiNotifications];
+      // Merge API and local notifications, preserving read status from local storage
+      const allNotifications = [...apiNotifications];
+      
+      // Update API notifications with read status from local storage
+      allNotifications.forEach(apiNotif => {
+        const localNotif = localNotifications.find(local => local.id === apiNotif.id);
+        if (localNotif && localNotif.isRead) {
+          console.log(`📱 Preserving read status for notification ${apiNotif.id}`);
+          apiNotif.isRead = true;
+        }
+      });
       
       // Add local notifications that don't exist in API
-        localNotifications.forEach(localNotif => {
+      localNotifications.forEach(localNotif => {
         const existsInAPI = apiNotifications.some(apiNotif => apiNotif.id === localNotif.id);
         if (!existsInAPI) {
-            console.log(`📱 Adding local notification ${localNotif.id} (not in API)`);
-            allNotifications.push(localNotif);
-          }
-        });
+          console.log(`📱 Adding local notification ${localNotif.id} (not in API)`);
+          allNotifications.push(localNotif);
+        }
+      });
         
         console.log('📱 Total notifications after merge:', allNotifications.length);
       
@@ -102,6 +111,14 @@ class NotificationService {
           token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
         } else if (user.id === '21') {
           token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
+        } else if (user.id === '112') {
+          token = '467|hyK770TmWQmZL6ihSgR4X8WOhGfVLRGCPogYrSLL5fd4ebb5';
+        } else if (user.id === '113') {
+          token = '471|GuG3QSUmuW9rvB7nuBgsM3R8nuBgMzivYRr2H0Lr3d105e12';
+        } else if (user.id === '120') {
+          token = '7bc9a143a60b74b47e37f717ecf37f8d08d72f89809bc5718431a8dd65cab9ff';
+        } else if (user.id === '121') {
+          token = '616|Mh2WHZIp1aFUXtMKiilSU84KTP3Snege7zRjE2bM00a52108';
         } else {
           console.log('❌ No token available for user:', user.id);
           return [];
@@ -128,13 +145,15 @@ class NotificationService {
             type: apiNotif.type || 'system',
             title: apiNotif.title || 'Notification',
             message: apiNotif.message || '',
-            time: apiNotif.created_at,
+            time: this.formatTimeTo24Hour(apiNotif.created_at),
             isRead: !!apiNotif.read_at,
             action: apiNotif.action || 'View Request', // Add action field
             data: apiNotif.data || null,
+            userId: user.id, // Add userId field for proper filtering
           }));
           
           console.log('✅ Converted API notifications:', notifications.length);
+          console.log('📋 Notification details:', notifications.map(n => ({ id: n.id, type: n.type, title: n.title, isRead: n.isRead })));
           return notifications;
         }
       } else {
@@ -176,22 +195,27 @@ class NotificationService {
         
         // Otherwise, use the old filtering logic
         if (isPetSitter) {
-          // Pet sitters see: booking requests, messages, reviews, system notifications
+          // Pet sitters see: booking requests, messages, reviews, system notifications, profile updates, ID verification
           const matches = notification.type === 'booking' || 
                  notification.type === 'message' || 
                  notification.type === 'review' || 
-                 notification.type === 'system';
+                 notification.type === 'system' ||
+                 notification.type === 'profile_update_approved' || 
+                 notification.type === 'profile_update_rejected' ||
+                 notification.type === 'id_verification_approved' || 
+                 notification.type === 'id_verification_rejected';
           console.log(`🔍 Pet sitter notification ${notification.id} (${notification.type}): ${matches}`);
           return matches;
-      } else {
-          // Pet owners see: booking confirmations/cancellations, messages, system notifications
+        } else {
+          // Pet owners see: booking confirmations/cancellations, messages, system notifications, profile updates
           const isBookingWithStatus = notification.type === 'booking' && 
                  (notification.data?.status === 'confirmed' || 
                   notification.data?.status === 'cancelled' ||
                   notification.title?.includes('confirmed') ||
                   notification.title?.includes('cancelled'));
           const isMessageOrSystem = notification.type === 'message' || notification.type === 'system';
-          const matches = isBookingWithStatus || isMessageOrSystem;
+          const isProfileUpdate = notification.type === 'profile_update_approved' || notification.type === 'profile_update_rejected';
+          const matches = isBookingWithStatus || isMessageOrSystem || isProfileUpdate;
           console.log(`🔍 Pet owner notification ${notification.id} (${notification.type}): ${matches}`);
           return matches;
         }
@@ -220,6 +244,25 @@ class NotificationService {
     }
   }
 
+  // Format time to 24-hour format
+  private formatTimeTo24Hour(dateString: string): string {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false // Use 24-hour format
+      });
+    } catch (error) {
+      console.error('❌ Error formatting time:', error);
+      return dateString; // Return original if formatting fails
+    }
+  }
+
   // Add notification for specific user
   async addNotificationForUser(userId: string, notificationData: Omit<Notification, 'id' | 'time' | 'isRead'>) {
     try {
@@ -228,7 +271,7 @@ class NotificationService {
     const newNotification: Notification = {
         ...notificationData,
       id: Date.now().toString(),
-      time: new Date().toLocaleString(),
+      time: this.formatTimeTo24Hour(new Date().toISOString()),
       isRead: false,
         userId: userId,
       };
@@ -266,10 +309,9 @@ class NotificationService {
         try {
           const [hours, minutes] = time.split(':');
           const hour = parseInt(hours, 10);
-          const ampm = hour >= 12 ? 'PM' : 'AM';
-          const hour12 = hour % 12 || 12;
-          return `${hour12}:${minutes} ${ampm}`;
-    } catch (error) {
+          const minute = parseInt(minutes, 10);
+          return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        } catch (error) {
           return time;
         }
       };
@@ -339,9 +381,8 @@ class NotificationService {
         try {
           const [hours, minutes] = time.split(':');
           const hour = parseInt(hours, 10);
-          const ampm = hour >= 12 ? 'PM' : 'AM';
-          const hour12 = hour % 12 || 12;
-          return `${hour12}:${minutes} ${ampm}`;
+          const minute = parseInt(minutes, 10);
+          return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         } catch (error) {
           return time;
         }

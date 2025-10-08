@@ -35,7 +35,7 @@ class ProfileUpdateRequestController extends Controller
             'first_name' => 'sometimes|string|max:255',
             'last_name' => 'sometimes|string|max:255',
             'phone' => 'sometimes|string|max:20',
-            'hourly_rate' => 'sometimes|numeric|min:0|max:9999.99',
+            'hourly_rate' => 'sometimes|numeric|min:0|max:9999999.99',
             'reason' => 'required|string|max:1000',
         ]);
 

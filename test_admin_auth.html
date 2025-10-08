@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Authentication Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #10B981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #059669;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #10B981;
+        }
+        .status.error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #EF4444;
+        }
+        .status.info {
+            background: #DBEAFE;
+            color: #1E40AF;
+            border: 1px solid #3B82F6;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin Authentication Test</h1>
+    
+    <div class="test-container">
+        <h2>Authentication Status Test</h2>
+        <button class="test-button" onclick="testAuthStatus()">Test Authentication Status</button>
+        <div id="authStatus" class="status info">Click the button to test authentication status</div>
+    </div>
+
+    <div class="test-container">
+        <h2>API Endpoint Test</h2>
+        <button class="test-button" onclick="testApiEndpoint()">Test API Endpoint</button>
+        <div id="apiStatus" class="status info">Click the button to test API endpoint</div>
+    </div>
+
+    <div class="test-container">
+        <h2>CSRF Token Test</h2>
+        <button class="test-button" onclick="testCSRFToken()">Test CSRF Token</button>
+        <div id="csrfStatus" class="status info">Click the button to test CSRF token</div>
+    </div>
+
+    <script>
+        // Test authentication status
+        async function testAuthStatus() {
+            const statusDiv = document.getElementById('authStatus');
+            statusDiv.innerHTML = 'Testing authentication status...';
+            statusDiv.className = 'status info';
+            
+            try {
+                // Test if we can access a protected admin route
+                const response = await fetch('/admin/csrf-token', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = '✅ Authentication successful! CSRF token: ' + (data.csrf_token ? 'Present' : 'Missing');
+                    statusDiv.className = 'status success';
+                } else {
+                    statusDiv.innerHTML = '❌ Authentication failed. Status: ' + response.status;
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '❌ Network error: ' + error.message;
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Test API endpoint
+        async function testApiEndpoint() {
+            const statusDiv = document.getElementById('apiStatus');
+            statusDiv.innerHTML = 'Testing API endpoint...';
+            statusDiv.className = 'status info';
+            
+            try {
+                // Test a simple API endpoint first
+                const response = await fetch('/api/health', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = '✅ API endpoint accessible! Response: ' + JSON.stringify(data);
+                    statusDiv.className = 'status success';
+                } else {
+                    statusDiv.innerHTML = '❌ API endpoint failed. Status: ' + response.status;
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '❌ Network error: ' + error.message;
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Test CSRF token
+        async function testCSRFToken() {
+            const statusDiv = document.getElementById('csrfStatus');
+            statusDiv.innerHTML = 'Testing CSRF token...';
+            statusDiv.className = 'status info';
+            
+            try {
+                // Get CSRF token
+                const response = await fetch('/admin/csrf-token', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.csrf_token) {
+                        statusDiv.innerHTML = '✅ CSRF token retrieved successfully! Token: ' + data.csrf_token.substring(0, 10) + '...';
+                        statusDiv.className = 'status success';
+                    } else {
+                        statusDiv.innerHTML = '❌ CSRF token is missing from response';
+                        statusDiv.className = 'status error';
+                    }
+                } else {
+                    statusDiv.innerHTML = '❌ Failed to get CSRF token. Status: ' + response.status;
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '❌ Network error: ' + error.message;
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Auto-run tests on page load
+        window.onload = function() {
+            console.log('Admin Authentication Test Page Loaded');
+            console.log('Current URL:', window.location.href);
+            console.log('Cookies:', document.cookie);
+        };
+    </script>
+</body>
+</html>

@@ -36,6 +36,26 @@ const CertificateViewer: React.FC<CertificateViewerProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Helper function to get proper image source using network service
+  const getImageSource = (imagePath: string) => {
+    if (!imagePath) return null;
+    
+    // If it's a URL (starts with http), use it directly
+    if (imagePath.startsWith('http')) {
+      return { uri: imagePath };
+    }
+    
+    // If it's a storage path (starts with /storage/), construct full URL using network service
+    if (imagePath.startsWith('/storage/')) {
+      const { networkService } = require('../services/networkService');
+      const fullUrl = networkService.getImageUrl(imagePath);
+      return { uri: fullUrl };
+    }
+    
+    // For any other string, treat as URI
+    return { uri: imagePath };
+  };
+
   const goToPrevious = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
@@ -116,7 +136,7 @@ const CertificateViewer: React.FC<CertificateViewerProps> = ({
             bounces={false}
           >
             <Image
-              source={{ uri: currentCertificate.image }}
+              source={getImageSource(currentCertificate.image)}
               style={styles.certificateImage}
               resizeMode="contain"
             />

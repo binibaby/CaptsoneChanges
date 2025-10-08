@@ -57,6 +57,7 @@ class User extends Authenticatable
         'id_verified_at',
         'verification_status',
         'can_accept_bookings',
+        'wallet_balance',
     ];
 
     /**
@@ -91,6 +92,7 @@ class User extends Authenticatable
         'id_verified' => 'boolean',
         'id_verified_at' => 'datetime',
         'can_accept_bookings' => 'boolean',
+        'wallet_balance' => 'decimal:2',
     ];
 
     // Relationships

@@ -233,17 +233,6 @@ const PetOwnerDashboardScreen = () => {
       </ScrollView>
     </SafeAreaView>
   );
-  } catch (error) {
-    console.error('PetOwnerDashboardScreen error:', error);
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Something went wrong loading the dashboard</Text>
-          <Text style={styles.errorSubtext}>Please try again later</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 };
 
 const styles = StyleSheet.create({

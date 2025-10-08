@@ -79,7 +79,7 @@ class ProfileController extends Controller
             'age' => 'sometimes|integer|min:1|max:120',
             'gender' => 'sometimes|string|in:male,female,other',
             'bio' => 'sometimes|string|max:1000',
-            'hourly_rate' => 'sometimes|numeric|min:0',
+            'hourly_rate' => 'sometimes|numeric|min:0|max:9999999.99',
             'experience' => 'sometimes|string|max:255',
             'specialties' => 'sometimes|array',
             'specialties.*' => 'string|max:255',

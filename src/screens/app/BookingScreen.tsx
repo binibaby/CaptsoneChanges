@@ -326,14 +326,6 @@ const BookingScreen: React.FC = () => {
         sitterRate
       });
       
-      // Debug date format
-      console.log('📝 Date debugging:');
-      console.log('  - selectedDate type:', typeof selectedDate);
-      console.log('  - selectedDate value:', selectedDate);
-      console.log('  - new Date(selectedDate):', new Date(selectedDate!));
-      console.log('  - ISO string:', new Date(selectedDate!).toISOString().split('T')[0]);
-      console.log('  - Is valid date:', !isNaN(new Date(selectedDate!).getTime()));
-      
       // Create booking using the service (which handles API call)
       const newBooking = await bookingService.createBooking({
         sitterId: sitterId!,
@@ -375,16 +367,30 @@ const BookingScreen: React.FC = () => {
         hourlyRate: parseFloat(sitterRate || '25'),
       });
 
-      Alert.alert(
-        'Booking Request Sent!',
-        `Your booking request has been sent to ${sitterName || 'the sitter'}. They will be notified and can confirm or cancel the booking.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back()
-          }
-        ]
-      );
+      // Calculate duration in minutes
+      const startTimeMinutes = selectedTimeRange.startTime.split(':').reduce((acc, time) => (60 * acc) + +time, 0);
+      const endTimeMinutes = selectedTimeRange.endTime.split(':').reduce((acc, time) => (60 * acc) + +time, 0);
+      const duration = endTimeMinutes - startTimeMinutes;
+
+      // Redirect to booking summary screen for payment
+      router.push({
+        pathname: '/booking-summary',
+        params: {
+          bookingId: newBooking.id.toString(),
+          sitterId: sitterId,
+          sitterName: sitterName,
+          sitterImage: sitterImage,
+          sitterRate: sitterRate,
+          selectedDate: selectedDate,
+          startTime: selectedTimeRange.startTime,
+          endTime: selectedTimeRange.endTime,
+          petName: 'My Pet', // Default pet name
+          petType: 'Dog', // Default pet type
+          serviceType: 'Pet Sitting',
+          duration: duration.toString(),
+          description: 'Pet sitting service',
+        },
+      });
     } catch (error) {
       console.error('❌ BookingScreen - Error creating booking:', error);
       Alert.alert('Error', 'Failed to send booking request. Please try again.');

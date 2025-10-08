@@ -163,14 +163,18 @@ class ReverbMessagingService extends EventEmitter {
   }
 
   public async connect() {
-    console.log('🔌 WebSocket connection temporarily disabled - using API-only mode');
-    // Temporarily disable WebSocket connection to focus on API messaging
-    // TODO: Re-enable WebSocket once API messaging is working
-    return;
+    console.log('🔌 Attempting WebSocket connection to Laravel Reverb...');
+    // Re-enabled WebSocket connection for real-time notifications
     
-    if (this.isConnected || this.ws) {
+    if (this.isConnected || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
       console.log('🔄 Already connected or connecting');
       return;
+    }
+    
+    // Clean up any existing connection
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
     }
 
     try {
@@ -179,20 +183,51 @@ class ReverbMessagingService extends EventEmitter {
       
       // Get the network service to get the correct base URL
       const { networkService } = require('./networkService');
-      const baseUrl = networkService.getBaseUrl();
+      let baseUrl = networkService.getBaseUrl();
+      
+      // If baseUrl is empty or invalid, wait for network detection to complete
+      if (!baseUrl || baseUrl.trim() === '') {
+        console.log('🔄 Base URL not available, waiting for network detection...');
+        baseUrl = await networkService.detectWorkingIP();
+      }
+      
+      // Validate baseUrl before creating URL
+      if (!baseUrl || baseUrl.trim() === '') {
+        throw new Error('Unable to determine base URL for Reverb connection');
+      }
       
       // Extract host and port from base URL
-      const url = new URL(baseUrl);
-      const host = url.hostname;
-      const wsUrl = `ws://${host}`;
+      let url: URL;
+      let host: string;
+      let wsUrl: string;
+      
+      try {
+        url = new URL(baseUrl);
+        host = url.hostname;
+        wsUrl = `ws://${host}`;
+      } catch (urlError) {
+        console.error('❌ Invalid base URL:', baseUrl);
+        throw new Error(`Invalid base URL: ${baseUrl}. Error: ${urlError}`);
+      }
       
       // Connect to Laravel Reverb on port 8080
       const reverbUrl = `${wsUrl}:8080/app/${process.env.EXPO_PUBLIC_REVERB_APP_KEY || 'iycawpww023mjumkvwsj'}`;
       console.log('🔌 Connecting to Reverb:', reverbUrl);
+      console.log('🔌 Base URL used:', baseUrl);
+      console.log('🔌 Host extracted:', host);
       
       this.ws = new WebSocket(reverbUrl);
       
+      // Set up connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+          console.log('⏰ WebSocket connection timeout');
+          this.ws.close();
+        }
+      }, 10000); // 10 second timeout
+      
       this.ws.onopen = () => {
+        clearTimeout(connectionTimeout);
         console.log('✅ Connected to Laravel Reverb');
         this.isConnected = true;
         this.reconnectAttempts = 0;
@@ -211,8 +246,10 @@ class ReverbMessagingService extends EventEmitter {
         }
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
+        clearTimeout(connectionTimeout);
         console.log('🔌 Disconnected from Laravel Reverb');
+        console.log('🔌 Close code:', event.code, 'Reason:', event.reason);
         this.isConnected = false;
         this.ws = null;
         this.emit('disconnected');
@@ -220,8 +257,14 @@ class ReverbMessagingService extends EventEmitter {
       };
 
       this.ws.onerror = (error) => {
+        clearTimeout(connectionTimeout);
         console.error('❌ Reverb WebSocket error:', error);
+        console.error('❌ WebSocket readyState:', this.ws?.readyState);
+        console.error('❌ WebSocket URL:', reverbUrl);
         this.emit('error', error);
+        
+        // Don't schedule reconnect immediately on error - let onclose handle it
+        // This prevents rapid reconnection attempts that can overwhelm the server
       };
 
     } catch (error) {
@@ -283,9 +326,12 @@ class ReverbMessagingService extends EventEmitter {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    // Use exponential backoff with jitter to prevent thundering herd
+    const baseDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const jitter = Math.random() * 1000; // Add up to 1 second of jitter
+    const delay = baseDelay + jitter;
     
-    console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    console.log(`🔄 Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
     
     this.reconnectInterval = setTimeout(() => {
       this.connect();
@@ -309,6 +355,46 @@ class ReverbMessagingService extends EventEmitter {
 
   public isWebSocketConnected(): boolean {
     return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  // Debug method to get connection status
+  public getConnectionStatus() {
+    return {
+      isConnected: this.isConnected,
+      readyState: this.ws?.readyState,
+      reconnectAttempts: this.reconnectAttempts,
+      maxReconnectAttempts: this.maxReconnectAttempts,
+      hasAuthToken: !!this.authToken,
+      wsUrl: this.ws ? this.ws.url : 'No WebSocket instance'
+    };
+  }
+
+  // Method to manually test connection
+  public async testConnection(): Promise<boolean> {
+    try {
+      console.log('🧪 Testing WebSocket connection...');
+      const status = this.getConnectionStatus();
+      console.log('🧪 Connection status:', status);
+      
+      if (this.isWebSocketConnected()) {
+        console.log('✅ WebSocket is already connected');
+        return true;
+      }
+      
+      // Try to connect
+      await this.connect();
+      
+      // Wait a bit for connection to establish
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const finalStatus = this.getConnectionStatus();
+      console.log('🧪 Final connection status:', finalStatus);
+      
+      return this.isWebSocketConnected();
+    } catch (error) {
+      console.error('❌ Connection test failed:', error);
+      return false;
+    }
   }
 
   // API Methods
@@ -399,7 +485,9 @@ class ReverbMessagingService extends EventEmitter {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`❌ Send Message API Error ${response.status}:`, errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -456,7 +544,9 @@ class ReverbMessagingService extends EventEmitter {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`❌ Start Conversation API Error ${response.status}:`, errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();

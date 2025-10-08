@@ -57,6 +57,7 @@ export type AdminTabParamList = {
   AdminSupport: undefined;
   AdminVerification: undefined;
   AdminSettings: undefined;
+  AdminNameUpdateProfile: undefined;
 };
 
 declare global {

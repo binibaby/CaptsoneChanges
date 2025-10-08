@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { RealtimeSitter } from '../services/realtimeLocationService';
 
@@ -37,24 +37,6 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
 
   // Use real certificates from sitter object, fallback to empty array if none
   const sitterCertificates = sitter?.certificates || [];
-  
-  // Add some sample certificates for testing if none exist
-  const testCertificates = sitterCertificates.length === 0 ? [
-    {
-      id: '1',
-      name: 'Pet First Aid Certification',
-      image: 'https://via.placeholder.com/300x200/4CAF50/white?text=Pet+First+Aid',
-      date: '2024-01-15',
-      issuer: 'Pet Care Academy',
-    },
-    {
-      id: '2',
-      name: 'Dog Training Certificate',
-      image: 'https://via.placeholder.com/300x200/2196F3/white?text=Dog+Training',
-      date: '2024-02-20',
-      issuer: 'Canine Training Institute',
-    },
-  ] : sitterCertificates;
 
   
   // Reset image error state when sitter changes
@@ -233,9 +215,23 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                   />
                 </View>
                 <View style={styles.userDetails}>
-                  <Text style={styles.userName}>
-                    {sitter?.name || 'Loading...'}
-                  </Text>
+                  <View style={styles.nameAndVerification}>
+                    <Text style={styles.userName}>
+                      {sitter?.name || 'Loading...'}
+                    </Text>
+                    {/* Verification Status Badge */}
+                    {sitter?.isVerified ? (
+                      <View style={styles.verifiedBadge}>
+                        <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                        <Text style={styles.verifiedText}>Verified</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.unverifiedBadge}>
+                        <Ionicons name="warning" size={16} color="#F59E0B" />
+                        <Text style={styles.unverifiedText}>Not Verified</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.userLocation}>
                     📍 {sitter.location?.address || `${sitter.location?.latitude?.toFixed(4)}, ${sitter.location?.longitude?.toFixed(4)}`}
                   </Text>
@@ -258,16 +254,16 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                 <TouchableOpacity 
                   style={[
                     styles.credentialButton,
-                    testCertificates.length === 0 && styles.credentialButtonDisabled
+                    sitterCertificates.length === 0 && styles.credentialButtonDisabled
                   ]}
                   onPress={() => {
                     console.log('🔍 Certificate button pressed!');
                     setButtonPressed(true);
-                    console.log('🔍 testCertificates:', testCertificates);
-                    console.log('🔍 testCertificates.length:', testCertificates.length);
+                    console.log('🔍 sitterCertificates:', sitterCertificates);
+                    console.log('🔍 sitterCertificates.length:', sitterCertificates.length);
                     
-                    if (testCertificates.length > 0) {
-                      console.log('✅ Navigating to certificate screen with certificates:', testCertificates);
+                    if (sitterCertificates.length > 0) {
+                      console.log('✅ Navigating to certificate screen with certificates:', sitterCertificates);
                       // Close the popup first
                       onClose();
                       // Navigate to certificate screen
@@ -275,7 +271,7 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                         pathname: '/sitter-certificates',
                         params: {
                           sitterName: sitter?.name || 'Pet Sitter',
-                          certificates: JSON.stringify(testCertificates)
+                          certificates: JSON.stringify(sitterCertificates)
                         }
                       });
                     } else {
@@ -293,13 +289,13 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                   <Ionicons 
                     name="medal" 
                     size={16} 
-                    color={testCertificates.length === 0 ? "#ccc" : "#fff"} 
+                    color={sitterCertificates.length === 0 ? "#ccc" : "#fff"} 
                   />
                   <Text style={[
                     styles.credentialText,
-                    testCertificates.length === 0 && styles.credentialTextDisabled
+                    sitterCertificates.length === 0 && styles.credentialTextDisabled
                   ]}>
-                    View Certificates {testCertificates.length > 0 && `(${testCertificates.length})`}
+                    View Certificates {sitterCertificates.length > 0 && `(${sitterCertificates.length})`}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -309,6 +305,15 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                 <TouchableOpacity 
                   style={styles.credentialButton}
                   onPress={() => {
+                    // Check if sitter is verified before allowing messaging
+                    if (!sitter.isVerified) {
+                      Alert.alert(
+                        '⚠️ Sitter Not Verified',
+                        'This pet sitter has not completed ID verification yet. They cannot accept bookings or respond to messages until verified.',
+                        [{ text: 'OK' }]
+                      );
+                      return;
+                    }
                     onClose();
                     onMessage(sitter.id);
                   }}
@@ -321,6 +326,15 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                 <TouchableOpacity 
                   style={styles.credentialButton}
                   onPress={() => {
+                    // Check if sitter is verified before allowing booking
+                    if (!sitter.isVerified) {
+                      Alert.alert(
+                        '⚠️ Sitter Not Verified',
+                        'This pet sitter has not completed ID verification yet. They cannot accept bookings until verified.',
+                        [{ text: 'OK' }]
+                      );
+                      return;
+                    }
                     onClose();
                     router.push({
                       pathname: '/booking',
@@ -490,11 +504,49 @@ const styles = StyleSheet.create({
   userDetails: {
     flex: 1,
   },
+  nameAndVerification: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
   userName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 4,
+    marginRight: 8,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  verifiedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+    marginLeft: 4,
+  },
+  unverifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  unverifiedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F59E0B',
+    marginLeft: 4,
   },
   userLocation: {
     fontSize: 14,

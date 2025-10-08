@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 import { useAuth } from '../src/contexts/AuthContext';
 import BackIDScreen from '../src/screens/auth/BackIDScreen';
+import DocumentTypeScreen from '../src/screens/auth/DocumentTypeScreen';
 import FrontIDScreen from '../src/screens/auth/FrontIDScreen';
 import LoginScreen from '../src/screens/auth/LoginScreen';
 import PhoneVerificationScreen from '../src/screens/auth/PhoneVerificationScreen';
@@ -15,7 +16,7 @@ import SignUpScreen4_FinalSteps from '../src/screens/auth/SignUpScreen4_FinalSte
 import UserRoleSelectionScreen from '../src/screens/auth/UserRoleSelectionScreen';
 
 export default function Auth() {
-  const [authStep, setAuthStep] = useState<'role-selection' | 'login' | 'register' | 'signup1' | 'signup2' | 'signup3' | 'signup4' | 'phone-verification' | 'front-id' | 'back-id' | 'selfie'>('role-selection');
+  const [authStep, setAuthStep] = useState<'role-selection' | 'login' | 'register' | 'signup1' | 'signup2' | 'signup3' | 'signup4' | 'phone-verification' | 'document-type' | 'front-id' | 'back-id' | 'selfie'>('role-selection');
   const [selectedUserRole, setSelectedUserRole] = useState<'Pet Owner' | 'Pet Sitter' | null>(null);
   const [signupData, setSignupData] = useState<any>({});
   const router = useRouter();
@@ -69,6 +70,12 @@ export default function Auth() {
     setAuthStep('front-id');
   };
   
+  const goToDocumentType = (phoneVerified: boolean, userData: any) => {
+    console.log('goToDocumentType called with:', { phoneVerified, userData });
+    setSignupData({ ...signupData, phoneVerified, userData: userData || signupData.userData });
+    setAuthStep('document-type');
+  };
+
   const goToFrontIDWithUserData = (phoneVerified: boolean, userData: any) => {
     console.log('goToFrontIDWithUserData called with:', { phoneVerified, userData });
     setSignupData({ ...signupData, phoneVerified, userData: userData || signupData.userData });
@@ -81,6 +88,12 @@ export default function Auth() {
   const goToSelfie = (phoneVerified: boolean, frontImage: string, backImage: string, userData?: any) => {
     setSignupData({ ...signupData, phoneVerified, frontImage, backImage, userData: userData || signupData.userData });
     setAuthStep('selfie');
+  };
+
+  const goToFrontIDFromDocumentType = (phoneVerified: boolean, documentType: string, userData: any) => {
+    console.log('goToFrontIDFromDocumentType called with:', { phoneVerified, documentType, userData });
+    setSignupData({ ...signupData, phoneVerified, documentType, userData: userData || signupData.userData });
+    setAuthStep('front-id');
   };
 
   const onRoleSelected = (role: 'Pet Owner' | 'Pet Sitter') => {
@@ -447,14 +460,20 @@ export default function Auth() {
     case 'phone-verification':
       return <PhoneVerificationScreen 
         userData={signupData.userData} 
-        onPhoneVerified={signupData.userRole === 'Pet Sitter' ? (phoneVerified) => goToFrontIDWithUserData(phoneVerified, signupData.userData) : () => onAuthSuccess(signupData.userData)} 
+        onPhoneVerified={signupData.userRole === 'Pet Sitter' ? (phoneVerified) => goToDocumentType(phoneVerified, signupData.userData) : () => onAuthSuccess(signupData.userData)} 
+      />;
+    case 'document-type':
+      return <DocumentTypeScreen 
+        userData={signupData.userData} 
+        phoneVerified={signupData.phoneVerified} 
+        onDocumentTypeSelected={goToFrontIDFromDocumentType} 
       />;
     case 'front-id':
       return <FrontIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} onFrontIDComplete={(phoneVerified, frontImage, userData) => goToBackID(phoneVerified, frontImage, userData)} />;
     case 'back-id':
       return <BackIDScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} onBackIDComplete={(phoneVerified, frontImage, backImage, userData) => goToSelfie(phoneVerified, frontImage, backImage, userData)} />;
     case 'selfie':
-      return <SelfieScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} backImage={signupData.backImage} onSelfieComplete={onAuthSuccess} />;
+      return <SelfieScreen userData={signupData.userData} phoneVerified={signupData.phoneVerified} frontImage={signupData.frontImage} backImage={signupData.backImage} documentType={signupData.documentType} onSelfieComplete={onAuthSuccess} />;
     default:
       return (
         <UserRoleSelectionScreen 

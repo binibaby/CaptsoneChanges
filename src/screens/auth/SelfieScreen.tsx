@@ -1,6 +1,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import * as Location from 'expo-location';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -18,10 +19,11 @@ interface SelfieScreenProps {
   phoneVerified?: boolean;
   frontImage?: string;
   backImage?: string;
+  documentType?: string;
   onSelfieComplete?: (userData: any) => void;
 }
 
-const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, phoneVerified: propPhoneVerified, frontImage: propFrontImage, backImage: propBackImage, onSelfieComplete }) => {
+const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, phoneVerified: propPhoneVerified, frontImage: propFrontImage, backImage: propBackImage, documentType: propDocumentType, onSelfieComplete }) => {
   const navigation = useNavigation();
   const route = useRoute();
   
@@ -30,6 +32,7 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
   const phoneVerified = propPhoneVerified ?? (route.params as any)?.phoneVerified;
   const frontImage = propFrontImage || (route.params as any)?.frontImage;
   const backImage = propBackImage || (route.params as any)?.backImage;
+  const documentType = propDocumentType || (route.params as any)?.documentType || 'ph_national_id';
   
   console.log('SelfieScreen - propUserData:', propUserData);
   console.log('SelfieScreen - propPhoneVerified:', propPhoneVerified);
@@ -45,6 +48,70 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    address: string;
+    accuracy: number;
+  } | null>(null);
+
+  // Capture current location when component mounts
+  useEffect(() => {
+    captureCurrentLocation();
+  }, []);
+
+  const captureCurrentLocation = async () => {
+    try {
+      console.log('📍 SelfieScreen - Requesting location permission...');
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        console.log('❌ SelfieScreen - Location permission denied');
+        Alert.alert(
+          'Location Permission Required',
+          'Please enable location access to capture your verification location.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      console.log('📍 SelfieScreen - Getting current location...');
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        maximumAge: 10000, // 10 seconds
+        timeout: 15000, // 15 seconds
+      });
+
+      console.log('📍 SelfieScreen - Location captured:', location);
+
+      // Reverse geocode to get address
+      const addressResponse = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      const address = addressResponse[0] 
+        ? `${addressResponse[0].street || ''} ${addressResponse[0].streetNumber || ''} ${addressResponse[0].district || ''} ${addressResponse[0].city || ''} ${addressResponse[0].region || ''} ${addressResponse[0].country || ''}`.trim()
+        : 'Unknown Location';
+
+      const locationData = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        address: address,
+        accuracy: location.coords.accuracy || 0,
+      };
+
+      console.log('📍 SelfieScreen - Location data:', locationData);
+      setCurrentLocation(locationData);
+    } catch (error) {
+      console.error('❌ SelfieScreen - Location capture error:', error);
+      Alert.alert(
+        'Location Error',
+        'Failed to capture your location. Please ensure location services are enabled.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   const takeSelfie = async () => {
     try {
@@ -123,30 +190,106 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
 
       const payload = {
         user_id: userData?.id || null,
-        document_type: 'ph_national_id',
+        document_type: documentType,
         document_number: '123456789',
+        document_image: selfieImageBase64, // Use selfie as the main document image
+        first_name: userData?.firstName || userData?.first_name || 'Unknown',
+        last_name: userData?.lastName || userData?.last_name || 'Unknown',
+        phone: userData?.phone || '+639000000000',
         front_image: frontImageBase64,
         back_image: backImageBase64,
         selfie_image: selfieImageBase64,
         has_front_image: !!frontImageBase64,
         has_back_image: !!backImageBase64,
         has_selfie_image: !!selfieImageBase64,
+        // Add actual location data
+        selfie_latitude: currentLocation?.latitude || null,
+        selfie_longitude: currentLocation?.longitude || null,
+        selfie_address: currentLocation?.address || null,
+        location_accuracy: currentLocation?.accuracy || null,
       };
 
-      const response = await makeApiCall('/api/verification/submit-simple', {
+      console.log('📦 SelfieScreen - Payload being sent:', {
+        user_id: payload.user_id,
+        document_type: payload.document_type,
+        front_image_size: frontImageBase64 ? frontImageBase64.length : 0,
+        back_image_size: backImageBase64 ? backImageBase64.length : 0,
+        selfie_image_size: selfieImageBase64 ? selfieImageBase64.length : 0,
+        location: currentLocation ? `${currentLocation.address} (${currentLocation.latitude}, ${currentLocation.longitude})` : 'No location'
+      });
+
+      // Get authentication token
+      const authToken = userData?.token;
+      console.log('🔐 SelfieScreen - Auth token:', authToken ? 'Present' : 'Missing');
+      console.log('🔐 SelfieScreen - Token value:', authToken);
+      console.log('🔐 SelfieScreen - User data:', userData);
+      
+      if (!authToken) {
+        Alert.alert('Error', 'Authentication required. Please log in again.');
+        return;
+      }
+
+      const headers = getAuthHeaders(authToken);
+      console.log('🔐 SelfieScreen - Headers being sent:', headers);
+      console.log('📦 SelfieScreen - Payload being sent:', {
+        ...payload,
+        document_image: payload.document_image ? `[${payload.document_image.length} chars]` : 'empty',
+        front_image: payload.front_image ? `[${payload.front_image.length} chars]` : 'empty',
+        back_image: payload.back_image ? `[${payload.back_image.length} chars]` : 'empty',
+        selfie_image: payload.selfie_image ? `[${payload.selfie_image.length} chars]` : 'empty',
+      });
+
+      let response = await makeApiCall('/api/verification/submit-simple', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: headers,
         body: JSON.stringify(payload),
       });
 
       console.log('Response status:', response.status);
+      
+      // Handle 401 Unauthorized - try to refresh token and retry
+      if (response.status === 401) {
+        console.log('🔄 401 Unauthorized - attempting token refresh');
+        try {
+          const { default: authService } = await import('../../services/authService');
+          await authService.refreshUserToken();
+          
+          // Get updated user data with new token
+          const refreshedUser = await authService.getCurrentUser();
+          if (refreshedUser?.token && refreshedUser.token !== authToken) {
+            console.log('✅ Token refreshed successfully, retrying verification submission');
+            
+            // Update userData with new token
+            const updatedUserData = { ...userData, token: refreshedUser.token };
+            
+            // Retry with new token
+            const newHeaders = getAuthHeaders(refreshedUser.token);
+            response = await makeApiCall('/api/verification/submit-simple', {
+              method: 'POST',
+              headers: newHeaders,
+              body: JSON.stringify(payload),
+            });
+            
+            console.log('Retry response status:', response.status);
+          } else {
+            console.error('❌ Token refresh failed - no new token available');
+            Alert.alert('Authentication Error', 'Your session has expired. Please log in again.');
+            return;
+          }
+        } catch (refreshError) {
+          console.error('❌ Token refresh failed:', refreshError);
+          Alert.alert('Authentication Error', 'Your session has expired. Please log in again.');
+          return;
+        }
+      }
+      
       const data = await response.json();
       console.log('Response data:', data);
       
       if (data.success) {
         Alert.alert(
-          'Success!', 
-          'Your ID and face have been verified successfully!',
+          'Verification Submitted!', 
+          'Your ID verification has been submitted for admin review. You will be notified within 24 hours of the admin\'s decision. You cannot start jobs until your verification is approved.',
           [
             {
               text: 'OK',
@@ -276,6 +419,20 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
         <Text style={styles.subtitle}>
           Take a clear photo of your face for verification
         </Text>
+
+        {/* Location Display */}
+        {currentLocation && (
+          <View style={styles.locationContainer}>
+            <Text style={styles.locationTitle}>📍 Verification Location</Text>
+            <Text style={styles.locationText}>{currentLocation.address}</Text>
+            <Text style={styles.locationCoords}>
+              {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+            </Text>
+            <Text style={styles.locationAccuracy}>
+              Accuracy: {currentLocation.accuracy ? `${Math.round(currentLocation.accuracy)}m` : 'Unknown'}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.imageContainer}>
           {selfieImage ? (
@@ -441,6 +598,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  locationContainer: {
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  locationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  locationCoords: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  locationAccuracy: {
+    fontSize: 12,
+    color: '#6b7280',
   },
 });
 

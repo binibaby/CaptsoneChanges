@@ -44,18 +44,27 @@ export interface VerificationCriteria {
 export interface VerificationStatus {
   id: number;
   status: 'pending' | 'approved' | 'rejected';
+  verification_status?: 'pending' | 'approved' | 'rejected';
   document_type: string;
   document_number: string;
   is_philippine_id: boolean;
+  is_legit_sitter?: boolean;
   verification_score?: number;
   rejection_reason?: string;
   submitted_at: string;
   verified_at?: string;
+  review_deadline?: string;
   badges_earned?: Badge[];
   veriff_session_id?: string;
   verification_url?: string;
   notes?: string;
   document_image?: string;
+  front_id_image?: string;
+  back_id_image?: string;
+  selfie_image?: string;
+  selfie_address?: string;
+  admin_decision?: string;
+  admin_reviewed_at?: string;
 }
 
 
@@ -353,7 +362,7 @@ class VerificationService {
       const response = await makeApiCall('/api/verification/status', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`,
+          'Authorization': `Bearer ${await this.getAuthToken()}`,
         },
       });
 
@@ -375,6 +384,80 @@ class VerificationService {
     }
   }
 
+  // API method to submit enhanced verification
+  async submitEnhancedVerification(verificationData: {
+    front_id_image: string;
+    back_id_image: string;
+    selfie_image: string;
+    location: {
+      latitude: number;
+      longitude: number;
+      address: string;
+      accuracy: number;
+    };
+    document_type: string;
+    is_resubmission?: boolean;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    verification?: any;
+    review_deadline?: string;
+  }> {
+    try {
+      // Debug authentication
+      const authToken = await this.getAuthToken();
+      console.log('🔐 VerificationService - Auth token:', authToken ? 'Present' : 'Missing');
+      console.log('🔐 VerificationService - Token length:', authToken?.length || 0);
+      
+      if (!authToken) {
+        throw new Error('No authentication token available. Please log in and try again.');
+      }
+      
+      const { networkService } = await import('./networkService');
+      const baseUrl = networkService.getBaseUrl();
+      const url = `${baseUrl}/api/verification/submit-enhanced`;
+      
+      console.log('🔐 VerificationService - Making API call to:', url);
+      console.log('🔐 VerificationService - Auth token (first 10 chars):', authToken.substring(0, 10) + '...');
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          front_id_image: verificationData.front_id_image,
+          back_id_image: verificationData.back_id_image,
+          selfie_image: verificationData.selfie_image,
+          selfie_latitude: verificationData.location.latitude,
+          selfie_longitude: verificationData.location.longitude,
+          selfie_address: verificationData.location.address,
+          location_accuracy: verificationData.location.accuracy,
+          document_type: verificationData.document_type,
+          is_resubmission: verificationData.is_resubmission || false,
+        }),
+      });
+
+      console.log('📡 VerificationService - Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ VerificationService - API Error:', errorData);
+        console.error('❌ VerificationService - Response status:', response.status);
+        console.error('❌ VerificationService - Response headers:', response.headers);
+        throw new Error(errorData.message || `Failed to submit enhanced verification (${response.status})`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error submitting enhanced verification:', error);
+      throw error;
+    }
+  }
+
   // API method to submit verification
   async submitVerification(verificationData: {
     document_type: string;
@@ -393,7 +476,7 @@ class VerificationService {
       const response = await makeApiCall('/api/verification/submit', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`,
+          'Authorization': `Bearer ${await this.getAuthToken()}`,
         },
         body: JSON.stringify({
           document_type: verificationData.document_type,
@@ -427,7 +510,7 @@ class VerificationService {
       const response = await makeApiCall('/api/verification/session-status', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`,
+          'Authorization': `Bearer ${await this.getAuthToken()}`,
         },
       });
 
@@ -474,10 +557,23 @@ class VerificationService {
     }
   }
 
-  private getAuthToken(): string {
-    // In a real implementation, get token from secure storage
-    // For now, return a placeholder
-    return 'your-auth-token';
+  private async getAuthToken(): Promise<string> {
+    try {
+      // Import authService dynamically to avoid circular dependencies
+      const { default: authService } = await import('./authService');
+      const user = await authService.getCurrentUser();
+      
+      if (user?.token) {
+        console.log('✅ VerificationService - Auth token found for user:', user.email);
+        return user.token;
+      } else {
+        console.warn('⚠️ VerificationService - No auth token found for user:', user?.email || 'unknown');
+        return '';
+      }
+    } catch (error) {
+      console.error('❌ VerificationService - Error getting auth token:', error);
+      return '';
+    }
   }
 }
 

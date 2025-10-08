@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
-  Modal,
+  KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -16,11 +17,17 @@ import {
   View
 } from 'react-native';
 import CertificateAlbum from '../../components/CertificateAlbum';
+// import PullToRefreshWrapper from '../../components/PullToRefreshWrapper';
 import { useAuth } from '../../contexts/AuthContext';
+import echoService from '../../services/echoService';
+import echoServiceFallback from '../../services/echoServiceFallback';
+import { EchoServiceInterface } from '../../services/echoServiceInterface';
+import { RealtimeNotificationData, realtimeNotificationService } from '../../services/realtimeNotificationService';
+import verificationService from '../../services/verificationService';
 
 const PetSitterProfileScreen = () => {
   const router = useRouter();
-  const { user, logout, updateUserProfile, currentLocation, userAddress, startLocationTracking } = useAuth();
+  const { user, logout, updateUserProfile, currentLocation, userAddress, startLocationTracking, refresh } = useAuth();
   
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
@@ -36,13 +43,38 @@ const PetSitterProfileScreen = () => {
     rating: 0,
     reviews: 0,
   });
-  const [verifyModalVisible, setVerifyModalVisible] = useState(false);
-  const [selectedIDType, setSelectedIDType] = useState('');
-  const [idImage, setIdImage] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
   const [imageError, setImageError] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [certificateAlbumVisible, setCertificateAlbumVisible] = useState(false);
+  
+  // Profile update request states
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [cooldownInfo, setCooldownInfo] = useState<any>(null);
+  const [requestData, setRequestData] = useState<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+    hourlyRate: string;
+    experience: string;
+    aboutMe: string;
+    reason: string;
+  }>({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    hourlyRate: '',
+    experience: '',
+    aboutMe: '',
+    reason: '',
+  });
+  
+  // Verification states
+  const [verification, setVerification] = useState<any>(null);
+  const [isVerificationLoading, setIsVerificationLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [certificates, setCertificates] = useState([
     // Sample certificates - in real app, these would come from API
     {
@@ -60,14 +92,17 @@ const PetSitterProfileScreen = () => {
       issuer: 'Canine Training Institute',
     },
   ]);
-  const [verifiedIDs, setVerifiedIDs] = useState([
-    { type: 'umid', label: 'UMID (Unified Multi-Purpose ID)', icon: 'card', color: '#4CAF50', verified: false },
-    { type: 'sss', label: 'SSS ID', icon: 'card', color: '#2196F3', verified: false },
-    { type: 'gsis', label: 'GSIS ID', icon: 'card', color: '#9C27B0', verified: false },
-    { type: 'philhealth', label: 'PhilHealth ID', icon: 'medical', color: '#00BCD4', verified: false },
-    { type: 'passport', label: 'Philippine Passport', icon: 'airplane', color: '#FF9800', verified: false },
-    { type: 'driver', label: "Driver's License (LTO)", icon: 'car', color: '#795548', verified: false },
-  ]);
+  
+  const [verificationStatus, setVerificationStatus] = useState({
+    isVerified: false,
+    isLegitSitter: false,
+    verificationBadges: [] as string[],
+    verificationStatus: 'pending',
+    reviewDeadline: null as string | null,
+  });
+  
+  // Real-time notification state
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   // Auto-populate location field when userAddress is available
   useEffect(() => {
@@ -79,6 +114,181 @@ const PetSitterProfileScreen = () => {
       }));
     }
   }, [userAddress]);
+
+  // Load verification status and setup real-time connection
+  useEffect(() => {
+    loadVerificationStatus();
+    setupRealTimeConnection();
+    checkCooldownStatus();
+    
+    return () => {
+      // Cleanup real-time connection
+      if (user?.id) {
+        echoService.stopListeningToVerificationUpdates(String(user.id));
+        echoServiceFallback.stopListeningToVerificationUpdates(String(user.id));
+      }
+      echoService.disconnect();
+      echoServiceFallback.disconnect();
+    };
+  }, []);
+
+  // Setup real-time connection
+  const setupRealTimeConnection = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Set auth token for private channels
+      const authToken = await getAuthToken();
+      if (authToken) {
+        echoService.setAuthToken(authToken);
+        echoServiceFallback.setAuthToken(authToken);
+      }
+
+      // Try main Echo service first
+      let connected = await echoService.connect();
+      let service: EchoServiceInterface = echoService;
+
+      // If main service fails, use fallback
+      if (!connected) {
+        console.warn('Main Echo service failed, using fallback polling service');
+        connected = await echoServiceFallback.connect();
+        service = echoServiceFallback as EchoServiceInterface;
+      }
+
+      setIsConnected(connected);
+
+      if (connected) {
+        // Listen for verification updates
+        const channel = service.listenToVerificationUpdates(String(user.id), (data) => {
+          console.log('📡 Real-time verification update received:', data);
+          setLastUpdate(new Date());
+          
+          // Update verification status
+          if (data.verification) {
+            setVerification(data.verification);
+            setVerificationStatus({
+              isVerified: data.verification.verification_status === 'approved',
+              isLegitSitter: data.verification.is_legit_sitter || false,
+              verificationBadges: data.verification.badges_earned?.map((badge: any) => badge.id) || [],
+              verificationStatus: data.verification.verification_status || 'pending',
+              reviewDeadline: data.verification.review_deadline || null,
+            });
+          }
+          
+          // Show success/error message
+          if (data.status === 'approved') {
+            Alert.alert(
+              '🎉 Verification Approved!',
+              data.message || '🎉 Congratulations! Your ID verification has been approved! You can now start accepting jobs and bookings.',
+              [{ text: 'OK', onPress: () => refresh() }]
+            );
+          } else if (data.status === 'rejected') {
+            Alert.alert(
+              '❌ Verification Rejected',
+              data.message || 'Your ID verification has been rejected. Please contact the admin at barnacheajp.228.stud@cdd.edu.ph for further assistance in resolving this issue.',
+              [{ text: 'OK' }]
+            );
+          }
+        });
+
+        if (channel) {
+          console.log('👂 Real-time listener set up successfully');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to setup real-time connection:', error);
+      setIsConnected(false);
+    }
+  };
+
+  // Get auth token
+  const getAuthToken = async (): Promise<string> => {
+    try {
+      const { default: authService } = await import('../../services/authService');
+      if (!authService) {
+        console.error('AuthService not found in import');
+        return '';
+      }
+      const currentUser = await authService.getCurrentUser();
+      return currentUser?.token || '';
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return '';
+    }
+  };
+
+  // Load verification status
+  const loadVerificationStatus = async () => {
+    try {
+      setIsVerificationLoading(true);
+      const response = await verificationService.getVerificationStatusFromAPI();
+      
+      if (response.success) {
+        setVerification(response.verification || null);
+        setVerificationStatus({
+          isVerified: response.verification?.verification_status === 'approved',
+          isLegitSitter: response.verification?.is_legit_sitter || false,
+          verificationBadges: response.badges?.map((badge: any) => badge.id) || [],
+          verificationStatus: response.verification?.verification_status || 'pending',
+          reviewDeadline: response.verification?.review_deadline || null,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading verification status:', error);
+    } finally {
+      setIsVerificationLoading(false);
+    }
+  };
+
+  // Pull to refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadVerificationStatus();
+    setRefreshing(false);
+  }, []);
+
+  const fetchVerificationStatus = async () => {
+    try {
+      // Fetch real verification status from API
+      const { makeApiCall } = await import('../../services/networkService');
+      const response = await makeApiCall('/api/verification/status', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setVerificationStatus({
+          isVerified: data.verification?.verification_status === 'approved',
+          isLegitSitter: data.verification?.is_legit_sitter || false,
+          verificationBadges: data.badges?.map((badge: any) => badge.id) || [],
+          verificationStatus: data.verification?.verification_status || 'pending',
+          reviewDeadline: data.verification?.review_deadline || null,
+        });
+      } else {
+        // If no verification found, set to pending state
+        setVerificationStatus({
+          isVerified: false,
+          isLegitSitter: false,
+          verificationBadges: [],
+          verificationStatus: 'pending',
+          reviewDeadline: null,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching verification status:', error);
+      // Set to pending state on error
+      setVerificationStatus({
+        isVerified: false,
+        isLegitSitter: false,
+        verificationBadges: [],
+        verificationStatus: 'pending',
+        reviewDeadline: null,
+      });
+    }
+  };
 
   // Start location tracking when user logs in
   useEffect(() => {
@@ -92,7 +302,57 @@ const PetSitterProfileScreen = () => {
   useEffect(() => {
     if (user) {
       loadCertificatesFromAPI();
+      loadVerificationStatus(); // Fetch verification status when user loads
     }
+  }, [user]);
+
+  // Initialize real-time notifications for verification status updates
+  useEffect(() => {
+    if (!user) return;
+
+    const initializeRealtime = async () => {
+      try {
+        console.log('🔔 Initializing real-time notifications for pet sitter profile:', user.id);
+        const connected = await realtimeNotificationService.initialize(user.id, user.token || '');
+        setRealtimeConnected(connected);
+        
+        if (connected) {
+          console.log('✅ Real-time notifications connected for pet sitter profile');
+        } else {
+          console.warn('⚠️ Real-time notifications not available for pet sitter profile');
+        }
+      } catch (error) {
+        console.error('❌ Error initializing real-time notifications:', error);
+        setRealtimeConnected(false);
+      }
+    };
+
+    initializeRealtime();
+
+    // Set up real-time notification listener for verification updates
+    const unsubscribe = realtimeNotificationService.subscribe((notification: RealtimeNotificationData) => {
+      console.log('🔔 Real-time notification received in PetSitterProfileScreen:', notification);
+      
+      // Handle verification status updates
+      if (notification.type === 'id_verification_approved' || notification.type === 'id_verification_rejected') {
+        console.log('🔄 Verification status updated, refreshing profile...');
+        // Refresh verification status immediately
+        loadVerificationStatus();
+        
+        // Show notification to user
+        Alert.alert(
+          notification.title,
+          notification.message,
+          [
+            { text: 'OK', onPress: () => console.log('User acknowledged verification update') }
+          ]
+        );
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [user]);
 
   // Update profile data when user changes
@@ -162,6 +422,9 @@ const PetSitterProfileScreen = () => {
         
         console.log('📱 PetSitterProfileScreen: Force updating profile on focus:', updatedProfile);
         setProfile(updatedProfile);
+        
+        // Also fetch verification status when screen comes into focus
+        loadVerificationStatus();
       }
     }, [user])
   );
@@ -198,7 +461,58 @@ const PetSitterProfileScreen = () => {
   };
 
   const handleEdit = () => {
+    // Pre-populate request data with current user data
+    if (user) {
+      // Split name into firstName and lastName
+      const nameParts = (user.name || '').split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      setRequestData({
+        firstName: firstName,
+        lastName: lastName,
+        phone: user.phone || '',
+        hourlyRate: user.hourlyRate ? user.hourlyRate.toString() : '',
+        experience: user.experience || '',
+        aboutMe: user.aboutMe || '',
+        reason: '', // Leave reason empty for user to fill
+      });
+    }
     setIsEditing(true);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh user data from the server
+      await refresh();
+      
+      // Update profile data with fresh user data
+      if (user) {
+        const nameParts = (user.name || '').split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        setProfile({
+          firstName: firstName,
+          lastName: lastName,
+          email: user.email || '',
+          phone: user.phone || '',
+          location: user.address || '',
+          bio: user.aboutMe || '',
+          hourlyRate: user.hourlyRate || '',
+          experience: user.experience || '',
+          specialties: user.specialties || [],
+          rating: 0, // Default value since rating is not in User type
+          reviews: 0, // Default value since reviews is not in User type
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+      Alert.alert('Error', 'Failed to refresh profile. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleAddCertificate = async (certificate: any) => {
@@ -238,11 +552,59 @@ const PetSitterProfileScreen = () => {
   const saveCertificatesToAPI = async (certificatesToSave: any[]) => {
     try {
       const { makeApiCall } = await import('../../services/networkService');
+      const { default: authService } = await import('../../services/authService');
+      if (!authService) {
+        console.error('AuthService not found in import');
+        return;
+      }
+      
+      // Get fresh user data with token
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser) {
+        Alert.alert(
+          'Authentication Required',
+          'Your session has expired. Please log in again.',
+          [
+            { text: 'OK', onPress: () => router.replace('/auth') }
+          ]
+        );
+        throw new Error('No user found for certificates API call');
+      }
+      
+      if (!currentUser.token) {
+        console.error('No token found for user:', currentUser.email);
+        
+        // Try to refresh the token first
+        try {
+          console.log('🔄 Attempting to refresh token for user:', currentUser.email);
+          await authService.refreshUserToken();
+          
+          // Get the user again after token refresh
+          const refreshedUser = await authService.getCurrentUser();
+          if (!refreshedUser || !refreshedUser.token) {
+            throw new Error('Token refresh failed');
+          }
+          
+          console.log('✅ Token refreshed successfully, retrying API call');
+          // Retry the API call with the new token
+          return saveCertificatesToAPI(certificatesToSave);
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          Alert.alert(
+            'Authentication Required',
+            'Your session has expired. Please log in again.',
+            [
+              { text: 'OK', onPress: () => router.replace('/auth') }
+            ]
+          );
+          throw new Error('No token found for user');
+        }
+      }
       
       const response = await makeApiCall('/api/profile/save-certificates', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${user?.token || ''}`,
+          'Authorization': `Bearer ${currentUser.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ certificates: certificatesToSave }),
@@ -250,6 +612,42 @@ const PetSitterProfileScreen = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        
+        if (response.status === 401) {
+          console.error('Authentication failed - token may be invalid or expired');
+          // Try to refresh the user session
+          try {
+            const { default: authService } = await import('../../services/authService');
+            if (!authService) {
+              console.error('AuthService not found in retry import');
+              return;
+            }
+            const refreshedUser = await authService.getCurrentUser();
+            if (refreshedUser?.token && refreshedUser.token !== currentUser.token) {
+              console.log('Token refreshed, retrying save certificates API call');
+              // Retry with refreshed token
+              const retryResponse = await makeApiCall('/api/profile/save-certificates', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${refreshedUser.token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ certificates: certificatesToSave }),
+              });
+              
+              if (retryResponse.ok) {
+                const retryResult = await retryResponse.json();
+                console.log('Certificates saved successfully after token refresh:', retryResult);
+                return;
+              }
+            }
+          } catch (refreshError) {
+            console.error('Error refreshing user token:', refreshError);
+          }
+          throw new Error('Authentication failed. Please log in again.');
+        }
+        
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
@@ -265,16 +663,105 @@ const PetSitterProfileScreen = () => {
     try {
       const { makeApiCall } = await import('../../services/networkService');
       
+      const { default: authService } = await import('../../services/authService');
+      if (!authService) {
+        console.error('AuthService not found in import');
+        return;
+      }
+      
+      // Get fresh user data with token
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser) {
+        console.error('No user found for certificates API call');
+        Alert.alert(
+          'Authentication Required',
+          'Your session has expired. Please log in again.',
+          [
+            { text: 'OK', onPress: () => router.replace('/auth') }
+          ]
+        );
+        return;
+      }
+      
+      if (!currentUser.token) {
+        console.error('No token found for user:', currentUser.email);
+        
+        // Try to refresh the token first
+        try {
+          console.log('🔄 Attempting to refresh token for user:', currentUser.email);
+          await authService.refreshUserToken();
+          
+          // Get the user again after token refresh
+          const refreshedUser = await authService.getCurrentUser();
+          if (!refreshedUser || !refreshedUser.token) {
+            throw new Error('Token refresh failed');
+          }
+          
+          console.log('✅ Token refreshed successfully, retrying API call');
+          // Retry the API call with the new token
+          return loadCertificatesFromAPI();
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          Alert.alert(
+            'Authentication Required',
+            'Your session has expired. Please log in again.',
+            [
+              { text: 'OK', onPress: () => router.replace('/auth') }
+            ]
+          );
+          return;
+        }
+      }
+      
+      console.log('Loading certificates with token:', currentUser.token.substring(0, 10) + '...');
+      
       const response = await makeApiCall('/api/profile/certificates', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${user?.token || ''}`,
+          'Authorization': `Bearer ${currentUser.token}`,
           'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        
+        if (response.status === 401) {
+          console.error('Authentication failed - token may be invalid or expired');
+          // Try to refresh the user session
+          try {
+            const { default: authService } = await import('../../services/authService');
+            if (!authService) {
+              console.error('AuthService not found in retry import');
+              return;
+            }
+            const refreshedUser = await authService.getCurrentUser();
+            if (refreshedUser?.token && refreshedUser.token !== currentUser.token) {
+              console.log('Token refreshed, retrying API call');
+              // Retry with refreshed token
+              const retryResponse = await makeApiCall('/api/profile/certificates', {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${refreshedUser.token}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              
+              if (retryResponse.ok) {
+                const retryResult = await retryResponse.json();
+                if (retryResult.success && retryResult.certificates) {
+                  setCertificates(retryResult.certificates);
+                  console.log('Certificates loaded successfully after token refresh:', retryResult.certificates);
+                  return;
+                }
+              }
+            }
+          } catch (refreshError) {
+            console.error('Error refreshing user token:', refreshError);
+          }
+        }
+        
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
@@ -291,7 +778,205 @@ const PetSitterProfileScreen = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
-    // Reset to original values if needed
+    // Reset request data to empty values
+    setRequestData({
+      firstName: '',
+      lastName: '',
+      phone: '',
+      hourlyRate: '',
+      experience: '',
+      aboutMe: '',
+      reason: '',
+    });
+  };
+
+  // Profile update request functions
+  const checkCooldownStatus = async () => {
+    try {
+      const { makeApiCall } = await import('../../services/networkService');
+      const { default: authService } = await import('../../services/authService');
+      if (!authService) {
+        console.error('AuthService not found in import');
+        return;
+      }
+      
+      // Get fresh user data with token
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser) {
+        console.error('No user found for cooldown check');
+        Alert.alert(
+          'Authentication Required',
+          'Please log in to check your profile update status.',
+          [
+            { text: 'OK', onPress: () => router.replace('/auth') }
+          ]
+        );
+        return;
+      }
+
+      if (!currentUser.token) {
+        console.error('No token found for user:', currentUser.email);
+        
+        // Try to refresh the token first
+        try {
+          console.log('🔄 Attempting to refresh token for cooldown check');
+          await authService.refreshUserToken();
+          
+          // Get the user again after token refresh
+          const refreshedUser = await authService.getCurrentUser();
+          if (!refreshedUser || !refreshedUser.token) {
+            throw new Error('Token refresh failed');
+          }
+          
+          console.log('✅ Token refreshed successfully, retrying cooldown check');
+          // Retry the API call with the new token
+          return checkCooldownStatus();
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          Alert.alert(
+            'Authentication Required',
+            'Your session has expired. Please log in again.',
+            [
+              { text: 'OK', onPress: () => router.replace('/auth') }
+            ]
+          );
+          return;
+        }
+      }
+      
+      const response = await makeApiCall('/api/profile/update-request/check-pending', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${currentUser.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setCooldownInfo(result.cooldown_info || null);
+      }
+    } catch (error) {
+      console.error('Error checking cooldown status:', error);
+    }
+  };
+
+  const handleSubmitProfileRequest = async () => {
+    try {
+      setIsSubmittingRequest(true);
+      
+      // Validate required fields
+      if (!requestData.firstName.trim() || !requestData.lastName.trim()) {
+        Alert.alert('Validation Error', 'First name and last name are required');
+        return;
+      }
+      
+      if (!requestData.reason.trim()) {
+        Alert.alert('Validation Error', 'Please provide a reason for the changes');
+        return;
+      }
+      
+      console.log('PetSitterProfileScreen: Submitting profile update request:', requestData);
+      
+      const { submitProfileUpdateRequest } = await import('../../services/networkService');
+      const { default: authService } = await import('../../services/authService');
+      if (!authService) {
+        console.error('AuthService not found in import');
+        return;
+      }
+      
+      // Get fresh user data with token
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser) {
+        Alert.alert(
+          'Authentication Required',
+          'Please log in to submit profile update requests.',
+          [
+            { text: 'OK', onPress: () => router.replace('/auth') }
+          ]
+        );
+        return;
+      }
+
+      if (!currentUser.token) {
+        console.error('No token found for user:', currentUser.email);
+        
+        // Try to refresh the token first
+        try {
+          console.log('🔄 Attempting to refresh token for profile update request');
+          await authService.refreshUserToken();
+          
+          // Get the user again after token refresh
+          const refreshedUser = await authService.getCurrentUser();
+          if (!refreshedUser || !refreshedUser.token) {
+            throw new Error('Token refresh failed');
+          }
+          
+          console.log('✅ Token refreshed successfully, retrying profile update request');
+          // Retry the API call with the new token
+          return handleSubmitProfileRequest();
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          Alert.alert(
+            'Authentication Required',
+            'Your session has expired. Please log in again.',
+            [
+              { text: 'OK', onPress: () => router.replace('/auth') }
+            ]
+          );
+          return;
+        }
+      }
+      
+      const response = await submitProfileUpdateRequest({
+        firstName: requestData.firstName.trim(),
+        lastName: requestData.lastName.trim(),
+        phone: requestData.phone.trim(),
+        hourlyRate: requestData.hourlyRate.trim(),
+        experience: requestData.experience.trim(),
+        aboutMe: requestData.aboutMe.trim(),
+        reason: requestData.reason.trim(),
+      }, currentUser.token, currentUser.role || 'pet_sitter');
+      
+      console.log('PetSitterProfileScreen: Profile update request response:', response);
+      
+      if (response.success) {
+        Alert.alert(
+          'Request Submitted', 
+          'Your update request has been submitted. Please wait for the admin to examine and approve your changes.',
+          [{ text: 'OK', onPress: () => setIsEditing(false) }]
+        );
+        // Reset form
+        setRequestData({
+          firstName: '',
+          lastName: '',
+          phone: '',
+          hourlyRate: '',
+          experience: '',
+          aboutMe: '',
+          reason: '',
+        });
+        // Refresh cooldown status
+        await checkCooldownStatus();
+      } else {
+        // Check if it's a cooldown error
+        if (response.cooldown_info && response.cooldown_info.in_cooldown) {
+          Alert.alert(
+            'Profile Update Cooldown',
+            `You can submit another request in ${response.cooldown_info.remaining_time}.`,
+            [{ text: 'OK' }]
+          );
+          setCooldownInfo(response.cooldown_info);
+        } else {
+          Alert.alert('Error', response.message || 'Failed to submit request. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('PetSitterProfileScreen: Error submitting profile update request:', error);
+      Alert.alert('Error', 'Failed to submit request. Please try again.');
+    } finally {
+      setIsSubmittingRequest(false);
+    }
   };
 
   const handleLogout = () => {
@@ -305,15 +990,6 @@ const PetSitterProfileScreen = () => {
     );
   };
 
-  const openVerifyModal = () => {
-    setVerifyModalVisible(true);
-  };
-
-  const closeVerifyModal = () => {
-    setVerifyModalVisible(false);
-    setSelectedIDType('');
-    setIdImage(null);
-  };
 
   const pickProfileImage = async () => {
     try {
@@ -410,47 +1086,7 @@ const PetSitterProfileScreen = () => {
     }
   };
 
-  const pickImage = async () => {
-    // Request camera permissions first
-    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-    
-    if (cameraPermission.granted === false) {
-      Alert.alert("Camera Permission Required", "Please allow camera access to take ID photos.");
-      return;
-    }
 
-    try {
-      // Force camera mode with explicit settings
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-        cameraType: ImagePicker.CameraType.back,
-        allowsMultipleSelection: false,
-        selectionLimit: 1,
-        presentationStyle: Platform.OS === 'ios' ? ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN : undefined,
-        videoQuality: ImagePicker.UIImagePickerControllerQualityType.High,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setIdImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-      Alert.alert('Camera Error', 'Failed to open camera. Please try again.');
-    }
-  };
-
-  const submitVerification = () => {
-    // Mock admin approval: set verified true for selectedIDType
-    setVerifiedIDs((prev) =>
-      prev.map((id) =>
-        id.type === selectedIDType ? { ...id, verified: true } : id
-      )
-    );
-    closeVerifyModal();
-  };
 
   // Helper function to validate image URI
   const isValidImageUri = (uri: string | null): boolean => {
@@ -539,7 +1175,40 @@ const PetSitterProfileScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      {/* Real-time connection indicator - Hidden per user request */}
+      {/* <View style={styles.connectionIndicator}>
+        <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#10B981' : '#EF4444' }]} />
+        <Text style={styles.connectionText}>
+          {isConnected ? 'Real-time connected' : 'Real-time disconnected'}
+        </Text>
+        {lastUpdate && (
+          <Text style={styles.lastUpdateText}>
+            Last update: {lastUpdate.toLocaleTimeString()}
+          </Text>
+        )}
+      </View> */}
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#3B82F6']} // Android
+              tintColor="#3B82F6" // iOS
+              title="Pull to refresh"
+              titleColor="#6B7280"
+            />
+          }
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickProfileImage} style={styles.profileImageContainer}>
@@ -562,21 +1231,37 @@ const PetSitterProfileScreen = () => {
             <Text style={styles.profileName}>{`${profile.firstName} ${profile.lastName}`.trim()}</Text>
             
             
-            {/* Badge Row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              {verifiedIDs.filter((id) => id.verified).map((id) => (
-                <View key={id.type} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
-                  <Ionicons name={id.icon as any} size={14} color={id.color} />
-                  <Text style={{ color: id.color, fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>{id.label}</Text>
+            {/* Verification Status - Only ID Verified */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+              {/* ID Verified Badge - Shows when verification is approved */}
+              {verificationStatus.isVerified && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#D1FAE5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8, marginBottom: 4 }}>
+                  <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                  <Text style={{ color: '#10B981', fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>🆔 ID Verified</Text>
                 </View>
-              ))}
-              {/* Show "Not Verified Yet" when no IDs are verified */}
-              {verifiedIDs.filter((id) => id.verified).length === 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF3E0', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, marginTop: 4, marginBottom: 4 }}>
-                  <View style={{ backgroundColor: '#FF9800', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-                    <Ionicons name="alert-circle" size={16} color="#fff" />
-                  </View>
-                  <Text style={{ color: '#FF9800', fontWeight: 'bold', fontSize: 14 }}>Not Verified Yet</Text>
+              )}
+
+              {/* Pending Status */}
+              {!verificationStatus.isVerified && verificationStatus.verificationStatus === 'pending' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8, marginBottom: 4 }}>
+                  <Ionicons name="time" size={14} color="#F59E0B" />
+                  <Text style={{ color: '#F59E0B', fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>⏳ Under Review</Text>
+                </View>
+              )}
+
+              {/* Rejected Status */}
+              {verificationStatus.verificationStatus === 'rejected' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEE2E2', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8, marginBottom: 4 }}>
+                  <Ionicons name="close-circle" size={14} color="#EF4444" />
+                  <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>❌ Verification Rejected</Text>
+                </View>
+              )}
+
+              {/* Not Verified Status */}
+              {!verificationStatus.isVerified && verificationStatus.verificationStatus !== 'pending' && verificationStatus.verificationStatus !== 'rejected' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF3E0', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8, marginBottom: 4 }}>
+                  <Ionicons name="warning" size={14} color="#FF9800" />
+                  <Text style={{ color: '#FF9800', fontWeight: 'bold', fontSize: 13, marginLeft: 4 }}>Not Verified Yet</Text>
                 </View>
               )}
             </View>
@@ -586,20 +1271,8 @@ const PetSitterProfileScreen = () => {
           </View>
         </View>
 
-        {/* Verify Your ID and Add Certificates Buttons */}
+        {/* Add Certificates Button */}
         <View style={styles.verificationButtonsContainer}>
-          <TouchableOpacity 
-            style={styles.verifyButton} 
-            onPress={openVerifyModal}
-            activeOpacity={0.8}
-          >
-            <View style={styles.verifyButtonContent}>
-              <Ionicons name="shield-checkmark" size={16} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.verifyButtonText}>Verify Your ID</Text>
-              <Ionicons name="chevron-forward" size={14} color="#fff" style={{ marginLeft: 6 }} />
-            </View>
-          </TouchableOpacity>
-          
           <TouchableOpacity 
             style={styles.certificatesButton} 
             onPress={() => setCertificateAlbumVisible(true)}
@@ -648,9 +1321,116 @@ const PetSitterProfileScreen = () => {
           )}
         </View>
 
-        {/* Profile Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+        {/* Profile Update Request Form */}
+        {isEditing && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Request Profile Changes</Text>
+            <Text style={styles.sectionDescription}>
+              Review and modify your current profile information below. Only changed fields will be submitted for admin approval.
+            </Text>
+            
+            {cooldownInfo && cooldownInfo.in_cooldown && (
+              <View style={styles.cooldownWarning}>
+                <Text style={styles.cooldownText}>
+                  You can submit another request in {cooldownInfo.remaining_time}.
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>First Name (Current: {user?.name?.split(' ')[0] || 'Not set'})</Text>
+              <TextInput
+                style={styles.input}
+                value={requestData.firstName}
+                onChangeText={(text) => setRequestData({...requestData, firstName: text})}
+                placeholder="Enter your first name"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Last Name (Current: {user?.name?.split(' ').slice(1).join(' ') || 'Not set'})</Text>
+              <TextInput
+                style={styles.input}
+                value={requestData.lastName}
+                onChangeText={(text) => setRequestData({...requestData, lastName: text})}
+                placeholder="Enter your last name"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Phone Number (Current: {user?.phone || 'Not set'})</Text>
+              <TextInput
+                style={styles.input}
+                value={requestData.phone}
+                onChangeText={(text) => setRequestData({...requestData, phone: text})}
+                placeholder="Enter your phone number"
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Hourly Rate (Current: ₱{user?.hourlyRate || 'Not set'})</Text>
+              <TextInput
+                style={styles.input}
+                value={requestData.hourlyRate}
+                onChangeText={(text) => setRequestData({...requestData, hourlyRate: text})}
+                placeholder="Enter your hourly rate"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Experience (Current: {user?.experience || 'Not set'} years)</Text>
+              <TextInput
+                style={styles.input}
+                value={requestData.experience}
+                onChangeText={(text) => setRequestData({...requestData, experience: text})}
+                placeholder="Enter your experience in years"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>About Me (Current: {user?.aboutMe ? 'Set' : 'Not set'})</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={requestData.aboutMe}
+                onChangeText={(text) => setRequestData({...requestData, aboutMe: text})}
+                placeholder="Tell us about yourself..."
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Reason for Changes *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={requestData.reason}
+                onChangeText={(text) => setRequestData({...requestData, reason: text})}
+                placeholder="Please explain why you want to update your profile information..."
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.saveButton, isSubmittingRequest && styles.disabledButton]} 
+              onPress={handleSubmitProfileRequest}
+              disabled={isSubmittingRequest || (cooldownInfo && cooldownInfo.in_cooldown)}
+            >
+              <Text style={styles.saveButtonText}>
+                {isSubmittingRequest ? 'Submitting...' : 'Submit Request'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Profile Details - Hidden when editing */}
+        {!isEditing && (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Personal Information</Text>
           
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>First Name</Text>
@@ -727,7 +1507,7 @@ const PetSitterProfileScreen = () => {
             />
           </View>
 
-        </View>
+            </View>
 
         {/* Experience Section */}
         <View style={[styles.section, { marginBottom: 20, paddingBottom: 15 }]}>
@@ -790,38 +1570,11 @@ const PetSitterProfileScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
         </View>
-      </ScrollView>
+          </>
+        )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-      {/* Modal for ID Verification */}
-      <Modal visible={verifyModalVisible} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 32, width: '90%', maxWidth: 400 }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 24, marginBottom: 20, textAlign: 'center' }}>Verify Your ID</Text>
-            <Text style={{ marginBottom: 16, fontSize: 16, color: '#666' }}>Select ID Type:</Text>
-            {verifiedIDs.map((id) => (
-              <TouchableOpacity key={id.type} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingVertical: 8 }} onPress={() => setSelectedIDType(id.type)}>
-                <Ionicons name={id.icon as any} size={24} color={id.color} />
-                <Text style={{ marginLeft: 12, color: id.color, fontWeight: 'bold', fontSize: 18 }}>{id.label}</Text>
-                {selectedIDType === id.type && <Ionicons name="checkmark" size={24} color="#4CAF50" style={{ marginLeft: 12 }} />}
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={{ marginTop: 20, backgroundColor: '#F59E0B', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, alignSelf: 'center' }} onPress={pickImage}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{idImage ? 'Capture Again' : 'Open Camera to Capture'}</Text>
-            </TouchableOpacity>
-            {idImage && (
-              <Image source={{ uri: idImage }} style={{ width: 160, height: 120, borderRadius: 12, marginTop: 16, alignSelf: 'center' }} />
-            )}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, gap: 16 }}>
-              <TouchableOpacity onPress={closeVerifyModal} style={{ flex: 1, backgroundColor: '#E0E0E0', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}>
-                <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16 }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={submitVerification} disabled={!selectedIDType || !idImage} style={{ flex: 1, backgroundColor: (!selectedIDType || !idImage) ? '#F0F0F0' : '#4CAF50', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}>
-                <Text style={{ color: (!selectedIDType || !idImage) ? '#aaa' : '#fff', fontWeight: 'bold', fontSize: 16 }}>Submit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Certificate Album Modal */}
       <CertificateAlbum
@@ -1090,6 +1843,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  resubmitButton: {
+    backgroundColor: '#EF4444',
+    shadowColor: '#EF4444',
+  },
   verifyButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1101,7 +1858,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   certificatesButton: {
-    flex: 1,
     backgroundColor: '#8B5CF6',
     borderRadius: 12,
     paddingHorizontal: 16,
@@ -1137,6 +1893,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
+  },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    backgroundColor: '#F3F4F6',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  connectionText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  lastUpdateText: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginLeft: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  cooldownWarning: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  cooldownText: {
+    fontSize: 14,
+    color: '#92400E',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
 });
 

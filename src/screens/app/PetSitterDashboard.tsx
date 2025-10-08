@@ -4,18 +4,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import SitterLocationSharing from '../../components/SitterLocationSharing';
 import authService from '../../services/authService';
 import { Booking, bookingService } from '../../services/bookingService';
+import { DashboardMetrics, dashboardService } from '../../services/dashboardService';
 import { notificationService } from '../../services/notificationService';
+import { realtimeService } from '../../services/realtimeService';
 
 const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
 
@@ -31,6 +35,7 @@ const quickActions: { title: string; icon: any; color: string; route: string }[]
   { title: 'View Requests', icon: require('../../assets/icons/req.png'), color: '#DDD6FE', route: '/pet-sitter-requests' },
   { title: 'My Schedule', icon: require('../../assets/icons/sched.png'), color: '#FDE68A', route: '/pet-sitter-schedule' },
   { title: 'Messages', icon: require('../../assets/icons/message2.png'), color: '#BAE6FD', route: '/pet-sitter-messages' },
+  { title: 'E-Wallet', icon: 'wallet-outline', color: '#FDE68A', route: '/e-wallet' },
 ];
 
 const reflectionColors = {
@@ -54,6 +59,9 @@ const PetSitterDashboard = () => {
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
   const [imageError, setImageError] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics>({});
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   // Check if user is logged out and redirect to onboarding
   useEffect(() => {
@@ -75,6 +83,49 @@ const PetSitterDashboard = () => {
   useEffect(() => {
     checkAuthentication();
   }, []);
+
+  // Initialize real-time service and load dashboard metrics
+  useEffect(() => {
+    if (currentUserId) {
+      initializeRealtimeService();
+      loadDashboardMetrics();
+    }
+  }, [currentUserId]);
+
+  // Subscribe to dashboard updates
+  useEffect(() => {
+    const unsubscribe = dashboardService.subscribe((metrics) => {
+      setDashboardMetrics(metrics);
+      if (metrics.walletBalance !== undefined) {
+        setWalletBalance(metrics.walletBalance);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Initialize real-time service
+  const initializeRealtimeService = async () => {
+    try {
+      await realtimeService.initialize(currentUserId!);
+      console.log('🔌 PetSitterDashboard: Real-time service initialized');
+    } catch (error) {
+      console.error('Error initializing real-time service:', error);
+    }
+  };
+
+  // Load dashboard metrics
+  const loadDashboardMetrics = async () => {
+    try {
+      const metrics = await dashboardService.getSitterMetrics();
+      setDashboardMetrics(metrics);
+      if (metrics.walletBalance !== undefined) {
+        setWalletBalance(metrics.walletBalance);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard metrics:', error);
+    }
+  };
 
   // Check authentication status
   const checkAuthentication = async () => {
@@ -113,9 +164,13 @@ const PetSitterDashboard = () => {
   // Refresh user data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('📱 PetSitterDashboard: Screen focused, checking authentication');
+      console.log('📱 PetSitterDashboard: Screen focused, checking authentication and refreshing data');
       checkAuthentication();
-    }, [])
+      if (currentUserId) {
+        loadDashboardData();
+        loadDashboardMetrics();
+      }
+    }, [currentUserId])
   );
 
   useEffect(() => {
@@ -170,21 +225,26 @@ const PetSitterDashboard = () => {
     return isValid;
   };
 
-  // Helper function to get full image URL
+  // Helper function to get full image URL using network service
   const getFullImageUrl = (uri: string | null): string | null => {
     if (!uri) return null;
     if (uri.startsWith('http')) return uri;
+    
+    // Import network service dynamically to avoid circular dependencies
+    const { networkService } = require('../../services/networkService');
+    const baseUrl = networkService.getBaseUrl();
+    
     if (uri.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.192:8000${uri}`;
+      const fullUrl = `${baseUrl}${uri}`;
       console.log('🔗 PetSitterDashboard: Generated URL for /storage/ path:', fullUrl);
       return fullUrl;
     }
     if (uri.startsWith('profile_images/')) {
-      const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+      const fullUrl = `${baseUrl}/storage/${uri}`;
       console.log('🔗 PetSitterDashboard: Generated URL for profile_images/ path:', fullUrl);
       return fullUrl;
     }
-    const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+    const fullUrl = `${baseUrl}/storage/${uri}`;
     console.log('🔗 PetSitterDashboard: Generated URL for fallback path:', fullUrl);
     return fullUrl;
   };
@@ -228,12 +288,20 @@ const PetSitterDashboard = () => {
       // Load earnings data
       const earnings = await bookingService.getSitterEarnings(currentUserId);
       console.log('💰 Earnings data:', earnings);
-      setEarningsData({
+      console.log('💰 Earnings breakdown:', {
+        thisWeek: earnings.thisWeek,
+        thisMonth: earnings.thisMonth,
+        total: earnings.total,
+        completedJobs: earnings.completedJobs
+      });
+      const newEarningsData = {
         thisWeek: `₱${earnings.thisWeek.toFixed(0)}`,
         thisMonth: `₱${earnings.thisMonth.toFixed(0)}`,
         totalEarnings: `₱${earnings.total.toFixed(0)}`,
         completedJobs: earnings.completedJobs,
-      });
+      };
+      console.log('💰 Setting earnings data state:', newEarningsData);
+      setEarningsData(newEarningsData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -241,17 +309,54 @@ const PetSitterDashboard = () => {
     }
   };
 
+  // Handle pull to refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    console.log('🔄 Refreshing sitter dashboard data...');
+    
+    try {
+      // Refresh dashboard data
+      await loadDashboardData();
+      
+      // Refresh dashboard metrics
+      await loadDashboardMetrics();
+    } catch (error) {
+      console.error('❌ Error refreshing dashboard data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [currentUserId]);
+
   // Removed loadNotificationCount function for fresh start
 
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#10B981', '#8B5CF6', '#F97316']} // Android
+            tintColor="#10B981" // iOS
+            title="Refreshing dashboard..." // iOS
+            titleColor="#666" // iOS
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.headerCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image source={require('../../assets/images/logo.png')} style={{ width: 28, height: 28, marginRight: 8 }} />
             <Text style={styles.headerTitle}>Pet Sitter Dashboard</Text>
+            {refreshing && (
+              <ActivityIndicator 
+                size="small" 
+                color="#10B981" 
+                style={{ marginLeft: 8 }} 
+              />
+            )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={() => router.push('/pet-sitter-notifications')} style={{ marginRight: 16, position: 'relative' }}>
@@ -306,7 +411,12 @@ const PetSitterDashboard = () => {
                 <Ionicons name="wallet" size={24} color="#fff" />
                 <Text style={styles.totalIncomeLabel}>Total Income</Text>
               </View>
-              <Text style={styles.totalIncomeAmount}>{earningsData.totalEarnings}</Text>
+              <Text style={styles.totalIncomeAmount}>
+                {(() => {
+                  console.log('💰 Rendering total income:', earningsData.totalEarnings);
+                  return earningsData.totalEarnings || '₱0.00';
+                })()}
+              </Text>
               <View style={styles.totalIncomeHint}>
                 <Ionicons name="arrow-forward" size={16} color="#fff" />
                 <Text style={styles.totalIncomeHintText}>Tap to view E-Wallet</Text>
@@ -331,7 +441,12 @@ const PetSitterDashboard = () => {
             <View style={styles.statsIcon}>
               <Ionicons name="checkmark-circle" size={24} color="#fff" />
             </View>
-            <Text style={styles.statsValueWhite}>{earningsData.completedJobs}</Text>
+            <Text style={styles.statsValueWhite}>
+              {(() => {
+                console.log('💰 Rendering completed jobs:', earningsData.completedJobs);
+                return earningsData.completedJobs || 0;
+              })()}
+            </Text>
             <Text style={styles.statsLabelWhite}>Jobs Completed</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.jobs }]} />
           </TouchableOpacity>
@@ -350,7 +465,9 @@ const PetSitterDashboard = () => {
             <View style={styles.statsIcon}>
               <Ionicons name="calendar" size={24} color="#fff" />
             </View>
-            <Text style={styles.statsValueWhite}>{upcomingBookings.length}</Text>
+            <Text style={styles.statsValueWhite}>
+              {upcomingBookings.length || 0}
+            </Text>
             <Text style={styles.statsLabelWhite}>Upcoming Jobs</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
           </TouchableOpacity>
@@ -369,7 +486,12 @@ const PetSitterDashboard = () => {
             <View style={styles.statsIcon}>
               <Ionicons name="trending-up" size={24} color="#fff" />
             </View>
-            <Text style={styles.statsValueWhite}>{earningsData.thisWeek}</Text>
+            <Text style={styles.statsValueWhite}>
+              {(() => {
+                console.log('💰 Rendering this week:', earningsData.thisWeek);
+                return earningsData.thisWeek || '₱0.00';
+              })()}
+            </Text>
             <Text style={styles.statsLabelWhite}>This Week</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.week }]} />
           </TouchableOpacity>
@@ -384,11 +506,15 @@ const PetSitterDashboard = () => {
           {quickActions.map((action) => (
             <TouchableOpacity key={action.title} style={styles.quickAction} onPress={() => router.push(action.route as any)}>
               <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}> 
-                <Image 
-                  source={action.icon} 
-                  style={styles.quickActionImage}
-                  resizeMode="contain"
-                />
+                {typeof action.icon === 'string' ? (
+                  <Ionicons name={action.icon as any} size={24} color="#fff" />
+                ) : (
+                  <Image 
+                    source={action.icon} 
+                    style={styles.quickActionImage}
+                    resizeMode="contain"
+                  />
+                )}
               </View>
               <Text style={styles.quickActionLabel}>{action.title}</Text>
             </TouchableOpacity>

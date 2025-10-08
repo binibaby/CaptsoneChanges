@@ -51,7 +51,7 @@ const IDVerificationScreen = () => {
         document_image: idImage,
       });
       if (result.success) {
-        Alert.alert('Success', 'ID verified! You can now enter the app.', [
+        Alert.alert('Verification Submitted!', 'Your ID verification has been submitted for admin review. You will be notified within 24 hours of the admin\'s decision. You cannot start jobs until your verification is approved.', [
           { text: 'Continue', onPress: () => navigation.navigate('PetSitterDashboard') }
         ]);
       } else {

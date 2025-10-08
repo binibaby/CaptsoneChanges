@@ -459,6 +459,17 @@ class AuthService {
       console.log('  - this.currentUser.firstName:', JSON.stringify(this.currentUser.firstName));
       console.log('  - this.currentUser.lastName:', JSON.stringify(this.currentUser.lastName));
       console.log('  - this.currentUser.name:', JSON.stringify(this.currentUser.name));
+      
+      // Check if user has a token, if not try to refresh it
+      if (!this.currentUser.token) {
+        console.log('⚠️ Current user has no token, attempting to refresh...');
+        try {
+          await this.refreshUserToken();
+        } catch (error) {
+          console.error('Failed to refresh token:', error);
+        }
+      }
+      
       return this.currentUser;
     }
     
@@ -473,6 +484,17 @@ class AuthService {
         console.log('  - user.firstName:', JSON.stringify(user.firstName));
         console.log('  - user.lastName:', JSON.stringify(user.lastName));
         console.log('  - user.name:', JSON.stringify(user.name));
+        
+        // Check if restored user has a token, if not try to refresh it
+        if (!user.token) {
+          console.log('⚠️ Restored user has no token, attempting to refresh...');
+          try {
+            await this.refreshUserToken();
+          } catch (error) {
+            console.error('Failed to refresh token for restored user:', error);
+          }
+        }
+        
         return user;
       }
     } catch (error) {
@@ -481,6 +503,116 @@ class AuthService {
     
     console.log('getCurrentUser: No user found');
     return null;
+  }
+
+  // Method to refresh user token
+  async refreshUserToken(): Promise<void> {
+    if (!this.currentUser) {
+      console.log('❌ Cannot refresh token: No current user');
+      return;
+    }
+
+    try {
+      console.log('🔄 Refreshing token for user:', this.currentUser.email);
+      
+      // Use direct fetch to avoid circular dependency with makeApiCall
+      const { getApiUrl } = await import('./networkService');
+      const url = await getApiUrl('/api/refresh-token');
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          email: this.currentUser.email,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('❌ Token refresh failed:', response.status, response.statusText);
+        throw new Error(`Token refresh failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Token refresh response:', result);
+      
+      if (result.success && result.token) {
+        // Update the current user with the new token
+        this.currentUser.token = result.token;
+        
+        // Update stored user data
+        await AsyncStorage.setItem('user', JSON.stringify(this.currentUser));
+        
+        console.log('✅ Token refreshed successfully for user:', this.currentUser.email);
+      } else {
+        console.error('❌ Token refresh failed: Invalid response', result);
+        throw new Error('Token refresh failed: Invalid response');
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing token:', error);
+      
+      // If token refresh fails, try to generate a new token
+      try {
+        await this.generateNewToken();
+      } catch (generateError) {
+        console.error('❌ Failed to generate new token:', generateError);
+        throw error; // Re-throw the original error
+      }
+    }
+  }
+
+  // Method to generate a new token for the user
+  async generateNewToken(): Promise<void> {
+    if (!this.currentUser) {
+      console.log('❌ Cannot generate token: No current user');
+      return;
+    }
+
+    try {
+      console.log('🔄 Generating new token for user:', this.currentUser.email);
+      
+      // Use direct fetch to avoid circular dependency with makeApiCall
+      const { getApiUrl } = await import('./networkService');
+      const url = await getApiUrl('/api/generate-token');
+      
+      // Call the backend to generate a new token
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          email: this.currentUser.email,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('❌ Token generation failed:', response.status, response.statusText);
+        throw new Error(`Token generation failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Token generation response:', result);
+      
+      if (result.success && result.token) {
+        // Update the current user with the new token
+        this.currentUser.token = result.token;
+        
+        // Update stored user data
+        await AsyncStorage.setItem('user', JSON.stringify(this.currentUser));
+        
+        console.log('✅ New token generated successfully for user:', this.currentUser.email);
+      } else {
+        console.error('❌ Token generation failed: Invalid response', result);
+        throw new Error('Token generation failed: Invalid response');
+      }
+    } catch (error) {
+      console.error('❌ Error generating new token:', error);
+      throw error;
+    }
   }
 
   // Method to restore profile data from persistent storage
