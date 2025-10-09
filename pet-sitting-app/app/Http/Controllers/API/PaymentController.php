@@ -329,13 +329,25 @@ class PaymentController extends Controller
     public function getPaymentHistory(Request $request)
     {
         $user = Auth::user();
-        $payments = Payment::with(['booking.sitter', 'booking.user'])
-            ->whereHas('booking', function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                      ->orWhere('sitter_id', $user->id);
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        
+        // Filter payments based on user role
+        if ($user->role === 'pet_owner') {
+            // Pet owners only see payments they made (as the booking owner)
+            $payments = Payment::with(['booking.sitter', 'booking.user'])
+                ->whereHas('booking', function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate(20);
+        } else {
+            // Pet sitters only see payments they received (as the booking sitter)
+            $payments = Payment::with(['booking.sitter', 'booking.user'])
+                ->whereHas('booking', function ($query) use ($user) {
+                    $query->where('sitter_id', $user->id);
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate(20);
+        }
 
         return response()->json($payments);
     }

@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     FlatList,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -55,6 +57,13 @@ const EWalletScreen: React.FC = () => {
     loadWalletData();
     loadAvailableBanks();
   }, []);
+
+  // Refresh wallet data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadWalletData();
+    }, [])
+  );
 
   const loadWalletData = async () => {
     try {
@@ -183,8 +192,19 @@ const EWalletScreen: React.FC = () => {
     setAccountNumber('');
   };
 
-  const formatCurrency = (amount: number) => {
-    return `₱${amount.toFixed(2)}`;
+  const formatCurrency = (amount: any) => {
+    if (amount === undefined || amount === null) {
+      return '₱0.00';
+    }
+    
+    // Convert to number if it's a string
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    if (isNaN(numAmount)) {
+      return '₱0.00';
+    }
+    
+    return `₱${numAmount.toFixed(2)}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -286,7 +306,17 @@ const EWalletScreen: React.FC = () => {
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView style={styles.modalContent}>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ScrollView 
+            style={styles.modalContent}
+            contentContainerStyle={styles.modalContentContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Amount</Text>
             <TextInput
@@ -355,7 +385,8 @@ const EWalletScreen: React.FC = () => {
               Cash out requests are processed within 1-3 business days. You will receive a notification once the transaction is completed.
             </Text>
           </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
         <View style={styles.modalFooter}>
           <TouchableOpacity
@@ -370,7 +401,7 @@ const EWalletScreen: React.FC = () => {
               <ActivityIndicator color="#FFF" size="small" />
             ) : (
               <Text style={styles.cashOutButtonText}>
-                Cash Out {cashOutAmount ? formatCurrency(parseFloat(cashOutAmount)) : ''}
+                Cash Out {cashOutAmount ? formatCurrency(parseFloat(cashOutAmount)) : '₱0.00'}
               </Text>
             )}
           </TouchableOpacity>
@@ -662,6 +693,12 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  modalContentContainer: {
+    paddingBottom: 20,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   formGroup: {
     marginTop: 24,

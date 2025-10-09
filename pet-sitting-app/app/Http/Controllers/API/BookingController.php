@@ -11,6 +11,49 @@ use Carbon\Carbon;
 
 class BookingController extends Controller
 {
+    /**
+     * Safely parse a date string with error handling
+     */
+    private function safeParseDate($dateString, $format = 'Y-m-d')
+    {
+        try {
+            $cleanDate = trim($dateString);
+            // Extract only the date part if there's extra data
+            if (preg_match('/(\d{4}-\d{2}-\d{2})/', $cleanDate, $matches)) {
+                $cleanDate = $matches[1];
+            }
+            return \Carbon\Carbon::createFromFormat($format, $cleanDate);
+        } catch (\Exception $e) {
+            \Log::error('Date parsing error:', [
+                'input' => $dateString,
+                'format' => $format,
+                'error' => $e->getMessage()
+            ]);
+            return \Carbon\Carbon::now();
+        }
+    }
+
+    /**
+     * Safely parse a time string with error handling
+     */
+    private function safeParseTime($timeString, $format = 'H:i')
+    {
+        try {
+            $cleanTime = trim($timeString);
+            // Extract only the time part if there's extra data
+            if (preg_match('/(\d{1,2}:\d{2})/', $cleanTime, $matches)) {
+                $cleanTime = $matches[1];
+            }
+            return \Carbon\Carbon::createFromFormat($format, $cleanTime);
+        } catch (\Exception $e) {
+            \Log::error('Time parsing error:', [
+                'input' => $timeString,
+                'format' => $format,
+                'error' => $e->getMessage()
+            ]);
+            return \Carbon\Carbon::now();
+        }
+    }
     public function index(Request $request)
     {
         $user = $request->user();
@@ -66,6 +109,27 @@ class BookingController extends Controller
 
     public function store(Request $request)
     {
+        // Debug: Log the incoming request data
+        \Log::info('📝 BookingController - Incoming booking request:', [
+            'date' => $request->date,
+            'time' => $request->time,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'sitter_id' => $request->sitter_id,
+            'is_weekly' => $request->is_weekly,
+            'all_data' => $request->all()
+        ]);
+        
+        // Debug: Test date parsing with error handling
+        $testDate = $request->date;
+        $parsedDate = $this->safeParseDate($testDate);
+        \Log::info('📅 Backend date parsing test:', [
+            'input_date' => $testDate,
+            'parsed_date' => $parsedDate->format('Y-m-d'),
+            'formatted_for_notification' => $parsedDate->format('F j, Y'),
+            'timezone' => $parsedDate->timezone->getName()
+        ]);
+        
         $request->validate([
             'sitter_id' => 'required|exists:users,id',
             'date' => 'required|date|after_or_equal:today',
@@ -136,6 +200,18 @@ class BookingController extends Controller
             'service_type' => $request->service_type,
             'duration' => $request->duration,
             'description' => $request->description
+        ]);
+        
+        // Debug: Log the created booking data
+        \Log::info('📝 BookingController - Booking created successfully:', [
+            'booking_id' => $booking->id,
+            'date' => $booking->date,
+            'time' => $booking->time,
+            'start_time' => $booking->start_time,
+            'end_time' => $booking->end_time,
+            'is_weekly' => $booking->is_weekly,
+            'sitter_id' => $booking->sitter_id,
+            'user_id' => $booking->user_id
         ]);
 
         // Notify admin about new booking
@@ -246,12 +322,12 @@ class BookingController extends Controller
         // Notify pet owner about confirmation
         $message = '';
         if ($booking->is_weekly) {
-            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
-            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $startDate = $this->safeParseDate($booking->start_date)->format('F j, Y');
+            $endDate = $this->safeParseDate($booking->end_date)->format('F j, Y');
             $message = "Your weekly booking with {$user->name} has been confirmed from {$startDate} to {$endDate}.";
         } else {
-            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
-            $time = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $date = $this->safeParseDate($booking->date)->format('F j, Y');
+            $time = $this->safeParseTime($booking->time)->format('g:i A');
             $message = "Your booking with {$user->name} has been confirmed for {$date} at {$time}.";
         }
         
@@ -315,12 +391,12 @@ class BookingController extends Controller
         
         $message = '';
         if ($booking->is_weekly) {
-            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
-            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $startDate = $this->safeParseDate($booking->start_date)->format('F j, Y');
+            $endDate = $this->safeParseDate($booking->end_date)->format('F j, Y');
             $message = "Your weekly booking from {$startDate} to {$endDate} has been cancelled by {$user->name}.";
         } else {
-            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
-            $time = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $date = $this->safeParseDate($booking->date)->format('F j, Y');
+            $time = $this->safeParseTime($booking->time)->format('g:i A');
             $message = "Your booking for {$date} at {$time} has been cancelled by {$user->name}.";
         }
         
@@ -362,17 +438,17 @@ class BookingController extends Controller
         
         if ($booking->is_weekly) {
             // Weekly booking message
-            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
-            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
-            $startTime = \Carbon\Carbon::parse($booking->start_time)->format('g:i A');
-            $endTime = \Carbon\Carbon::parse($booking->end_time)->format('g:i A');
+            $startDate = $this->safeParseDate($booking->start_date)->format('F j, Y');
+            $endDate = $this->safeParseDate($booking->end_date)->format('F j, Y');
+            $startTime = $this->safeParseTime($booking->start_time)->format('g:i A');
+            $endTime = $this->safeParseTime($booking->end_time)->format('g:i A');
             
             $message = "New weekly booking request: {$booking->user->name} booked {$booking->sitter->name} from {$startDate} to {$endDate} at {$startTime} - {$endTime}. Service: {$details['service_type']} for {$details['pet_name']} ({$details['pet_type']}). Duration: {$details['duration']} hours. Total: ₱{$totalAmount}.";
         } else {
             // Daily booking message
-            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
-            $startTime = \Carbon\Carbon::parse($booking->time)->format('g:i A');
-            $endTime = \Carbon\Carbon::parse($booking->time)->addHours($details['duration'] ?? 8)->format('g:i A');
+            $date = $this->safeParseDate($booking->date)->format('F j, Y');
+            $startTime = $this->safeParseTime($booking->time)->format('g:i A');
+            $endTime = $this->safeParseTime($booking->time)->addHours($details['duration'] ?? 8)->format('g:i A');
             
             $message = "New booking request: {$booking->user->name} booked {$booking->sitter->name} for {$date} at {$startTime} - {$endTime}. Service: {$details['service_type']} for {$details['pet_name']} ({$details['pet_type']}). Duration: {$details['duration']} hours. Total: ₱{$totalAmount}.";
         }
@@ -402,24 +478,52 @@ class BookingController extends Controller
 
     private function notifySitterNewBooking($booking, $sitter)
     {
+        // Debug: Log the booking data being used for notification
+        \Log::info('🔔 Creating sitter notification for booking:', [
+            'booking_id' => $booking->id,
+            'date' => $booking->date,
+            'time' => $booking->time,
+            'start_time' => $booking->start_time,
+            'end_time' => $booking->end_time,
+            'duration' => $booking->duration,
+            'is_weekly' => $booking->is_weekly,
+            'pet_owner_name' => $booking->user->name,
+            'sitter_name' => $sitter->name
+        ]);
+        
         $message = '';
         
         if ($booking->is_weekly) {
             // Weekly booking message
-            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
-            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
-            $startTime = \Carbon\Carbon::parse($booking->start_time)->format('g:i A');
-            $endTime = \Carbon\Carbon::parse($booking->end_time)->format('g:i A');
+            $startDate = $this->safeParseDate($booking->start_date)->format('F j, Y');
+            $endDate = $this->safeParseDate($booking->end_date)->format('F j, Y');
+            $startTime = $this->safeParseTime($booking->start_time)->format('g:i A');
+            $endTime = $this->safeParseTime($booking->end_time)->format('g:i A');
             
             $message = "New weekly booking request from {$booking->user->name} from {$startDate} to {$endDate} at {$startTime} - {$endTime}. Please review and confirm.";
         } else {
-            // Daily booking message
-            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
-            $startTime = \Carbon\Carbon::parse($booking->time)->format('g:i A');
-            $endTime = \Carbon\Carbon::parse($booking->time)->addHours($booking->duration ?? 8)->format('g:i A');
+            // Daily booking message - parse date without timezone conversion
+            $date = $this->safeParseDate($booking->date)->format('F j, Y');
+            
+            // Use start_time and end_time if available, otherwise fall back to time + duration
+            if ($booking->start_time && $booking->end_time) {
+                $startTime = $this->safeParseTime($booking->start_time)->format('g:i A');
+                $endTime = $this->safeParseTime($booking->end_time)->format('g:i A');
+            } else {
+                $startTime = $this->safeParseTime($booking->time)->format('g:i A');
+                $endTime = $this->safeParseTime($booking->time)->addHours($booking->duration ?? 8)->format('g:i A');
+            }
             
             $message = "New booking request from {$booking->user->name} for {$date} at {$startTime} - {$endTime}. Please review and confirm.";
         }
+        
+        // Debug: Log the final message being created
+        \Log::info('🔔 Sitter notification message:', [
+            'message' => $message,
+            'formatted_date' => $date ?? 'N/A',
+            'formatted_start_time' => $startTime ?? 'N/A',
+            'formatted_end_time' => $endTime ?? 'N/A'
+        ]);
         
         Notification::create([
             'user_id' => $sitter->id,
@@ -448,12 +552,12 @@ class BookingController extends Controller
         
         $message = '';
         if ($booking->is_weekly) {
-            $startDate = \Carbon\Carbon::parse($booking->start_date)->format('F j, Y');
-            $endDate = \Carbon\Carbon::parse($booking->end_date)->format('F j, Y');
+            $startDate = $this->safeParseDate($booking->start_date)->format('F j, Y');
+            $endDate = $this->safeParseDate($booking->end_date)->format('F j, Y');
             $message = "Weekly booking confirmed: {$booking->sitter->name} confirmed the booking with {$booking->user->name} from {$startDate} to {$endDate}.";
         } else {
-            $date = \Carbon\Carbon::parse($booking->date)->format('F j, Y');
-            $time = \Carbon\Carbon::parse($booking->time)->format('g:i A');
+            $date = $this->safeParseDate($booking->date)->format('F j, Y');
+            $time = $this->safeParseTime($booking->time)->format('g:i A');
             $message = "Booking confirmed: {$booking->sitter->name} confirmed the booking with {$booking->user->name} for {$date} at {$time}.";
         }
         

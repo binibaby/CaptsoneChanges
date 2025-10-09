@@ -443,26 +443,48 @@ class BookingService {
 
       // Ensure date is in Y-m-d format and not in the past
       const formatDateForAPI = (dateString: string) => {
-        const date = new Date(dateString);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Reset time to start of day
+        console.log('📅 formatDateForAPI input:', dateString);
         
-        // Check if date is valid
+        // Parse the date string directly as YYYY-MM-DD format to avoid timezone issues
+        const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateMatch) {
+          const [, year, month, day] = dateMatch;
+          // Create date in local timezone to avoid timezone conversion issues
+          const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          const formattedDate = `${year}-${month}-${day}`;
+          console.log('📅 Parsed date from YYYY-MM-DD (local):', formattedDate);
+          return formattedDate;
+        }
+        
+        // Fallback: try to extract YYYY-MM-DD from any date string
+        const isoMatch = dateString.match(/(\d{4}-\d{2}-\d{2})/);
+        if (isoMatch) {
+          const formattedDate = isoMatch[1];
+          console.log('📅 Extracted YYYY-MM-DD from string:', formattedDate);
+          return formattedDate;
+        }
+        
+        // Last resort: parse as date and format
+        const date = new Date(dateString);
         if (isNaN(date.getTime())) {
           console.log('⚠️ Invalid date format, using today\'s date instead');
+          const today = new Date();
           return today.toISOString().split('T')[0];
         }
         
-        // Reset time to start of day for comparison
-        date.setHours(0, 0, 0, 0);
+        // Format as YYYY-MM-DD in local timezone
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}`;
         
-        // If the date is in the past, use today's date instead
-        if (date < today) {
-          console.log('⚠️ Date is in the past, using today\'s date instead');
-          return today.toISOString().split('T')[0];
-        }
+        console.log('📅 Date formatting result:', {
+          inputDate: dateString,
+          parsedDate: date.toISOString(),
+          formattedDate: formattedDate
+        });
         
-        return date.toISOString().split('T')[0];
+        return formattedDate;
       };
 
       const formattedDate = formatDateForAPI(bookingData.date);
@@ -471,6 +493,8 @@ class BookingService {
         sitter_id: bookingData.sitterId,
         date: formattedDate,
         time: convertTo24Hour(bookingData.startTime),
+        start_time: convertTo24Hour(bookingData.startTime),
+        end_time: convertTo24Hour(bookingData.endTime),
         pet_name: 'My Pet', // Default pet name
         pet_type: 'Dog', // Default pet type
         service_type: 'Pet Sitting',
@@ -481,8 +505,17 @@ class BookingService {
       };
 
       console.log('📝 Sending booking to API:', bookingPayload);
-      console.log('📝 Original date:', bookingData.date);
+      console.log('📝 Original booking data:', {
+        date: bookingData.date,
+        startTime: bookingData.startTime,
+        endTime: bookingData.endTime,
+        sitterId: bookingData.sitterId
+      });
       console.log('📝 Formatted date:', formattedDate);
+      console.log('📝 Converted times:', {
+        startTime: convertTo24Hour(bookingData.startTime),
+        endTime: convertTo24Hour(bookingData.endTime)
+      });
       console.log('📝 Date validation - is today or future:', formattedDate >= new Date().toISOString().split('T')[0]);
       console.log('📝 Today\'s date:', new Date().toISOString().split('T')[0]);
       console.log('📝 Date comparison details:');
@@ -803,27 +836,40 @@ class BookingService {
     const sitterBookings = await this.getSitterBookings(sitterId);
     console.log('📊 All sitter bookings:', sitterBookings.length);
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    console.log('📅 Today:', today.toISOString().split('T')[0]);
+    const now = new Date();
+    console.log('📅 Current time:', now.toISOString());
 
-    // Include pending bookings from today onwards, or all pending if none found
-    let upcoming = sitterBookings.filter(booking => {
+    // Helper function to check if booking is upcoming (future schedule)
+    const isBookingUpcoming = (booking: any) => {
+      // Include confirmed, pending, and active bookings that are in the future
+      // 'active' means payment is successful but job hasn't started yet
+      if (booking.status !== 'confirmed' && booking.status !== 'pending' && booking.status !== 'active') return false;
+      
       const bookingDate = new Date(booking.date);
+      const startTime = booking.startTime || booking.start_time || booking.time;
+      
+      if (startTime) {
+        // Parse time and create full datetime
+        const [hours, minutes] = startTime.split(':');
+        const fullDateTime = new Date(bookingDate);
+        fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        console.log(`  - ${booking.date} ${startTime} (${booking.status}): ${fullDateTime.toISOString()} > ${now.toISOString()} = ${fullDateTime > now}`);
+        return fullDateTime > now;
+      }
+      
+      // If no time, just check if date is today or future
       bookingDate.setHours(0, 0, 0, 0);
-      const isUpcoming = bookingDate >= today;
-      const isPending = (booking.status === 'pending');
-      console.log(`  - ${booking.date} (${booking.status}): upcoming=${isUpcoming}, status=${isPending}`);
-      // Include only pending bookings from today onwards
-      return isUpcoming && isPending;
-    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    // If no upcoming bookings found, show all pending bookings
-    if (upcoming.length === 0) {
-      console.log('📅 No upcoming bookings found, showing all pending bookings');
-      upcoming = sitterBookings.filter(booking => booking.status === 'pending')
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      console.log(`  - ${booking.date} (${booking.status}): ${bookingDate.toISOString()} >= ${today.toISOString()} = ${bookingDate >= today}`);
+      return bookingDate >= today;
+    };
+
+    // Filter upcoming bookings
+    const upcoming = sitterBookings.filter(isBookingUpcoming)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     console.log('📅 Upcoming bookings result:', upcoming.length);
     return upcoming;

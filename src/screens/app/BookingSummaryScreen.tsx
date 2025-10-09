@@ -52,6 +52,15 @@ const BookingSummaryScreen: React.FC = () => {
     description,
   } = useLocalSearchParams<BookingSummaryScreenProps>();
 
+  // Debug logging to see what time values we're receiving
+  console.log('🔍 BookingSummaryScreen received params:', {
+    selectedDate,
+    startTime,
+    endTime,
+    duration,
+    sitterRate
+  });
+
   // Calculate total amount with proper validation
   const hourlyRate = parseFloat(sitterRate || '25') || 25; // Fallback to 25 if NaN
   const hours = duration ? (parseFloat(duration.toString()) / 60) || 2 : 2; // Default to 2 hours if not specified or invalid
@@ -81,12 +90,63 @@ const BookingSummaryScreen: React.FC = () => {
   };
 
   const formatTime = (timeString: string) => {
-    const time = new Date(`2000-01-01T${timeString}`);
-    return time.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+    if (!timeString) return 'Invalid Time';
+    
+    try {
+      // Handle different time formats
+      let cleanTime = timeString;
+      
+      // If it contains 'T' (ISO format), extract just the time part
+      if (timeString.includes('T')) {
+        const timeMatch = timeString.match(/(\d{1,2}):(\d{2})/);
+        if (timeMatch) {
+          cleanTime = `${timeMatch[1]}:${timeMatch[2]}`;
+        }
+      }
+      
+      // Handle 12-hour format with AM/PM
+      const time12HourRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+      const time24HourRegex = /^(\d{1,2}):(\d{2})$/;
+      
+      let hour, minute, ampm;
+      
+      if (time12HourRegex.test(cleanTime)) {
+        const match = cleanTime.match(time12HourRegex);
+        hour = parseInt(match[1], 10);
+        minute = parseInt(match[2], 10);
+        ampm = match[3].toUpperCase();
+        
+        // Convert to 24-hour format for validation
+        if (ampm === 'PM' && hour !== 12) {
+          hour += 12;
+        } else if (ampm === 'AM' && hour === 12) {
+          hour = 0;
+        }
+      } else if (time24HourRegex.test(cleanTime)) {
+        const match = cleanTime.match(time24HourRegex);
+        hour = parseInt(match[1], 10);
+        minute = parseInt(match[2], 10);
+        ampm = hour >= 12 ? 'PM' : 'AM';
+      } else {
+        console.error('Invalid time format:', timeString);
+        return 'Invalid Time';
+      }
+      
+      // Validate hour and minute
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        console.error('Invalid time values:', { hour, minute });
+        return 'Invalid Time';
+      }
+      
+      // Convert to 12-hour format
+      const hour12 = hour % 12 || 12;
+      const formattedMinute = minute.toString().padStart(2, '0');
+      
+      return `${hour12}:${formattedMinute} ${ampm}`;
+    } catch (error) {
+      console.error('Error formatting time:', error, 'Input:', timeString);
+      return 'Invalid Time';
+    }
   };
 
   // Helper function to safely format currency

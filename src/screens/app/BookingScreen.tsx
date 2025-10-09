@@ -17,7 +17,6 @@ import authService from '../../services/authService';
 import { bookingService } from '../../services/bookingService';
 import { messagingService } from '../../services/messagingService';
 import { makeApiCall } from '../../services/networkService';
-import { notificationService } from '../../services/notificationService';
 
 interface TimeRange {
   id: string;
@@ -326,6 +325,19 @@ const BookingScreen: React.FC = () => {
         sitterRate
       });
       
+      // Debug: Log the exact data being passed to createBooking
+      console.log('📝 BookingScreen - Exact data for createBooking:', {
+        sitterId: sitterId!,
+        sitterName: sitterName || 'Sitter',
+        petOwnerId: currentUser.id,
+        petOwnerName: currentUser.name || 'Pet Owner',
+        date: selectedDate,
+        startTime: selectedTimeRange.startTime,
+        endTime: selectedTimeRange.endTime,
+        hourlyRate: parseFloat(sitterRate || '25'),
+        status: 'pending',
+      });
+      
       // Create booking using the service (which handles API call)
       const newBooking = await bookingService.createBooking({
         sitterId: sitterId!,
@@ -341,18 +353,7 @@ const BookingScreen: React.FC = () => {
       
       console.log('✅ New booking created:', newBooking);
 
-      // Create notification for the sitter
-      await notificationService.createBookingNotification({
-        sitterId: sitterId!,
-        sitterName: sitterName || 'Sitter',
-        petOwnerId: currentUser.id,
-        petOwnerName: currentUser.name || 'Pet Owner',
-        bookingId: newBooking.id,
-        date: selectedDate,
-        startTime: selectedTimeRange.startTime,
-        endTime: selectedTimeRange.endTime,
-        hourlyRate: parseFloat(sitterRate || '25'),
-      });
+      // Note: Backend will create the notification with the correct data from the database
 
       // Create message for the sitter
       await messagingService.createBookingRequestMessage({

@@ -90,29 +90,71 @@ const PetOwnerDashboard = () => {
         const bookingsData = await bookingsResponse.json();
         console.log('📅 Bookings data:', bookingsData);
         
-        // Process bookings data
+        // Process bookings data with proper time-based categorization
         console.log('💳 Processing bookings data...');
-        const activeBookings = bookingsData.bookings?.filter((booking: any) => 
-          booking.status === 'active' || booking.status === 'confirmed'
-        ) || [];
-        console.log('💳 Active bookings found:', activeBookings.length);
-        
-        // Filter upcoming bookings (confirmed status and future dates/times)
         const now = new Date();
-        const upcomingBookingsData = bookingsData.bookings?.filter((booking: any) => {
-          if (booking.status !== 'confirmed') return false;
+        
+        // Helper function to check if booking is currently active (within time range)
+        const isBookingActive = (booking: any) => {
+          if (booking.status !== 'active' && booking.status !== 'confirmed') return false;
           
-          // Check if booking is in the future
           const bookingDate = new Date(booking.date);
-          const bookingTime = booking.start_time || booking.time;
+          const startTime = booking.start_time || booking.time;
+          const endTime = booking.end_time;
           
-          if (bookingTime) {
+          if (startTime) {
+            // Parse start time and create full datetime
+            const [startHours, startMinutes] = startTime.split(':');
+            const startDateTime = new Date(bookingDate);
+            startDateTime.setHours(parseInt(startHours), parseInt(startMinutes), 0, 0);
+            
+            // If we have end time, use it; otherwise calculate from duration
+            let endDateTime;
+            if (endTime) {
+              const [endHours, endMinutes] = endTime.split(':');
+              endDateTime = new Date(bookingDate);
+              endDateTime.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
+            } else {
+              // Calculate end time from duration (default 8 hours if no duration)
+              endDateTime = new Date(startDateTime);
+              endDateTime.setHours(endDateTime.getHours() + (booking.duration || 8));
+            }
+            
+            // Check if current time is within the booking time range
+            return now >= startDateTime && now <= endDateTime;
+          }
+          
+          return false;
+        };
+        
+        // Helper function to check if booking is upcoming (future schedule)
+        const isBookingUpcoming = (booking: any) => {
+          console.log(`🔍 Checking if booking ${booking.id} (${booking.date}) is upcoming:`, {
+            status: booking.status,
+            date: booking.date,
+            start_time: booking.start_time,
+            time: booking.time
+          });
+          
+          // Include confirmed, pending, and active bookings that are in the future
+          // 'active' means payment is successful but job hasn't started yet
+          if (booking.status !== 'confirmed' && booking.status !== 'pending' && booking.status !== 'active') {
+            console.log(`❌ Booking ${booking.id} not upcoming: status is ${booking.status}, not confirmed, pending, or active`);
+            return false;
+          }
+          
+          const bookingDate = new Date(booking.date);
+          const startTime = booking.start_time || booking.time;
+          
+          if (startTime) {
             // Parse time and create full datetime
-            const [hours, minutes] = bookingTime.split(':');
+            const [hours, minutes] = startTime.split(':');
             const fullDateTime = new Date(bookingDate);
             fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
             
-            return fullDateTime > now;
+            const isUpcoming = fullDateTime > now;
+            console.log(`🔍 Booking ${booking.id} time check: ${fullDateTime.toISOString()} > ${now.toISOString()} = ${isUpcoming}`);
+            return isUpcoming;
           }
           
           // If no time, just check if date is today or future
@@ -120,8 +162,38 @@ const PetOwnerDashboard = () => {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           
-          return bookingDate >= today;
-        }).map((booking: any) => {
+          const isUpcoming = bookingDate >= today;
+          console.log(`🔍 Booking ${booking.id} date check: ${bookingDate.toISOString()} >= ${today.toISOString()} = ${isUpcoming}`);
+          return isUpcoming;
+        };
+        
+        // Categorize bookings based on actual schedule timing
+        const activeBookings = bookingsData.bookings?.filter(isBookingActive) || [];
+        console.log('💳 Active bookings found (based on schedule):', activeBookings.length);
+        
+        // Debug: Log all bookings to see what we have
+        console.log('💳 All bookings for debugging:', bookingsData.bookings?.map((b: any) => ({
+          id: b.id,
+          date: b.date,
+          start_time: b.start_time,
+          end_time: b.end_time,
+          time: b.time,
+          status: b.status,
+          pet_name: b.pet_name
+        })));
+        
+        // Filter upcoming bookings (confirmed status and future dates/times)
+        const upcomingBookingsData = bookingsData.bookings?.filter(isBookingUpcoming).map((booking: any) => {
+          // Debug: Log booking data to see what we have
+          console.log('🔍 Processing booking for upcoming display:', {
+            id: booking.id,
+            pet_sitter: booking.pet_sitter,
+            sitter: booking.sitter,
+            sitter_name: booking.sitter_name,
+            start_time: booking.start_time,
+            end_time: booking.end_time,
+            time: booking.time
+          });
           // Format date and time for display
           const date = new Date(booking.date);
           const formattedDate = date.toLocaleDateString('en-US', { 
@@ -130,19 +202,30 @@ const PetOwnerDashboard = () => {
             year: 'numeric'
           });
           
+          // Format time consistently using utility function
           let formattedTime = '';
-          if (booking.start_time && booking.end_time) {
-            const startTime = booking.start_time;
+          try {
+            const { formatTimeRange, formatTime24To12 } = require('../../utils/timeUtils');
+            const startTime = booking.start_time || booking.time;
             const endTime = booking.end_time;
-            formattedTime = `${startTime} - ${endTime}`;
-          } else if (booking.time) {
-            formattedTime = booking.time;
+            
+            if (startTime && endTime) {
+              formattedTime = formatTimeRange(startTime, endTime);
+            } else if (startTime) {
+              formattedTime = formatTime24To12(startTime);
+            } else {
+              formattedTime = 'Time not set';
+            }
+          } catch (error) {
+            console.error('Error formatting time:', error);
+            formattedTime = 'Time not set';
           }
           
           return {
             ...booking,
             date: formattedDate,
             time: formattedTime,
+            sitterName: booking.pet_sitter?.name || booking.sitter?.name || booking.sitter_name || 'Unknown Sitter',
             petImage: booking.pet_image ? { uri: booking.pet_image } : require('../../assets/images/cat.png')
           };
         }) || [];
@@ -480,16 +563,17 @@ const PetOwnerDashboard = () => {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
           {upcomingBookings.map((b, idx) => (
             <View key={b.id} style={[styles.upcomingJobCard, { backgroundColor: ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'][idx % 4] }]}> 
-              <Image source={b.petImage} style={styles.jobPetImage} />
-              <Text style={styles.jobPetName}>{b.petName}</Text>
-              <Text style={styles.jobOwnerName}>{b.sitterName}</Text>
-              <View style={styles.jobStatusBadge}><Text style={styles.jobStatusText}>Upcoming</Text></View>
-              <Text style={styles.jobEarnings}>{b.cost}</Text>
+              <Text style={styles.jobPetName}>{b.sitterName}</Text>
               <View style={styles.jobMetaRow}>
+                <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 4 }} />
                 <Text style={styles.jobMetaText}>{b.date}</Text>
               </View>
               <View style={styles.jobMetaRow}>
+                <Ionicons name="time-outline" size={16} color="#666" style={{ marginRight: 4 }} />
                 <Text style={styles.jobMetaText}>{b.time}</Text>
+              </View>
+              <View style={styles.jobStatusBadge}>
+                <Text style={styles.jobStatusText}>{b.status}</Text>
               </View>
             </View>
           ))}

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    FlatList,
     SafeAreaView,
     StyleSheet,
     Text,
@@ -246,6 +245,30 @@ const UpcomingJobsScreen = () => {
     }
   };
 
+  // Group jobs by date
+  const groupJobsByDate = (jobs: Booking[]) => {
+    const grouped: { [key: string]: Booking[] } = {};
+    
+    jobs.forEach(job => {
+      const dateKey = formatDate(job.date);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(job);
+    });
+    
+    // Sort jobs within each date by time
+    Object.keys(grouped).forEach(dateKey => {
+      grouped[dateKey].sort((a, b) => {
+        const timeA = a.startTime || a.time || '00:00';
+        const timeB = b.startTime || b.time || '00:00';
+        return timeA.localeCompare(timeB);
+      });
+    });
+    
+    return grouped;
+  };
+
   const renderJob = ({ item }: { item: Booking }) => {
     console.log('🎨 Rendering job card:', item);
     
@@ -274,6 +297,20 @@ const UpcomingJobsScreen = () => {
       </TouchableOpacity>
     );
   };
+
+  const renderDateSection = (date: string, jobs: Booking[]) => (
+    <View key={date} style={styles.dateSection}>
+      <View style={styles.dateHeader}>
+        <Text style={styles.dateHeaderText}>{date}</Text>
+        <Text style={styles.jobCountText}>{jobs.length} job{jobs.length !== 1 ? 's' : ''}</Text>
+      </View>
+      {jobs.map((job) => (
+        <View key={job.id}>
+          {renderJob({ item: job })}
+        </View>
+      ))}
+    </View>
+  );
 
   if (loading) {
     return (
@@ -324,21 +361,23 @@ const UpcomingJobsScreen = () => {
       </View>
 
       {/* Jobs List */}
-      <FlatList
-        data={upcomingJobs}
-        renderItem={renderJob}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         style={styles.jobsList}
         contentContainerStyle={styles.jobsListContent}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
+      >
+        {upcomingJobs.length > 0 ? (
+          Object.entries(groupJobsByDate(upcomingJobs)).map(([date, jobs]) => 
+            renderDateSection(date, jobs)
+          )
+        ) : (
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={64} color="#ccc" />
             <Text style={styles.emptyTitle}>No upcoming jobs</Text>
             <Text style={styles.emptySubtitle}>Your upcoming jobs will appear here</Text>
           </View>
-        }
-      />
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -507,6 +546,26 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  dateSection: {
+    marginBottom: 24,
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  dateHeaderText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  jobCountText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });
 

@@ -302,40 +302,19 @@ class NotificationService {
   async createBookingNotification(bookingData: any) {
     try {
       console.log('🔔 Creating booking notification for sitter:', bookingData.sitterId);
+      console.log('🔔 Booking data received:', {
+        date: bookingData.date,
+        startTime: bookingData.startTime,
+        endTime: bookingData.endTime,
+        petOwnerName: bookingData.petOwnerName
+      });
       
-      // Format time properly
-      const formatTime = (time: string) => {
-        if (!time) return 'Invalid Time';
-        try {
-          const [hours, minutes] = time.split(':');
-          const hour = parseInt(hours, 10);
-          const minute = parseInt(minutes, 10);
-          return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        } catch (error) {
-          return time;
-        }
-      };
+      // Import time utilities
+      const { formatTime24To12, formatDate } = await import('../utils/timeUtils');
 
-      const formattedStartTime = formatTime(bookingData.startTime);
-      const formattedEndTime = formatTime(bookingData.endTime);
+      const formattedStartTime = formatTime24To12(bookingData.startTime);
+      const formattedEndTime = formatTime24To12(bookingData.endTime);
       const bookingType = bookingData.isWeekly ? 'Weekly' : 'Daily';
-      
-      // Format date properly
-      const formatDate = (dateString: string) => {
-        if (!dateString) return 'Invalid Date';
-        try {
-          const date = new Date(dateString);
-          const options: Intl.DateTimeFormatOptions = { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          };
-          return date.toLocaleDateString('en-US', options);
-        } catch (error) {
-          return dateString;
-        }
-      };
-
       const formattedDate = formatDate(bookingData.date);
       
       const notificationData = {

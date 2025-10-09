@@ -17,7 +17,6 @@ import authService from '../src/services/authService';
 import { bookingService } from '../src/services/bookingService';
 import { messagingService } from '../src/services/messagingService';
 import { makeApiCall } from '../src/services/networkService';
-import { notificationService } from '../src/services/notificationService';
 
 interface TimeRange {
   id: string;
@@ -206,18 +205,7 @@ const WeekBookingScreen: React.FC = () => {
 
         bookings.push(booking);
 
-        // Create notification for each day
-        await notificationService.createBookingNotification({
-          sitterId: sitterId,
-          sitterName: sitterName || 'Sitter',
-          petOwnerId: currentUser.id,
-          petOwnerName: currentUser.name || 'Pet Owner',
-          bookingId: booking.id,
-          date: dateStr,
-          startTime: selectedTimeRange.startTime,
-          endTime: selectedTimeRange.endTime,
-          hourlyRate: parseFloat(sitterRate || '25'),
-        });
+        // Note: Backend will create the notification with the correct data from the database
 
         // Create message for each day
         await messagingService.createBookingRequestMessage({

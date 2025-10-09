@@ -525,70 +525,38 @@ const PetSitterDashboard = () => {
         {/* Upcoming Jobs */}
         <View style={styles.sectionRowAligned}>
           <Text style={styles.sectionTitle}>Upcoming Jobs</Text>
-          <TouchableOpacity>
-            <Text style={styles.sectionAction}>View All</Text>
-          </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
           {upcomingBookings.map((booking, idx) => {
             return (
-              <TouchableOpacity 
+              <View 
                 key={booking.id} 
                 style={[styles.upcomingJobCard, { backgroundColor: upcomingJobColors[idx % upcomingJobColors.length] }]}
-                onPress={() => {
-                  console.log('🔴 Dashboard job card pressed!');
-                  router.push({
-                    pathname: '/booking',
-                    params: {
-                      jobId: booking.id,
-                      petOwnerName: booking.petOwnerName,
-                      date: booking.date,
-                      startTime: booking.startTime,
-                      endTime: booking.endTime,
-                      status: booking.status,
-                      petName: booking.petName,
-                      specialInstructions: booking.specialInstructions || '',
-                      hourlyRate: booking.hourlyRate?.toString() || '0'
-                    }
-                  });
-                }}
               >
                 <Text style={styles.jobOwnerName}>{booking.petOwnerName}</Text>
                 <View style={styles.jobMetaRow}>
-                  <Ionicons name="time-outline" size={16} color="#888" style={{ marginRight: 4 }} />
+                  <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 4 }} />
                   <Text style={styles.jobMetaText}>
                     {(() => {
                       try {
-                        // Clean up the time format
-                        let startTime = booking.startTime;
-                        let endTime = booking.endTime;
-                        
-                        if (startTime && startTime.includes('T')) {
-                          const timeMatch = startTime.match(/(\d{1,2}):(\d{2})/);
-                          if (timeMatch) {
-                            startTime = `${timeMatch[1]}:${timeMatch[2]}`;
-                          }
-                        }
-                        
-                        if (endTime && endTime.includes('T')) {
-                          const timeMatch = endTime.match(/(\d{1,2}):(\d{2})/);
-                          if (timeMatch) {
-                            endTime = `${timeMatch[1]}:${timeMatch[2]}`;
-                          }
-                        }
-                        
-                        // Convert to 12-hour format
-                        const formatTime = (time24: string) => {
-                          if (!time24) return 'Invalid Time';
-                          const [hours, minutes] = time24.split(':');
-                          const hour = parseInt(hours, 10);
-                          const ampm = hour >= 12 ? 'PM' : 'AM';
-                          const hour12 = hour % 12 || 12;
-                          return `${hour12}:${minutes} ${ampm}`;
-                        };
-                        
-                        return `${formatTime(startTime)} - ${formatTime(endTime)}`;
+                        const { formatDate } = require('../../utils/timeUtils');
+                        return formatDate(booking.date);
                       } catch (error) {
+                        console.error('Error formatting date:', error);
+                        return booking.date;
+                      }
+                    })()}
+                  </Text>
+                </View>
+                <View style={styles.jobMetaRow}>
+                  <Ionicons name="time-outline" size={16} color="#666" style={{ marginRight: 4 }} />
+                  <Text style={styles.jobMetaText}>
+                    {(() => {
+                      try {
+                        const { formatTimeRange } = require('../../utils/timeUtils');
+                        return formatTimeRange(booking.startTime, booking.endTime);
+                      } catch (error) {
+                        console.error('Error formatting time:', error);
                         return 'Time not set';
                       }
                     })()}
@@ -597,7 +565,7 @@ const PetSitterDashboard = () => {
                 <View style={styles.jobStatusBadge}>
                   <Text style={styles.jobStatusText}>{booking.status}</Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })}
         </ScrollView>
