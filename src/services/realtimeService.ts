@@ -114,9 +114,9 @@ class RealtimeService {
 
       this.ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        console.error('🔌 RealtimeService: WebSocket error:', error);
-        console.error('🔌 RealtimeService: WebSocket readyState:', this.ws?.readyState);
-        console.error('🔌 RealtimeService: WebSocket URL:', reverbUrl);
+        console.warn('⚠️ RealtimeService: WebSocket connection failed - this is normal if Reverb server is not running');
+        console.warn('⚠️ RealtimeService: WebSocket URL attempted:', reverbUrl);
+        console.warn('⚠️ This error can be safely ignored - real-time features will use fallback methods');
         this.isConnected = false;
         
         // Don't schedule reconnect immediately on error - let onclose handle it

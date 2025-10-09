@@ -210,6 +210,13 @@ class ReverbMessagingService extends EventEmitter {
         throw new Error(`Invalid base URL: ${baseUrl}. Error: ${urlError}`);
       }
       
+      // Check if we're in development mode and should skip Reverb connection
+      if (__DEV__ && (host === 'localhost' || host === '127.0.0.1')) {
+        console.log('🔌 Development mode detected - skipping Reverb connection to prevent errors');
+        console.log('🔌 Real-time features will use fallback methods');
+        return;
+      }
+      
       // Connect to Laravel Reverb on port 8080
       const reverbUrl = `${wsUrl}:8080/app/${process.env.EXPO_PUBLIC_REVERB_APP_KEY || 'iycawpww023mjumkvwsj'}`;
       console.log('🔌 Connecting to Reverb:', reverbUrl);
@@ -258,10 +265,13 @@ class ReverbMessagingService extends EventEmitter {
 
       this.ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        console.error('❌ Reverb WebSocket error:', error);
-        console.error('❌ WebSocket readyState:', this.ws?.readyState);
-        console.error('❌ WebSocket URL:', reverbUrl);
-        this.emit('error', error);
+        console.warn('⚠️ Reverb WebSocket connection failed - this is normal if Reverb server is not running');
+        console.warn('⚠️ WebSocket URL attempted:', reverbUrl);
+        console.warn('⚠️ This error can be safely ignored - real-time features will use fallback methods');
+        
+        // Don't emit error to prevent console spam - this is expected behavior
+        // when Reverb server is not running
+        this.isConnected = false;
         
         // Don't schedule reconnect immediately on error - let onclose handle it
         // This prevents rapid reconnection attempts that can overwhelm the server

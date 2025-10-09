@@ -97,9 +97,55 @@ const PetOwnerDashboard = () => {
         ) || [];
         console.log('💳 Active bookings found:', activeBookings.length);
         
-        const upcomingBookingsData = bookingsData.bookings?.filter((booking: any) => 
-          booking.status === 'pending' || booking.status === 'confirmed'
-        ) || [];
+        // Filter upcoming bookings (confirmed status and future dates/times)
+        const now = new Date();
+        const upcomingBookingsData = bookingsData.bookings?.filter((booking: any) => {
+          if (booking.status !== 'confirmed') return false;
+          
+          // Check if booking is in the future
+          const bookingDate = new Date(booking.date);
+          const bookingTime = booking.start_time || booking.time;
+          
+          if (bookingTime) {
+            // Parse time and create full datetime
+            const [hours, minutes] = bookingTime.split(':');
+            const fullDateTime = new Date(bookingDate);
+            fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            
+            return fullDateTime > now;
+          }
+          
+          // If no time, just check if date is today or future
+          bookingDate.setHours(0, 0, 0, 0);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          return bookingDate >= today;
+        }).map((booking: any) => {
+          // Format date and time for display
+          const date = new Date(booking.date);
+          const formattedDate = date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            year: 'numeric'
+          });
+          
+          let formattedTime = '';
+          if (booking.start_time && booking.end_time) {
+            const startTime = booking.start_time;
+            const endTime = booking.end_time;
+            formattedTime = `${startTime} - ${endTime}`;
+          } else if (booking.time) {
+            formattedTime = booking.time;
+          }
+          
+          return {
+            ...booking,
+            date: formattedDate,
+            time: formattedTime,
+            petImage: booking.pet_image ? { uri: booking.pet_image } : require('../../assets/images/cat.png')
+          };
+        }) || [];
         
         console.log('💳 Setting upcoming bookings:', upcomingBookingsData.length);
         setUpcomingBookings(upcomingBookingsData);
@@ -427,12 +473,9 @@ const PetOwnerDashboard = () => {
           ))}
         </View>
 
-        {/* Upcoming Bookings (mirrors sitter Upcoming Jobs) */}
+        {/* Upcoming Bookings */}
         <View style={styles.sectionRowAligned}>
           <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-          <TouchableOpacity>
-            <Text style={styles.sectionAction}>View All</Text>
-          </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
           {upcomingBookings.map((b, idx) => (
@@ -440,14 +483,12 @@ const PetOwnerDashboard = () => {
               <Image source={b.petImage} style={styles.jobPetImage} />
               <Text style={styles.jobPetName}>{b.petName}</Text>
               <Text style={styles.jobOwnerName}>{b.sitterName}</Text>
-              <View style={styles.jobStatusBadge}><Text style={styles.jobStatusText}>{b.status}</Text></View>
+              <View style={styles.jobStatusBadge}><Text style={styles.jobStatusText}>Upcoming</Text></View>
               <Text style={styles.jobEarnings}>{b.cost}</Text>
               <View style={styles.jobMetaRow}>
-                <Ionicons name="calendar-outline" size={16} color="#888" style={{ marginRight: 4 }} />
                 <Text style={styles.jobMetaText}>{b.date}</Text>
               </View>
               <View style={styles.jobMetaRow}>
-                <Ionicons name="time-outline" size={16} color="#888" style={{ marginRight: 4 }} />
                 <Text style={styles.jobMetaText}>{b.time}</Text>
               </View>
             </View>

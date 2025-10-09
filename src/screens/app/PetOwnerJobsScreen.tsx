@@ -32,7 +32,7 @@ interface Job {
 const PetOwnerJobsScreen = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const [selectedTab, setSelectedTab] = useState<'pending' | 'upcoming' | 'past'>('pending');
+  const [selectedTab, setSelectedTab] = useState<'active' | 'upcoming' | 'past'>('active');
   const [jobs, setJobs] = useState<Job[]>([
     // New users start with no jobs
   ]);
@@ -162,8 +162,10 @@ const PetOwnerJobsScreen = () => {
     switch (status) {
       case 'pending':
         return '#F59E0B';
+      case 'active':
+        return '#10B981';
       case 'confirmed':
-        return '#4CAF50';
+        return '#3B82F6';
       case 'in-progress':
         return '#3B82F6';
       case 'completed':
@@ -179,6 +181,8 @@ const PetOwnerJobsScreen = () => {
     switch (status) {
       case 'pending':
         return 'Pending';
+      case 'active':
+        return 'Active';
       case 'confirmed':
         return 'Confirmed';
       case 'in-progress':
@@ -192,12 +196,13 @@ const PetOwnerJobsScreen = () => {
     }
   };
 
-  const pendingBookings = bookings.filter(booking => booking.status === 'pending');
-  const upcomingJobs = jobs.filter(job => ['confirmed', 'in-progress'].includes(job.status));
-  const pastJobs = jobs.filter(job => ['completed', 'cancelled'].includes(job.status));
+  // Updated filtering logic for new categories
+  const activeBookings = bookings.filter(booking => booking.status === 'active');
+  const upcomingBookings = bookings.filter(booking => booking.status === 'confirmed');
+  const pastBookings = bookings.filter(booking => booking.status === 'completed');
 
-  const currentJobs = selectedTab === 'pending' ? pendingBookings : 
-                     selectedTab === 'upcoming' ? upcomingJobs : pastJobs;
+  const currentJobs = selectedTab === 'active' ? activeBookings : 
+                     selectedTab === 'upcoming' ? upcomingBookings : pastBookings;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -215,11 +220,11 @@ const PetOwnerJobsScreen = () => {
       {/* Tab Selector */}
       <View style={styles.tabContainer}>
         <TouchableOpacity 
-          style={[styles.tab, selectedTab === 'pending' && styles.activeTab]} 
-          onPress={() => setSelectedTab('pending')}
+          style={[styles.tab, selectedTab === 'active' && styles.activeTab]} 
+          onPress={() => setSelectedTab('active')}
         >
-          <Text style={[styles.tabText, selectedTab === 'pending' && styles.activeTabText]}>
-            Pending ({pendingBookings.length})
+          <Text style={[styles.tabText, selectedTab === 'active' && styles.activeTabText]}>
+            Active ({activeBookings.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
@@ -227,7 +232,7 @@ const PetOwnerJobsScreen = () => {
           onPress={() => setSelectedTab('upcoming')}
         >
           <Text style={[styles.tabText, selectedTab === 'upcoming' && styles.activeTabText]}>
-            Upcoming ({upcomingJobs.length})
+            Upcoming ({upcomingBookings.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
@@ -235,7 +240,7 @@ const PetOwnerJobsScreen = () => {
           onPress={() => setSelectedTab('past')}
         >
           <Text style={[styles.tabText, selectedTab === 'past' && styles.activeTabText]}>
-            Past ({pastJobs.length})
+            Past ({pastBookings.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -273,13 +278,13 @@ const PetOwnerJobsScreen = () => {
 
             return (
               <View key={job.id} style={styles.jobCard}>
-                {selectedTab === 'pending' ? (
-                  // Simplified pending card
+                {selectedTab === 'active' ? (
+                  // Simplified active card
                   <>
                     <View style={styles.pendingCardHeader}>
                       <Text style={styles.pendingSitterName}>{job.petSitterName}</Text>
                       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-                        <Text style={styles.statusText}>Pending</Text>
+                        <Text style={styles.statusText}>Active</Text>
                       </View>
                     </View>
                     
@@ -295,13 +300,6 @@ const PetOwnerJobsScreen = () => {
                       >
                         <Ionicons name="chatbubbles-outline" size={16} color="#3B82F6" />
                         <Text style={styles.contactButtonText}>Message</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={styles.detailsButton}
-                        onPress={() => handlePendingDetails(job)}
-                      >
-                        <Text style={styles.detailsButtonText}>View Details</Text>
                       </TouchableOpacity>
                     </View>
                   </>
@@ -353,13 +351,6 @@ const PetOwnerJobsScreen = () => {
                         <Text style={styles.contactButtonText}>Message</Text>
                       </TouchableOpacity>
                       
-                      <TouchableOpacity 
-                        style={styles.detailsButton}
-                        onPress={() => handleJobPress(job)}
-                      >
-                        <Text style={styles.detailsButtonText}>View Details</Text>
-                      </TouchableOpacity>
-                      
                       {job.status === 'confirmed' && (
                         <TouchableOpacity 
                           style={styles.cancelButton}
@@ -377,24 +368,24 @@ const PetOwnerJobsScreen = () => {
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons 
-              name={selectedTab === 'pending' ? 'hourglass-outline' : 
+              name={selectedTab === 'active' ? 'play-circle-outline' : 
                     selectedTab === 'upcoming' ? 'calendar-outline' : 'checkmark-circle-outline'} 
               size={64} 
               color="#ccc" 
             />
             <Text style={styles.emptyTitle}>
-              {selectedTab === 'pending' ? 'No pending bookings' :
+              {selectedTab === 'active' ? 'No active bookings' :
                selectedTab === 'upcoming' ? 'No upcoming bookings' : 'No past bookings'}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {selectedTab === 'pending' 
-                ? 'Your pending bookings will appear here' 
+              {selectedTab === 'active' 
+                ? 'Your ongoing bookings will appear here' 
                 : selectedTab === 'upcoming' 
                 ? 'Find a pet sitter to get started!' 
                 : 'Your completed bookings will appear here.'
               }
             </Text>
-            {(selectedTab === 'upcoming' || selectedTab === 'pending') && (
+            {(selectedTab === 'upcoming' || selectedTab === 'active') && (
               <TouchableOpacity 
                 style={styles.findSitterButton}
                 onPress={() => router.push('/find-sitter-map')}

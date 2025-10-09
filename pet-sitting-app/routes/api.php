@@ -137,6 +137,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pets/{id}', [PetController::class, 'show']);
     Route::put('/pets/{id}', [PetController::class, 'update']);
     Route::delete('/pets/{id}', [PetController::class, 'destroy']);
+    Route::post('/pets/upload-image', [PetController::class, 'uploadImage']);
 });
 
 // Verification routes

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Pet;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -20,36 +21,16 @@ class PetController extends Controller
         try {
             $user = Auth::user();
             
-            // For now, return mock data since we don't have a pets table yet
-            // In a real implementation, you would query the pets table
-            $pets = [
-                [
-                    'id' => 1,
-                    'name' => 'Buddy',
-                    'age' => '3 years',
-                    'breed' => 'Golden Retriever',
-                    'type' => 'Dog',
-                    'image' => null,
-                    'created_at' => now()->toISOString(),
-                    'updated_at' => now()->toISOString(),
-                ],
-                [
-                    'id' => 2,
-                    'name' => 'Whiskers',
-                    'age' => '2 years',
-                    'breed' => 'Persian',
-                    'type' => 'Cat',
-                    'image' => null,
-                    'created_at' => now()->toISOString(),
-                    'updated_at' => now()->toISOString(),
-                ]
-            ];
+            // Retrieve pets from database for the authenticated user
+            $pets = Pet::where('user_id', $user->id)->get();
+
+            \Log::info('✅ Retrieved ' . $pets->count() . ' pets for user: ' . $user->id);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pets retrieved successfully',
                 'pets' => $pets,
-                'count' => count($pets)
+                'count' => $pets->count()
             ]);
 
         } catch (\Exception $e) {
@@ -97,9 +78,8 @@ class PetController extends Controller
                 $data['image'] = $imagePath;
             }
 
-            // For now, just return the created pet data
-            // In a real implementation, you would save to the pets table
-            $pet = [
+            // Create the pet in the database
+            $pet = Pet::create([
                 'id' => $petId,
                 'name' => $data['name'],
                 'age' => $data['age'],
@@ -108,9 +88,9 @@ class PetController extends Controller
                 'image' => $data['image'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'user_id' => $user->id,
-                'created_at' => now()->toISOString(),
-                'updated_at' => now()->toISOString(),
-            ];
+            ]);
+
+            \Log::info('✅ Pet created in database with ID: ' . $petId);
 
             return response()->json([
                 'success' => true,
@@ -135,26 +115,12 @@ class PetController extends Controller
         try {
             $user = Auth::user();
             
-            // For now, return mock data
-            // In a real implementation, you would query the pets table
-            $pet = [
-                'id' => $id,
-                'name' => 'Buddy',
-                'age' => '3 years',
-                'breed' => 'Golden Retriever',
-                'type' => 'Dog',
-                'image' => null,
-                'notes' => 'Loves to play fetch',
-                'user_id' => $user->id,
-                'created_at' => now()->toISOString(),
-                'updated_at' => now()->toISOString(),
-            ];
-
+            // Return 404 for now since we don't have a pets table yet
             return response()->json([
-                'success' => true,
-                'message' => 'Pet retrieved successfully',
-                'pet' => $pet
-            ]);
+                'success' => false,
+                'message' => 'Pet not found',
+                'error' => 'Pet with ID ' . $id . ' not found'
+            ], 404);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -235,8 +201,20 @@ class PetController extends Controller
         try {
             $user = Auth::user();
             
-            // For now, just return success
-            // In a real implementation, you would delete from the pets table
+            // Find the pet and verify it belongs to the authenticated user
+            $pet = Pet::where('id', $id)->where('user_id', $user->id)->first();
+            
+            if (!$pet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pet not found or you do not have permission to delete this pet'
+                ], 404);
+            }
+
+            // Delete the pet from the database
+            $pet->delete();
+            
+            \Log::info('✅ Pet deleted from database with ID: ' . $id . ' by user: ' . $user->id);
 
             return response()->json([
                 'success' => true,
@@ -244,6 +222,7 @@ class PetController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('❌ Error deleting pet: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete pet',
@@ -258,20 +237,110 @@ class PetController extends Controller
     private function handleImageUpload(string $imageData, string $petId): string
     {
         try {
+            \Log::info('🖼️ PetController: Starting image upload for pet: ' . $petId);
+            \Log::info('🖼️ PetController: Image data: ' . $imageData);
+            
+            // Check if it's a file URI (from React Native)
+            if (strpos($imageData, 'file://') === 0) {
+                \Log::info('🖼️ PetController: Detected file URI, returning null for frontend handling');
+                // Return null so frontend can show default image
+                return null;
+            }
+            
             // Check if it's a base64 image
             if (strpos($imageData, 'data:image') === 0) {
                 $imageData = substr($imageData, strpos($imageData, ',') + 1);
+                \Log::info('🖼️ PetController: Removed data URL prefix, new length: ' . strlen($imageData));
             }
 
-            $imageData = base64_decode($imageData);
+            $decodedData = base64_decode($imageData);
+            \Log::info('🖼️ PetController: Decoded data length: ' . strlen($decodedData));
+            
+            if ($decodedData === false) {
+                \Log::error('❌ PetController: Base64 decode failed');
+                throw new \Exception('Invalid base64 image data');
+            }
+            
             $imageName = 'pet_' . $petId . '_' . time() . '.jpg';
             $imagePath = 'pet_images/' . $imageName;
 
-            Storage::disk('public')->put($imagePath, $imageData);
+            $saved = Storage::disk('public')->put($imagePath, $decodedData);
+            \Log::info('🖼️ PetController: Image saved: ' . ($saved ? 'SUCCESS' : 'FAILED'));
+            \Log::info('🖼️ PetController: Image path: ' . $imagePath);
 
             return '/storage/' . $imagePath;
         } catch (\Exception $e) {
+            \Log::error('❌ PetController: Image upload failed: ' . $e->getMessage());
             throw new \Exception('Failed to upload image: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Upload pet image
+     */
+    public function uploadImage(Request $request)
+    {
+        try {
+            $request->validate([
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB max
+                'pet_id' => 'required|string'
+            ]);
+
+            $user = Auth::user();
+            $petId = $request->input('pet_id');
+            
+            \Log::info('🖼️ PetController: Uploading image for pet: ' . $petId);
+
+            // Handle the uploaded file
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                
+                // Generate unique filename
+                $imageName = 'pet_' . $petId . '_' . time() . '.' . $file->getClientOriginalExtension();
+                $imagePath = 'pet_images/' . $imageName;
+
+                // Store the file
+                $stored = Storage::disk('public')->put($imagePath, file_get_contents($file));
+                
+                if ($stored) {
+                    $fullPath = '/storage/' . $imagePath;
+                    
+                    \Log::info('✅ PetController: Image uploaded successfully: ' . $fullPath);
+                    
+                    // Update the pet record in the database with the image path
+                    try {
+                        $pet = Pet::where('id', $petId)->first();
+                        if ($pet) {
+                            $pet->image = $fullPath;
+                            $pet->save();
+                            \Log::info('✅ Pet image path saved to database for pet: ' . $petId);
+                        } else {
+                            \Log::error('❌ Pet not found in database for ID: ' . $petId);
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('❌ Error updating pet image in database: ' . $e->getMessage());
+                    }
+                    
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Image uploaded successfully',
+                        'image_path' => $fullPath
+                    ]);
+                } else {
+                    throw new \Exception('Failed to store image file');
+                }
+            } else {
+                throw new \Exception('No image file provided');
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('❌ PetController: Image upload failed: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload image',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }
