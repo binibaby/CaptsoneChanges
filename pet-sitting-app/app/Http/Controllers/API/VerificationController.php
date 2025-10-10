@@ -227,6 +227,7 @@ class VerificationController extends Controller
         Notification::create([
             'user_id' => $user->id,
             'type' => 'verification',
+            'title' => 'Verification Submitted',
             'message' => $notificationMessage,
         ]);
 
@@ -240,6 +241,7 @@ class VerificationController extends Controller
             Notification::create([
                 'user_id' => $admin->id,
                 'type' => 'admin',
+                'title' => 'New Verification Request',
                 'message' => $adminMessage,
             ]);
         }

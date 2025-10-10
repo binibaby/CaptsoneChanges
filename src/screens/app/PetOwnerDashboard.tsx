@@ -63,6 +63,25 @@ const PetOwnerDashboard = () => {
   useEffect(() => {
     checkAuthentication();
     loadDashboardData();
+    
+    // Subscribe to notification updates to refresh dashboard data
+    const { notificationService } = require('../../services/notificationService');
+    const unsubscribeNotifications = notificationService.subscribe(() => {
+      console.log('🔔 Notification received, refreshing dashboard data...');
+      loadDashboardData();
+    });
+    
+    // Subscribe to booking updates to refresh dashboard data
+    const { bookingService } = require('../../services/bookingService');
+    const unsubscribeBookings = bookingService.subscribe(() => {
+      console.log('📅 Booking updated, refreshing dashboard data...');
+      loadDashboardData();
+    });
+    
+    return () => {
+      unsubscribeNotifications();
+      unsubscribeBookings();
+    };
   }, []);
 
   // Load dashboard data
@@ -94,37 +113,11 @@ const PetOwnerDashboard = () => {
         console.log('💳 Processing bookings data...');
         const now = new Date();
         
-        // Helper function to check if booking is currently active (within time range)
+        // Helper function to check if booking is currently active (session in progress)
         const isBookingActive = (booking: any) => {
-          if (booking.status !== 'active' && booking.status !== 'confirmed') return false;
-          
-          const bookingDate = new Date(booking.date);
-          const startTime = booking.start_time || booking.time;
-          const endTime = booking.end_time;
-          
-          if (startTime) {
-            // Parse start time and create full datetime
-            const [startHours, startMinutes] = startTime.split(':');
-            const startDateTime = new Date(bookingDate);
-            startDateTime.setHours(parseInt(startHours), parseInt(startMinutes), 0, 0);
-            
-            // If we have end time, use it; otherwise calculate from duration
-            let endDateTime;
-            if (endTime) {
-              const [endHours, endMinutes] = endTime.split(':');
-              endDateTime = new Date(bookingDate);
-              endDateTime.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
-            } else {
-              // Calculate end time from duration (default 8 hours if no duration)
-              endDateTime = new Date(startDateTime);
-              endDateTime.setHours(endDateTime.getHours() + (booking.duration || 8));
-            }
-            
-            // Check if current time is within the booking time range
-            return now >= startDateTime && now <= endDateTime;
-          }
-          
-          return false;
+          // Simply check if booking status is 'active' - no time-based filtering
+          // This ensures that when sitter starts a session, it immediately shows in active count
+          return booking.status === 'active';
         };
         
         // Helper function to check if booking is upcoming (future schedule)
@@ -136,10 +129,10 @@ const PetOwnerDashboard = () => {
             time: booking.time
           });
           
-          // Include confirmed, pending, and active bookings that are in the future
-          // 'active' means payment is successful but job hasn't started yet
-          if (booking.status !== 'confirmed' && booking.status !== 'pending' && booking.status !== 'active') {
-            console.log(`❌ Booking ${booking.id} not upcoming: status is ${booking.status}, not confirmed, pending, or active`);
+          // Include only confirmed and pending bookings that are in the future
+          // 'active' bookings are sessions in progress and should be counted separately
+          if (booking.status !== 'confirmed' && booking.status !== 'pending') {
+            console.log(`❌ Booking ${booking.id} not upcoming: status is ${booking.status}, not confirmed or pending`);
             return false;
           }
           

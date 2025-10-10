@@ -135,8 +135,32 @@ class PaymentController extends Controller
             $booking = $payment->booking;
             $sitter = $booking->sitter;
 
-            // Update booking status to active
-            $booking->update(['status' => 'active']);
+            // Auto-confirm the booking when payment is successful (remove manual confirmation step)
+            if ($booking->status === 'pending') {
+                $booking->update(['status' => 'confirmed']);
+                
+                // Create notification for the sitter about the new confirmed booking
+                $sitter->notifications()->create([
+                    'type' => 'booking_confirmed',
+                    'title' => 'New Booking Confirmed',
+                    'message' => "You have a new confirmed booking for {$booking->pet_name} on {$booking->date->format('M j, Y')} at {$booking->start_time}.",
+                    'data' => json_encode([
+                        'booking_id' => $booking->id,
+                        'pet_owner_name' => $booking->user->first_name . ' ' . $booking->user->last_name,
+                        'pet_name' => $booking->pet_name,
+                        'date' => $booking->date->format('Y-m-d'),
+                        'start_time' => $booking->start_time,
+                        'end_time' => $booking->end_time,
+                        'hourly_rate' => $booking->hourly_rate,
+                    ]),
+                ]);
+                
+                Log::info('Booking auto-confirmed after successful payment', [
+                    'booking_id' => $booking->id,
+                    'sitter_id' => $sitter->id,
+                    'pet_owner_id' => $booking->user_id
+                ]);
+            }
 
             // Add money to sitter's wallet
             $sitter->increment('wallet_balance', $payment->sitter_share);
@@ -152,14 +176,38 @@ class PaymentController extends Controller
                 'notes' => "Payment from booking #{$booking->id}"
             ]);
 
+            // Create notification for the pet owner about successful payment
+            $owner = $booking->user;
+            $owner->notifications()->create([
+                'type' => 'payment_success',
+                'title' => 'Payment Successful',
+                'message' => "Your payment of ₱{$payment->amount} for booking with {$sitter->first_name} {$sitter->last_name} has been processed successfully. Your booking is now confirmed!",
+                'data' => json_encode([
+                    'payment_id' => $payment->id,
+                    'booking_id' => $booking->id,
+                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'sitter_id' => $sitter->id,
+                    'pet_name' => $booking->pet_name,
+                    'date' => $booking->date->format('Y-m-d'),
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                    'amount' => $payment->amount,
+                    'status' => 'completed'
+                ]),
+            ]);
+
             // Broadcast events for real-time updates
             broadcast(new PaymentReceived($sitter, $payment));
             broadcast(new WalletUpdated($sitter));
+            
+            // Broadcast payment success event for pet owner
+            broadcast(new \App\Events\PaymentSuccess($owner, $payment, $booking));
 
             Log::info('Mock payment processed successfully', [
                 'payment_id' => $payment->id,
                 'booking_id' => $booking->id,
                 'sitter_id' => $sitter->id,
+                'owner_id' => $owner->id,
                 'amount' => $payment->sitter_share
             ]);
         });
@@ -188,8 +236,32 @@ class PaymentController extends Controller
             $booking = $payment->booking;
             $sitter = $booking->sitter;
 
-            // Update booking status to active
-            $booking->update(['status' => 'active']);
+            // Auto-confirm the booking when payment is successful (remove manual confirmation step)
+            if ($booking->status === 'pending') {
+                $booking->update(['status' => 'confirmed']);
+                
+                // Create notification for the sitter about the new confirmed booking
+                $sitter->notifications()->create([
+                    'type' => 'booking_confirmed',
+                    'title' => 'New Booking Confirmed',
+                    'message' => "You have a new confirmed booking for {$booking->pet_name} on {$booking->date->format('M j, Y')} at {$booking->start_time}.",
+                    'data' => json_encode([
+                        'booking_id' => $booking->id,
+                        'pet_owner_name' => $booking->user->first_name . ' ' . $booking->user->last_name,
+                        'pet_name' => $booking->pet_name,
+                        'date' => $booking->date->format('Y-m-d'),
+                        'start_time' => $booking->start_time,
+                        'end_time' => $booking->end_time,
+                        'hourly_rate' => $booking->hourly_rate,
+                    ]),
+                ]);
+                
+                Log::info('Booking auto-confirmed after successful payment', [
+                    'booking_id' => $booking->id,
+                    'sitter_id' => $sitter->id,
+                    'pet_owner_id' => $booking->user_id
+                ]);
+            }
 
             // Add money to sitter's wallet
             $sitter->increment('wallet_balance', $payment->sitter_share);
@@ -205,14 +277,48 @@ class PaymentController extends Controller
                 'notes' => "Payment from booking #{$booking->id}"
             ]);
 
+            // Create notification for the pet owner about successful payment
+            $owner = $booking->user;
+            $owner->notifications()->create([
+                'type' => 'payment_success',
+                'title' => 'Payment Successful',
+                'message' => "Your payment of ₱{$payment->amount} for booking with {$sitter->first_name} {$sitter->last_name} has been processed successfully. Your booking is now confirmed!",
+                'data' => json_encode([
+                    'payment_id' => $payment->id,
+                    'booking_id' => $booking->id,
+                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'sitter_id' => $sitter->id,
+                    'pet_name' => $booking->pet_name,
+                    'date' => $booking->date->format('Y-m-d'),
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                    'amount' => $payment->amount,
+                    'status' => 'completed'
+                ]),
+            ]);
+
             // Broadcast events for real-time updates
             broadcast(new PaymentReceived($sitter, $payment));
             broadcast(new WalletUpdated($sitter));
+            
+            // Broadcast payment success event for pet owner
+            broadcast(new \App\Events\PaymentSuccess($owner, $payment, $booking));
+            
+            // Broadcast dashboard update for the sitter
+            $dashboardData = [
+                'wallet_balance' => $sitter->wallet_balance,
+                'total_income' => $sitter->wallet_balance,
+                'this_week_income' => $sitter->wallet_balance,
+                'upcoming_jobs' => $sitter->bookings()->where('status', 'confirmed')->count(),
+                'completed_jobs' => $sitter->bookings()->where('status', 'completed')->count(),
+            ];
+            broadcast(new \App\Events\DashboardUpdated($sitter, $dashboardData));
 
             Log::info('Payment processed successfully', [
                 'payment_id' => $payment->id,
                 'booking_id' => $booking->id,
                 'sitter_id' => $sitter->id,
+                'owner_id' => $owner->id,
                 'amount' => $payment->sitter_share
             ]);
         });

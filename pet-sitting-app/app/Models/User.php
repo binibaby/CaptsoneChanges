@@ -142,6 +142,16 @@ class User extends Authenticatable
         return $this->hasMany(NameUpdateRequest::class);
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class, 'sitter_id');
+    }
+
+    public function reviewsGiven()
+    {
+        return $this->hasMany(Review::class, 'owner_id');
+    }
+
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
@@ -212,5 +222,30 @@ class User extends Authenticatable
         }
 
         return [];
+    }
+
+    /**
+     * Calculate and update the average rating for a sitter.
+     */
+    public function updateAverageRating()
+    {
+        if (!$this->isPetSitter()) {
+            return;
+        }
+
+        $averageRating = $this->reviews()->avg('rating');
+        $this->update(['rating' => round($averageRating, 2)]);
+    }
+
+    /**
+     * Get the average rating for a sitter.
+     */
+    public function getAverageRating(): float
+    {
+        if (!$this->isPetSitter()) {
+            return 0.0;
+        }
+
+        return round($this->reviews()->avg('rating') ?? 0, 2);
     }
 }

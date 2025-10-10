@@ -15,6 +15,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import ReviewModal from '../../components/ReviewModal';
+import { bookingService } from '../../services/bookingService';
 import { ReverbConversation, ReverbMessage, reverbMessagingService } from '../../services/reverbMessagingService';
 
 interface Message {
@@ -56,6 +58,11 @@ const PetOwnerMessagesScreen = () => {
   const [supportTicketId, setSupportTicketId] = useState<string | null>(null);
   const [hasAutoOpenedConversation, setHasAutoOpenedConversation] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Review modal state
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<any>(null);
+  const [availableBookings, setAvailableBookings] = useState<any[]>([]);
 
   // Load conversations
   const loadConversations = useCallback(async () => {
@@ -148,6 +155,61 @@ const PetOwnerMessagesScreen = () => {
     };
     loadCurrentUser();
   }, []);
+
+  // Load available bookings for review
+  const loadAvailableBookings = useCallback(async () => {
+    if (!currentUserId) return;
+    
+    try {
+      const bookings = await bookingService.getPetOwnerBookings(currentUserId);
+      console.log('📊 All owner bookings:', bookings.length);
+      console.log('📊 Booking statuses:', bookings.map(b => ({ id: b.id, status: b.status, sitterName: b.sitterName })));
+      
+      // For testing: allow reviewing ANY booking (not just completed ones)
+      // This will help test if the sitter profile popup fetches updated ratings
+      const reviewableBookings = bookings.filter(booking => 
+        booking.status === 'completed' || 
+        booking.status === 'confirmed' || 
+        booking.status === 'active' ||
+        booking.status === 'pending'
+      );
+      
+      console.log('⭐ Reviewable bookings found (including non-completed for testing):', reviewableBookings.length);
+      setAvailableBookings(reviewableBookings);
+    } catch (error) {
+      console.error('Error loading available bookings:', error);
+    }
+  }, [currentUserId]);
+
+  // Load bookings when user changes
+  useEffect(() => {
+    if (currentUserId) {
+      loadAvailableBookings();
+    }
+  }, [currentUserId, loadAvailableBookings]);
+
+  // Handle review button press
+  const handleReviewPress = () => {
+    if (availableBookings.length === 0) {
+      Alert.alert('No Bookings Available', 'You don\'t have any bookings to review yet.');
+      return;
+    }
+    
+    // For testing: show the first available booking (regardless of status)
+    // This allows testing reviews on pending, confirmed, active, or completed bookings
+    const booking = availableBookings[0];
+    console.log('⭐ Opening review modal for booking (testing all statuses):', booking);
+    setSelectedBookingForReview(booking);
+    setReviewModalVisible(true);
+  };
+
+  // Handle review submission
+  const handleReviewSubmitted = () => {
+    setReviewModalVisible(false);
+    setSelectedBookingForReview(null);
+    // Reload available bookings
+    loadAvailableBookings();
+  };
 
   // Initialize messaging
   useEffect(() => {
@@ -493,7 +555,40 @@ const PetOwnerMessagesScreen = () => {
               />
             </TouchableOpacity>
           </View>
+
         </KeyboardAvoidingView>
+
+        {/* Floating Rate & Review Button - Owner Side Only */}
+        {(() => {
+          console.log('🔍 Checking floating button visibility:', {
+            availableBookingsLength: availableBookings.length,
+            availableBookings: availableBookings.map(b => ({ id: b.id, status: b.status, sitterName: b.sitterName })),
+            reviewModalVisible: reviewModalVisible
+          });
+          // Show button when there are any bookings available (for testing all booking statuses)
+          // Hide button when review modal is open to avoid interference
+          return availableBookings.length > 0 && !reviewModalVisible;
+        })() && (
+          <TouchableOpacity 
+            style={styles.floatingReviewButton}
+            onPress={handleReviewPress}
+          >
+            <Ionicons name="star" size={20} color="#fff" />
+            <Text style={styles.floatingReviewButtonText}>Rate & Review</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Review Modal */}
+        {selectedBookingForReview && (
+          <ReviewModal
+            visible={reviewModalVisible}
+            onClose={() => setReviewModalVisible(false)}
+            bookingId={selectedBookingForReview.id}
+            sitterName={selectedBookingForReview.sitterName || selectedBookingForReview.petSitterName || 'Pet Sitter'}
+            petName={selectedBookingForReview.petName || 'Pet'}
+            onReviewSubmitted={handleReviewSubmitted}
+          />
+        )}
       </SafeAreaView>
     );
   }
@@ -942,6 +1037,32 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#666',
+  },
+  floatingReviewButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: '#F59E0B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    gap: 8,
+    zIndex: 1000,
+  },
+  floatingReviewButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -33,6 +33,8 @@ class Booking extends Model
     protected $casts = [
         'date' => 'date',
         'time' => 'datetime',
+        'start_time' => 'string',
+        'end_time' => 'string',
     ];
     public function user()
     {
@@ -45,5 +47,18 @@ class Booking extends Model
     public function payment()
     {
         return $this->hasOne(Payment::class, 'booking_id');
+    }
+
+    public function review()
+    {
+        return $this->hasOne(Review::class);
+    }
+
+    /**
+     * Check if the booking has been reviewed.
+     */
+    public function hasReview(): bool
+    {
+        return $this->review()->exists();
     }
 }

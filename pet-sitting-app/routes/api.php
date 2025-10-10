@@ -115,9 +115,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bookings/{id}', [BookingController::class, 'show']);
     Route::put('/bookings/{id}', [BookingController::class, 'update']);
     Route::delete('/bookings/{id}', [BookingController::class, 'destroy']);
+    Route::post('/bookings/{id}/confirm', [BookingController::class, 'confirm']);
+    Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancel']);
     Route::post('/bookings/{id}/accept', [BookingController::class, 'accept']);
     Route::post('/bookings/{id}/reject', [BookingController::class, 'reject']);
+    Route::post('/bookings/{id}/start', [BookingController::class, 'start']);
     Route::post('/bookings/{id}/complete', [BookingController::class, 'complete']);
+    Route::post('/bookings/auto-complete', [BookingController::class, 'autoCompleteSessions']);
+});
+
+// Review routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/reviews', [App\Http\Controllers\API\ReviewController::class, 'store']);
+    Route::get('/sitters/{id}/reviews', [App\Http\Controllers\API\ReviewController::class, 'getSitterReviews']);
+    Route::get('/reviews/owner', [App\Http\Controllers\API\ReviewController::class, 'getOwnerReviews']);
 });
 
 // Messaging routes

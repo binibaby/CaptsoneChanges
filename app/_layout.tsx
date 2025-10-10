@@ -33,6 +33,10 @@ function NavigationWrapper() {
       <Stack.Screen name="pet-owner-jobs" />
       <Stack.Screen name="pet-owner-messages" />
       
+      {/* Shared Routes */}
+      <Stack.Screen name="sitter-reviews" />
+      <Stack.Screen name="sitter-certificates" />
+      
       {/* Admin Routes */}
       <Stack.Screen name="admin" />
       <Stack.Screen name="admin-name-update-profile" />

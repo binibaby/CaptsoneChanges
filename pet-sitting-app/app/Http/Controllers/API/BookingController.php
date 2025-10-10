@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Events\BookingCompleted;
+use App\Events\SessionStarted;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\User;
 use App\Models\Notification;
+use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -137,7 +140,7 @@ class BookingController extends Controller
             'pet_name' => 'nullable|string|max:100',
             'pet_type' => 'nullable|string|max:50',
             'service_type' => 'nullable|string|max:50',
-            'duration' => 'nullable|integer|min:1',
+            'duration' => 'nullable|numeric|min:0.5',
             'rate_per_hour' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:500',
             'is_weekly' => 'nullable|boolean',
@@ -170,6 +173,7 @@ class BookingController extends Controller
         if ($isWeekly && $request->total_amount) {
             $totalAmount = $request->total_amount;
         } elseif ($request->rate_per_hour && $request->duration) {
+            // Duration is now in hours, so multiply directly
             $totalAmount = $request->rate_per_hour * $request->duration;
         }
 
@@ -187,7 +191,7 @@ class BookingController extends Controller
             'sitter_id' => $request->sitter_id,
             'date' => $request->date,
             'time' => $request->time,
-            'status' => 'pending',
+            'status' => 'confirmed',
             'is_weekly' => $isWeekly,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
@@ -225,12 +229,12 @@ class BookingController extends Controller
             'is_weekly' => $isWeekly
         ]);
 
-        // Notify the sitter about new booking request
+        // Notify the sitter about new confirmed booking (auto-confirmed)
         $this->notifySitterNewBooking($booking, $sitter);
 
         return response()->json([
             'success' => true,
-            'message' => 'Booking request submitted successfully!',
+            'message' => 'Booking confirmed successfully!',
             'booking' => [
                 'id' => $booking->id,
                 'date' => $booking->date,
@@ -430,6 +434,397 @@ class BookingController extends Controller
         ]);
     }
 
+    /**
+     * Start a booking session (sitter only).
+     */
+    public function start(Request $request, $id)
+    {
+        $user = $request->user();
+        $booking = Booking::with(['sitter', 'user'])->find($id);
+        
+        if (!$booking) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking not found.'
+            ], 404);
+        }
+
+        // Only the sitter can start the session
+        if ($booking->sitter_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only the assigned sitter can start the session.'
+            ], 403);
+        }
+
+        // Check if booking is confirmed
+        if ($booking->status !== 'confirmed') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking must be confirmed before starting the session.'
+            ], 400);
+        }
+
+        // Check if session can be started (within 3 minutes of start time)
+        // Handle different time formats - start_time might be just time (HH:MM) or full datetime
+        $startTimeString = $booking->getRawOriginal('start_time');
+        
+        // Debug: Check if the issue is with model access
+        \Log::info('🕐 Model access debug:', [
+            'booking_id' => $booking->id,
+            'date' => $booking->date,
+            'date_type' => gettype($booking->date),
+            'start_time' => $startTimeString,
+            'start_time_type' => gettype($startTimeString),
+            'raw_attributes' => $booking->getRawOriginal(),
+            'toArray' => $booking->toArray()
+        ]);
+        
+        // Debug: Log the time data we're working with
+        \Log::info('🕐 Start session time parsing:', [
+            'booking_id' => $booking->id,
+            'date' => $booking->date,
+            'start_time' => $startTimeString,
+            'start_time_type' => gettype($startTimeString),
+            'contains_space' => strpos($startTimeString, ' ') !== false,
+            'raw_start_time' => $booking->getRawOriginal('start_time'),
+            'start_time_length' => strlen($startTimeString),
+            'char_codes' => array_map('ord', str_split($startTimeString)),
+            'regex_test_1' => preg_match('/(\d{1,2}:\d{2})/', $startTimeString, $matches1) ? $matches1[1] : 'no match',
+            'regex_test_2' => preg_match('/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(\d{1,2}:\d{2})/', $startTimeString, $matches2) ? $matches2 : 'no match'
+        ]);
+        
+        try {
+            // Clean up the time string first
+            $cleanTimeString = trim($startTimeString);
+            
+            // Get the raw date value to avoid datetime concatenation issues
+            $rawDate = $booking->getRawOriginal('date');
+            $dateOnly = date('Y-m-d', strtotime($rawDate));
+            
+            // Check if it's a malformed datetime with double time specification
+            if (preg_match('/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(\d{1,2}:\d{2})/', $cleanTimeString, $matches)) {
+                // Extract the actual time part (the second time specification)
+                $actualTime = $matches[3];
+                $startTime = Carbon::parse($dateOnly . ' ' . $actualTime);
+            } elseif (preg_match('/(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})/', $cleanTimeString, $matches)) {
+                // Handle case where date and time are combined but we only want the time part
+                $actualTime = $matches[2];
+                $startTime = Carbon::parse($dateOnly . ' ' . $actualTime);
+            } elseif (strpos($cleanTimeString, ' ') !== false) {
+                // If start_time already contains date and time, use it directly
+                $startTime = Carbon::parse($cleanTimeString);
+            } else {
+                // If start_time is just time (HH:MM), combine with date
+                $startTime = Carbon::parse($dateOnly . ' ' . $cleanTimeString);
+            }
+        } catch (\Exception $e) {
+            \Log::error('🕐 Time parsing error:', [
+                'booking_id' => $booking->id,
+                'date' => $booking->date,
+                'start_time' => $startTimeString,
+                'error' => $e->getMessage()
+            ]);
+            
+            // Fallback: try to extract just the time part if it's malformed
+            $rawDate = $booking->getRawOriginal('date');
+            $dateOnly = date('Y-m-d', strtotime($rawDate));
+            if (preg_match('/(\d{1,2}:\d{2})/', $startTimeString, $matches)) {
+                $startTime = Carbon::parse($dateOnly . ' ' . $matches[1]);
+            } elseif (preg_match('/(\d{1,2}:\d{2}:\d{2})/', $startTimeString, $matches)) {
+                // Try to match time with seconds
+                $startTime = Carbon::parse($dateOnly . ' ' . $matches[1]);
+            } else {
+                // Last resort: try to extract any time-like pattern
+                if (preg_match('/(\d{1,2}:\d{2}(?::\d{2})?)/', $startTimeString, $matches)) {
+                    $startTime = Carbon::parse($dateOnly . ' ' . $matches[1]);
+                } else {
+                    \Log::error('🕐 Complete time parsing failure:', [
+                        'booking_id' => $booking->id,
+                        'start_time_string' => $startTimeString,
+                        'string_length' => strlen($startTimeString),
+                        'char_codes' => array_map('ord', str_split($startTimeString))
+                    ]);
+                    
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid time format in booking data.'
+                    ], 400);
+                }
+            }
+        }
+        
+        $currentTime = Carbon::now();
+        $timeDifference = $startTime->diffInMinutes($currentTime, false);
+
+        // Allow starting session at any time (removed 3-minute restriction)
+        // Only prevent starting if it's more than 24 hours in the future
+        if ($timeDifference > 1440) { // 1440 minutes = 24 hours
+            return response()->json([
+                'success' => false,
+                'message' => 'Session cannot be started more than 24 hours in advance.'
+            ], 400);
+        }
+
+        try {
+            // Update booking status to active
+            $booking->update(['status' => 'active']);
+
+            // Create notification for the owner
+            $owner = $booking->user;
+            $sitter = $booking->sitter;
+            
+            $owner->notifications()->create([
+                'type' => 'session_started',
+                'title' => 'Session Started',
+                'message' => "Your sitter {$sitter->first_name} {$sitter->last_name} has started the session for your booking.",
+                'data' => json_encode([
+                    'booking_id' => $booking->id,
+                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'pet_name' => $booking->pet_name,
+                    'date' => $booking->date->format('Y-m-d'),
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                ]),
+            ]);
+
+            // Broadcast the event
+            broadcast(new SessionStarted($booking, $sitter, $owner));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Session started successfully!',
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'owner_name' => "{$owner->first_name} {$owner->last_name}",
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error starting session: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to start session. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Automatically complete sessions that have ended.
+     */
+    public function autoCompleteSessions()
+    {
+        try {
+            $now = Carbon::now();
+            
+            // Find active bookings where the session should have ended
+            $activeBookings = Booking::with(['sitter', 'user'])
+                ->where('status', 'active')
+                ->get()
+                ->filter(function ($booking) use ($now) {
+                    try {
+                        $endTime = Carbon::parse($booking->date . ' ' . $booking->end_time);
+                        return $now->greaterThan($endTime);
+                    } catch (\Exception $e) {
+                        \Log::error('Error parsing end time for auto-completion: ' . $e->getMessage());
+                        return false;
+                    }
+                });
+
+            $completedCount = 0;
+            
+            foreach ($activeBookings as $booking) {
+                try {
+                    // Update booking status to completed
+                    $booking->update(['status' => 'completed']);
+
+                    // Update sitter's wallet balance (90% of total amount)
+                    $sitter = $booking->sitter;
+                    $sitterShare = $booking->total_amount * 0.9;
+                    $sitter->increment('wallet_balance', $sitterShare);
+
+                    // Create wallet transaction record for the sitter
+                    WalletTransaction::create([
+                        'user_id' => $sitter->id,
+                        'type' => 'credit',
+                        'amount' => $sitterShare,
+                        'status' => 'completed',
+                        'reference_number' => 'BOOKING_' . $booking->id,
+                        'notes' => 'Payment for completed booking #' . $booking->id,
+                        'processed_at' => now(),
+                    ]);
+
+                    // Create notification for the owner
+                    $owner = $booking->user;
+                    
+                    $owner->notifications()->create([
+                        'type' => 'booking_completed',
+                        'title' => 'Booking Completed',
+                        'message' => "Your booking with {$sitter->first_name} {$sitter->last_name} has been automatically completed. You can go to the Book Service page, open the Past tab, and rate and review your sitter.",
+                        'data' => json_encode([
+                            'booking_id' => $booking->id,
+                            'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                            'sitter_id' => $sitter->id,
+                            'pet_name' => $booking->pet_name,
+                            'date' => $booking->date->format('Y-m-d'),
+                            'start_time' => $booking->start_time,
+                            'end_time' => $booking->end_time,
+                            'total_amount' => $booking->total_amount,
+                        ]),
+                    ]);
+
+                    // Create notification for the sitter
+                    $sitter->notifications()->create([
+                        'type' => 'booking_completed',
+                        'title' => 'Booking Completed',
+                        'message' => "Your session with {$owner->first_name} {$owner->last_name} has been automatically completed. You earned ₱{$sitterShare}.",
+                        'data' => json_encode([
+                            'booking_id' => $booking->id,
+                            'owner_name' => "{$owner->first_name} {$owner->last_name}",
+                            'owner_id' => $owner->id,
+                            'pet_name' => $booking->pet_name,
+                            'date' => $booking->date->format('Y-m-d'),
+                            'start_time' => $booking->start_time,
+                            'end_time' => $booking->end_time,
+                            'total_amount' => $booking->total_amount,
+                            'sitter_earnings' => $sitterShare,
+                        ]),
+                    ]);
+
+                    // Broadcast the event
+                    broadcast(new BookingCompleted($booking, $sitter, $owner));
+                    
+                    $completedCount++;
+                } catch (\Exception $e) {
+                    \Log::error('Error auto-completing booking ' . $booking->id . ': ' . $e->getMessage());
+                }
+            }
+
+            \Log::info("Auto-completed {$completedCount} sessions");
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Auto-completed {$completedCount} sessions",
+                'completed_count' => $completedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error in autoCompleteSessions: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to auto-complete sessions',
+            ], 500);
+        }
+    }
+
+    /**
+     * Complete a booking session (sitter only).
+     */
+    public function complete(Request $request, $id)
+    {
+        $user = $request->user();
+        $booking = Booking::with(['sitter', 'user'])->find($id);
+        
+        if (!$booking) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking not found.'
+            ], 404);
+        }
+
+        // Only the sitter can complete the session
+        if ($booking->sitter_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only the assigned sitter can complete the session.'
+            ], 403);
+        }
+
+        // Check if booking is active
+        if ($booking->status !== 'active') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking must be active before completing the session.'
+            ], 400);
+        }
+
+        try {
+            // Update booking status to completed
+            $booking->update(['status' => 'completed']);
+
+            // Update sitter's wallet balance (90% of total amount)
+            $sitterShare = $booking->total_amount * 0.9;
+            $sitter->increment('wallet_balance', $sitterShare);
+
+            // Create wallet transaction record for the sitter
+            WalletTransaction::create([
+                'user_id' => $sitter->id,
+                'type' => 'credit',
+                'amount' => $sitterShare,
+                'status' => 'completed',
+                'reference_number' => 'BOOKING_' . $booking->id,
+                'notes' => 'Payment for completed booking #' . $booking->id,
+                'processed_at' => now(),
+            ]);
+
+            // Create notification for the owner
+            $owner = $booking->user;
+            $sitter = $booking->sitter;
+            
+            $owner->notifications()->create([
+                'type' => 'booking_completed',
+                'title' => 'Booking Completed',
+                'message' => "Your booking with {$sitter->first_name} {$sitter->last_name} is now completed. You can go to the Book Service page, open the Past tab, and rate and review your sitter.",
+                'data' => json_encode([
+                    'booking_id' => $booking->id,
+                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'sitter_id' => $sitter->id,
+                    'pet_name' => $booking->pet_name,
+                    'date' => $booking->date->format('Y-m-d'),
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                    'total_amount' => $booking->total_amount,
+                ]),
+            ]);
+
+            // Broadcast the event
+            broadcast(new BookingCompleted($booking, $sitter, $owner));
+            
+            // Broadcast dashboard update for the sitter
+            $dashboardData = [
+                'wallet_balance' => $sitter->wallet_balance,
+                'total_income' => $sitter->wallet_balance,
+                'this_week_income' => $sitter->wallet_balance,
+                'upcoming_jobs' => $sitter->bookings()->where('status', 'confirmed')->count(),
+                'completed_jobs' => $sitter->bookings()->where('status', 'completed')->count(),
+            ];
+            broadcast(new \App\Events\DashboardUpdated($sitter, $dashboardData));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking completed successfully!',
+                'booking' => [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'owner_name' => "{$owner->first_name} {$owner->last_name}",
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error completing booking: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to complete booking. Please try again.'
+            ], 500);
+        }
+    }
+
     private function notifyAdminNewBooking($booking, $totalAmount, $details)
     {
         $admins = User::where('is_admin', true)->get();
@@ -457,6 +852,7 @@ class BookingController extends Controller
             Notification::create([
                 'user_id' => $admin->id,
                 'type' => 'booking',
+                'title' => 'New Booking Created',
                 'message' => $message,
                 'data' => json_encode([
                     'booking_id' => $booking->id,
@@ -500,7 +896,7 @@ class BookingController extends Controller
             $startTime = $this->safeParseTime($booking->start_time)->format('g:i A');
             $endTime = $this->safeParseTime($booking->end_time)->format('g:i A');
             
-            $message = "New weekly booking request from {$booking->user->name} from {$startDate} to {$endDate} at {$startTime} - {$endTime}. Please review and confirm.";
+            $message = "You have a new booking from {$booking->user->name}. Please check your schedule for details.";
         } else {
             // Daily booking message - parse date without timezone conversion
             $date = $this->safeParseDate($booking->date)->format('F j, Y');
@@ -514,7 +910,7 @@ class BookingController extends Controller
                 $endTime = $this->safeParseTime($booking->time)->addHours($booking->duration ?? 8)->format('g:i A');
             }
             
-            $message = "New booking request from {$booking->user->name} for {$date} at {$startTime} - {$endTime}. Please review and confirm.";
+            $message = "You have a new booking from {$booking->user->name}. Please check your schedule for details.";
         }
         
         // Debug: Log the final message being created
@@ -528,6 +924,7 @@ class BookingController extends Controller
         Notification::create([
             'user_id' => $sitter->id,
             'type' => 'booking',
+            'title' => 'New Booking Request',
             'message' => $message,
             'data' => json_encode([
                 'booking_id' => $booking->id,
@@ -565,6 +962,7 @@ class BookingController extends Controller
             Notification::create([
                 'user_id' => $admin->id,
                 'type' => 'booking',
+                'title' => 'Booking Confirmed',
                 'message' => $message
             ]);
         }

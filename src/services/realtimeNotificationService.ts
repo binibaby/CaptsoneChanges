@@ -5,7 +5,7 @@ import EchoService from './echoService';
 import { notificationService } from './notificationService';
 
 export interface RealtimeNotificationData {
-  type: 'profile_change_approved' | 'profile_change_rejected' | 'id_verification_approved' | 'id_verification_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'booking_updated';
+  type: 'profile_change_approved' | 'profile_change_rejected' | 'id_verification_approved' | 'id_verification_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'booking_updated' | 'session_started' | 'booking_completed' | 'new_review';
   message: string;
   title: string;
   data?: any;
@@ -199,6 +199,132 @@ class RealtimeNotificationService {
         });
       });
 
+    // Listen for session started notifications
+    echo.private(`user.${userId}`)
+      .listen('session.started', (data: any) => {
+        console.log('🔔 Session started notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'session_started',
+          title: 'Session Started',
+          message: data.message || 'Your sitter has started the session.',
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for booking completed notifications
+    echo.private(`user.${userId}`)
+      .listen('booking.completed', (data: any) => {
+        console.log('🔔 Booking completed notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'booking_completed',
+          title: 'Booking Completed',
+          message: data.message || 'Your booking has been completed.',
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for new review notifications
+    echo.private(`user.${userId}`)
+      .listen('review.created', (data: any) => {
+        console.log('🔔 New review notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'new_review',
+          title: 'New Review Received',
+          message: data.message || 'You received a new review!',
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for payment success notifications
+    echo.private(`user.${userId}`)
+      .listen('payment.success', (data: any) => {
+        console.log('🔔 Payment success notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'payment_success',
+          title: 'Payment Successful',
+          message: data.message || 'Your payment has been processed successfully!',
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for payment received notifications (for sitters)
+    echo.private(`user.${userId}`)
+      .listen('payment.received', (data: any) => {
+        console.log('🔔 Payment received notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'payment_received',
+          title: 'Payment Received',
+          message: data.message || `You received ₱${data.payment?.sitter_share || data.payment?.amount || '0'} for your service!`,
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for wallet updated notifications (for sitters)
+    echo.private(`user.${userId}`)
+      .listen('wallet.updated', (data: any) => {
+        console.log('🔔 Wallet updated notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'wallet_updated',
+          title: 'Wallet Updated',
+          message: data.message || `Your wallet balance is now ₱${data.wallet_balance || '0'}`,
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for dashboard updated notifications (for sitters)
+    echo.private(`user.${userId}`)
+      .listen('dashboard.updated', (data: any) => {
+        console.log('🔔 Dashboard updated notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'dashboard_updated',
+          title: 'Dashboard Updated',
+          message: data.message || 'Your dashboard has been updated with new information.',
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for booking confirmed notifications (for sitters)
+    echo.private(`user.${userId}`)
+      .listen('booking.confirmed', (data: any) => {
+        console.log('🔔 Booking confirmed notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'booking_confirmed',
+          title: 'Booking Confirmed',
+          message: data.message || 'A new booking has been confirmed for you!',
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
+    // Listen for session started notifications (for pet owners)
+    echo.private(`user.${userId}`)
+      .listen('session.started', (data: any) => {
+        console.log('🔔 Session started notification received:', data);
+        this.handleRealtimeNotification({
+          type: 'session_started',
+          title: 'Session Started',
+          message: data.message || 'Your sitter has started the session!',
+          data: data,
+          user_id: userId,
+          timestamp: new Date().toISOString()
+        });
+      });
+
     // Listen for general notifications
     echo.private(`user.${userId}`)
       .listen('notification.received', (data: any) => {
@@ -256,7 +382,11 @@ class RealtimeNotificationService {
       case 'booking_confirmed':
       case 'booking_cancelled':
       case 'booking_updated':
+      case 'session_started':
+      case 'booking_completed':
         return 'booking';
+      case 'new_review':
+        return 'review';
       default:
         return 'system';
     }
@@ -274,7 +404,11 @@ class RealtimeNotificationService {
       case 'booking_confirmed':
       case 'booking_cancelled':
       case 'booking_updated':
+      case 'session_started':
+      case 'booking_completed':
         return 'View Booking';
+      case 'new_review':
+        return 'View Reviews';
       default:
         return 'View Details';
     }

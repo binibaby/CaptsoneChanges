@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { Booking, bookingService } from '../../services/bookingService';
@@ -116,6 +116,17 @@ const AllBookingsScreen = () => {
 
   const calculateEarnings = (booking: Booking) => {
     try {
+      // Use totalAmount if available (most accurate)
+      if (booking.totalAmount) {
+        return booking.totalAmount;
+      }
+      
+      // Fallback to calculating from duration and hourly rate
+      if (booking.duration && booking.hourlyRate) {
+        return booking.duration * booking.hourlyRate;
+      }
+      
+      // Last resort: calculate from start/end times
       const start = new Date(`2000-01-01 ${booking.startTime}`);
       const end = new Date(`2000-01-01 ${booking.endTime}`);
       if (end <= start) {

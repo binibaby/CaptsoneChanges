@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    Image,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { RealtimeSitter } from '../services/realtimeLocationService';
 
@@ -34,10 +34,64 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
   const [imageLoading, setImageLoading] = useState(true);
   const [buttonPressed, setButtonPressed] = useState(false);
   const currentImageSource = useRef<any>(null);
+  
+  // Reviews state
+  const [sitterRating, setSitterRating] = useState(0);
+  const [hasReviews, setHasReviews] = useState(false);
 
   // Use real certificates from sitter object, fallback to empty array if none
   const sitterCertificates = sitter?.certificates || [];
 
+  // Load sitter rating and reviews
+  const loadSitterRating = async () => {
+    if (!sitter?.id) return;
+    
+    try {
+      const { makeApiCall } = await import('../services/networkService');
+      const authService = (await import('../services/authService')).default;
+      const currentUser = await authService.getCurrentUser();
+      const token = currentUser?.token;
+
+      const response = await makeApiCall(`/api/sitters/${sitter.id}/reviews`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('⭐ Sitter rating data fetched:', {
+          sitterId: sitter.id,
+          averageRating: result.sitter?.average_rating,
+          totalReviews: result.sitter?.total_reviews,
+          reviews: result.reviews?.length || 0
+        });
+        setSitterRating(result.sitter?.average_rating || 0);
+        setHasReviews((result.sitter?.total_reviews || 0) > 0);
+      }
+    } catch (error) {
+      console.error('Error loading sitter rating:', error);
+    }
+  };
+
+  // Subscribe to real-time review notifications
+  useEffect(() => {
+    if (!sitter?.id) return;
+
+    const { realtimeNotificationService } = require('../services/realtimeNotificationService');
+    const unsubscribe = realtimeNotificationService.subscribe((notification: any) => {
+      if (notification.type === 'new_review' && 
+          notification.data?.sitter_id === sitter.id) {
+        console.log('🔔 New review received for sitter, refreshing rating...');
+        // Refresh the sitter rating when a new review is received
+        loadSitterRating();
+      }
+    });
+
+    return unsubscribe;
+  }, [sitter?.id]);
   
   // Reset image error state when sitter changes
   useEffect(() => {
@@ -77,6 +131,13 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
     
     return () => clearTimeout(timeout);
   }, [sitter?.id, sitter?.profileImage, sitter?.imageSource, sitter?.images]);
+
+  // Load sitter rating when sitter changes
+  useEffect(() => {
+    if (sitter?.id) {
+      loadSitterRating();
+    }
+  }, [sitter?.id]);
 
   // Stable image source calculation to prevent flickering
   const getImageSource = () => {
@@ -236,7 +297,23 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                     📍 {sitter.location?.address || `${sitter.location?.latitude?.toFixed(4)}, ${sitter.location?.longitude?.toFixed(4)}`}
                   </Text>
                   <View style={styles.ratingContainer}>
-                    <Text style={styles.reviewsText}>{sitter.reviews} reviews</Text>
+                    {sitterRating > 0 ? (
+                      <View style={styles.ratingDisplay}>
+                        <View style={styles.starsContainer}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Ionicons
+                              key={star}
+                              name={star <= Math.round(sitterRating) ? 'star' : 'star-outline'}
+                              size={16}
+                              color={star <= Math.round(sitterRating) ? '#FFD700' : '#E5E7EB'}
+                            />
+                          ))}
+                        </View>
+                        <Text style={styles.ratingText}>{sitterRating.toFixed(1)}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.noRatingText}>No ratings yet</Text>
+                    )}
                   </View>
                 </View>
               </View>
@@ -245,11 +322,21 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
               <View style={styles.credentialsSection}>
                 <TouchableOpacity 
                   style={styles.credentialButton}
-                  onPress={() => onViewBadges(sitter.id)}
+                  onPress={() => {
+                    console.log('🔍 View Reviews button pressed for sitter:', sitter?.id);
+                    onClose(); // Close the popup first
+                    router.push({
+                      pathname: '/sitter-reviews' as any,
+                      params: {
+                        sitterId: sitter?.id || '',
+                        sitterName: sitter?.name || 'Pet Sitter'
+                      }
+                    });
+                  }}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="ribbon" size={16} color="#fff" />
-                  <Text style={styles.credentialText}>View Badges</Text>
+                  <Ionicons name="star" size={16} color="#fff" />
+                  <Text style={styles.credentialText}>View Reviews</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[
@@ -421,6 +508,31 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                 </Text>
               </View>
 
+              {/* Rating */}
+              <View style={styles.infoRow}>
+                <Ionicons name="star" size={16} color="#F59E0B" />
+                <Text style={styles.infoLabel}>Rating:</Text>
+                <View style={styles.ratingValueContainer}>
+                  {sitterRating > 0 ? (
+                    <>
+                      <View style={styles.starsContainer}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={star <= Math.round(sitterRating) ? 'star' : 'star-outline'}
+                            size={14}
+                            color={star <= Math.round(sitterRating) ? '#FFD700' : '#E5E7EB'}
+                          />
+                        ))}
+                      </View>
+                      <Text style={styles.ratingValueText}>{sitterRating.toFixed(1)}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.infoValue}>No ratings yet</Text>
+                  )}
+                </View>
+              </View>
+
               {/* Hourly Rate */}
               <View style={styles.infoRow}>
                 <Ionicons name="cash" size={16} color="#F59E0B" />
@@ -437,7 +549,6 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
         </View>
       </Modal>
 
-      
     </>
   );
 };
@@ -557,11 +668,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  ratingDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginRight: 8,
+  },
   ratingText: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#fff',
-    marginLeft: 4,
+    color: '#F59E0B',
+  },
+  noRatingText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
   },
   reviewsText: {
     fontSize: 12,
@@ -662,6 +785,18 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
     fontStyle: 'italic',
+  },
+  ratingValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: 8,
+  },
+  ratingValueText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+    fontWeight: '600',
   },
 });
 

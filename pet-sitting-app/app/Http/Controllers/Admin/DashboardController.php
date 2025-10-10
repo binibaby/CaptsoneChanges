@@ -53,11 +53,11 @@ class DashboardController extends Controller
             'total_bookings' => Booking::count(),
             'active_bookings' => Booking::where('status', 'confirmed')->count(),
             'pending_verifications' => Verification::where('verification_status', 'pending')->count(),
-            'total_revenue' => Payment::where('status', 'paid')->sum('amount'),
-            'monthly_revenue' => Payment::where('status', 'paid')
+            'total_revenue' => Payment::where('status', 'completed')->sum('amount'),
+            'monthly_revenue' => Payment::where('status', 'completed')
                 ->whereBetween('created_at', [$lastMonth, $now])
                 ->sum('amount'),
-            'platform_fees' => Payment::where('status', 'paid')->sum('app_share'),
+            'platform_fees' => Payment::where('status', 'completed')->sum('app_share'),
             'average_rating' => User::where('role', 'pet_sitter')->avg('rating') ?? 0,
             'new_users_this_month' => User::whereBetween('created_at', [$lastMonth, $now])->count(),
             'new_bookings_this_month' => Booking::whereBetween('created_at', [$lastMonth, $now])->count(),

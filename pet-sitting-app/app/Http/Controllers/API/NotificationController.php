@@ -21,7 +21,7 @@ class NotificationController extends Controller
         
         return response()->json([
             'success' => true,
-            'notifications' => $filteredNotifications->map(function($notification) {
+            'notifications' => array_values($filteredNotifications->map(function($notification) {
                 return [
                     'id' => $notification->id,
                     'type' => $notification->type,
@@ -31,7 +31,7 @@ class NotificationController extends Controller
                     'created_at' => $notification->created_at->format('Y-m-d H:i:s'),
                     'data' => $notification->data ? json_decode($notification->data, true) : null
                 ];
-            }),
+            })->toArray()),
             'unread_count' => $filteredNotifications->where('read_at', null)->count()
         ]);
     }
@@ -126,7 +126,10 @@ class NotificationController extends Controller
                     'message',
                     'system',
                     'profile_update_approved',
-                    'profile_update_rejected'
+                    'profile_update_rejected',
+                    'payment_success',
+                    'booking_completed',
+                    'session_started'
                 ]);
             }
         });

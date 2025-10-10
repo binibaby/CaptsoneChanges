@@ -34,7 +34,6 @@ const PetSitterNotificationsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
-  // Removed unread count for fresh start
 
   // Load notifications
   const loadNotifications = useCallback(async () => {
@@ -56,9 +55,8 @@ const PetSitterNotificationsScreen: React.FC = () => {
       
       setNotifications(fetchedNotifications);
       
-      // Update unread count
+      // Log unread count for debugging
       const unread = fetchedNotifications.filter(n => !n.isRead).length;
-      // Removed unread count setting
       console.log('📊 Unread count:', unread);
       console.log('📊 All notifications:', fetchedNotifications.map(n => ({ id: n.id, title: n.title, isRead: n.isRead, action: n.action })));
       
@@ -201,7 +199,7 @@ const PetSitterNotificationsScreen: React.FC = () => {
     const initializeRealtime = async () => {
       try {
         console.log('🔔 Initializing real-time notifications for pet sitter:', user.id);
-        const token = user.token || '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507'; // Fallback token
+        const token = user.token || '688|fg2lyoMmhIR8BGBwHgVp9MuohtviVQJ911IUJBrb4be87cba'; // Fallback token for sitter 126
         const connected = await realtimeNotificationService.initialize(user.id, token);
         setRealtimeConnected(connected);
         

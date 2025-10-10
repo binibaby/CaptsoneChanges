@@ -185,6 +185,15 @@ class RealtimeService {
       case 'booking.status.changed':
         this.handleBookingStatusChanged(data);
         break;
+      case 'session.started':
+        this.handleSessionStarted(data);
+        break;
+      case 'booking.completed':
+        this.handleBookingCompleted(data);
+        break;
+      case 'review.created':
+        this.handleReviewCreated(data);
+        break;
       default:
         // Notify generic listeners
         this.notifyListeners(eventName, data);
@@ -261,6 +270,54 @@ class RealtimeService {
     
     // Notify listeners
     this.notifyListeners('booking.status.changed', data);
+  }
+
+  /**
+   * Handle session started event
+   */
+  private handleSessionStarted(data: any): void {
+    console.log('🚀 RealtimeService: Session started:', data);
+    
+    // Show notification
+    this.showNotification(
+      'Session Started', 
+      `Your sitter ${data.sitter_name} has started the session for your booking.`
+    );
+    
+    // Notify listeners
+    this.notifyListeners('session.started', data);
+  }
+
+  /**
+   * Handle booking completed event
+   */
+  private handleBookingCompleted(data: any): void {
+    console.log('✅ RealtimeService: Booking completed:', data);
+    
+    // Show notification
+    this.showNotification(
+      'Booking Completed', 
+      `Your booking with ${data.sitter_name} is now completed. You can rate and review your sitter.`
+    );
+    
+    // Notify listeners
+    this.notifyListeners('booking.completed', data);
+  }
+
+  /**
+   * Handle review created event
+   */
+  private handleReviewCreated(data: any): void {
+    console.log('⭐ RealtimeService: Review created:', data);
+    
+    // Show notification
+    this.showNotification(
+      'New Review Received', 
+      `You received a new ${data.rating}-star review from ${data.owner_name}.`
+    );
+    
+    // Notify listeners
+    this.notifyListeners('review.created', data);
   }
 
   /**
@@ -372,6 +429,27 @@ class RealtimeService {
     } else {
       console.warn('WebSocket not connected, cannot send message');
     }
+  }
+
+  /**
+   * Force refresh connection
+   */
+  async forceRefresh(): Promise<void> {
+    console.log('🔄 RealtimeService: Force refreshing connection...');
+    this.disconnect();
+    if (this.userId) {
+      await this.initialize(this.userId);
+    }
+  }
+
+  /**
+   * Get connection status
+   */
+  getConnectionStatus(): { connected: boolean; userId: string | null } {
+    return {
+      connected: this.isConnected,
+      userId: this.userId
+    };
   }
 }
 

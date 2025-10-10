@@ -53,7 +53,9 @@ class BookingService {
   private cachedBookings: Booking[] | null = null;
   private cacheExpiry: number = 0;
   private cacheDurationMs: number = 30000; // 30 second cache
-  private pendingApiCall: Promise<Response> | null = null;
+  private pendingApiCall: Promise<Booking[]> | null = null;
+  private cachedEarnings: { [sitterId: string]: { data: any, expiry: number } } = {};
+  private earningsCacheDurationMs: number = 10000; // 10 second cache for earnings
 
   private constructor() {}
 
@@ -83,6 +85,15 @@ class BookingService {
     this.lastNotificationTime = now;
     console.log('📢 Notifying booking listeners:', this.listeners.length);
     this.listeners.forEach(listener => listener(bookings));
+    
+    // Clear earnings cache when bookings change
+    this.clearEarningsCache();
+  }
+
+  // Clear earnings cache
+  private clearEarningsCache() {
+    console.log('🧹 Clearing earnings cache');
+    this.cachedEarnings = {};
   }
 
   // Confirm a booking
@@ -238,9 +249,9 @@ class BookingService {
       // If there's already a pending API call, wait for it
       if (this.pendingApiCall) {
         console.log('🔄 Waiting for pending API call');
-        const response = await this.pendingApiCall;
-        // Process the response and return bookings
-        return await this.processApiResponse(response);
+        const bookings = await this.pendingApiCall;
+        // Return the already processed bookings
+        return bookings;
       }
 
       // Debounce API calls
@@ -277,15 +288,17 @@ class BookingService {
 
       console.log('🔑 Fetching bookings from API for user:', user.id);
 
-      // Create the pending API call
-      this.pendingApiCall = this.makeApiCall(user.id, token);
-      const response = await this.pendingApiCall;
+      // Create the pending API call that processes the response
+      this.pendingApiCall = this.makeApiCall(user.id, token).then(async (response) => {
+        return await this.processApiResponse(response);
+      });
+      
+      const bookings = await this.pendingApiCall;
       
       // Clear the pending call
       this.pendingApiCall = null;
 
-      // Process the response
-      return await this.processApiResponse(response);
+      return bookings;
     } catch (error) {
       console.error('Error fetching bookings from API:', error);
       // Clear the pending call on error
@@ -309,7 +322,9 @@ class BookingService {
   // Process API response and convert to Booking[]
   private async processApiResponse(response: Response): Promise<Booking[]> {
     if (response && response.ok) {
-      const data = await response.json();
+      // Clone the response to avoid "Already read" error
+      const responseClone = response.clone();
+      const data = await responseClone.json();
       console.log('📅 API bookings response:', data);
       
       if (data.success && data.bookings) {
@@ -489,6 +504,54 @@ class BookingService {
 
       const formattedDate = formatDateForAPI(bookingData.date);
 
+      // Calculate duration in hours from start and end times
+      const calculateDurationInHours = (startTime: string, endTime: string): number => {
+        // Convert 12-hour format to 24-hour format and then to minutes
+        const convertToMinutes = (timeStr: string): number => {
+          // Handle both 12-hour (AM/PM) and 24-hour formats
+          if (timeStr.includes('AM') || timeStr.includes('PM')) {
+            const [time, period] = timeStr.split(' ');
+            const [hours, minutes] = time.split(':');
+            let hour24 = parseInt(hours, 10);
+            
+            if (period === 'PM' && hour24 !== 12) {
+              hour24 += 12;
+            } else if (period === 'AM' && hour24 === 12) {
+              hour24 = 0;
+            }
+            
+            return hour24 * 60 + parseInt(minutes || '0', 10);
+          } else {
+            // Already in 24-hour format
+            const [hours, minutes] = timeStr.split(':');
+            return parseInt(hours, 10) * 60 + parseInt(minutes || '0', 10);
+          }
+        };
+
+        const startTimeMinutes = convertToMinutes(startTime);
+        const endTimeMinutes = convertToMinutes(endTime);
+        let durationMinutes = endTimeMinutes - startTimeMinutes;
+        
+        // Handle overnight bookings (end time is next day)
+        if (durationMinutes < 0) {
+          durationMinutes += 24 * 60; // Add 24 hours
+        }
+        
+        const durationHours = durationMinutes / 60;
+        console.log('🕐 Duration calculation:', {
+          startTime,
+          endTime,
+          startTimeMinutes,
+          endTimeMinutes,
+          durationMinutes,
+          durationHours
+        });
+        
+        return durationHours;
+      };
+
+      const durationInHours = calculateDurationInHours(bookingData.startTime, bookingData.endTime);
+
       const bookingPayload = {
         sitter_id: bookingData.sitterId,
         date: formattedDate,
@@ -498,7 +561,7 @@ class BookingService {
         pet_name: 'My Pet', // Default pet name
         pet_type: 'Dog', // Default pet type
         service_type: 'Pet Sitting',
-        duration: 3, // Default duration in hours
+        duration: Math.round(durationInHours * 100) / 100, // Duration in hours, rounded to 2 decimal places
         rate_per_hour: bookingData.hourlyRate,
         description: 'Pet sitting service requested',
         is_weekly: false
@@ -841,9 +904,9 @@ class BookingService {
 
     // Helper function to check if booking is upcoming (future schedule)
     const isBookingUpcoming = (booking: any) => {
-      // Include confirmed, pending, and active bookings that are in the future
-      // 'active' means payment is successful but job hasn't started yet
-      if (booking.status !== 'confirmed' && booking.status !== 'pending' && booking.status !== 'active') return false;
+      // Include only confirmed and pending bookings that are in the future
+      // 'active' bookings should only appear after sitter manually starts the session
+      if (booking.status !== 'confirmed' && booking.status !== 'pending') return false;
       
       const bookingDate = new Date(booking.date);
       const startTime = booking.startTime || booking.start_time || booking.time;
@@ -854,8 +917,18 @@ class BookingService {
         const fullDateTime = new Date(bookingDate);
         fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
         
-        console.log(`  - ${booking.date} ${startTime} (${booking.status}): ${fullDateTime.toISOString()} > ${now.toISOString()} = ${fullDateTime > now}`);
-        return fullDateTime > now;
+        // Use a more lenient comparison - consider bookings as upcoming if they're today or future
+        // and not yet started (not active status)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const bookingDay = new Date(bookingDate);
+        bookingDay.setHours(0, 0, 0, 0);
+        
+        const isTodayOrFuture = bookingDay >= today;
+        const isNotStarted = booking.status !== 'active';
+        
+        console.log(`  - ${booking.date} ${startTime} (${booking.status}): isTodayOrFuture=${isTodayOrFuture}, isNotStarted=${isNotStarted}`);
+        return isTodayOrFuture && isNotStarted;
       }
       
       // If no time, just check if date is today or future
@@ -884,8 +957,14 @@ class BookingService {
   // Get completed bookings for a sitter
   async getCompletedSitterBookings(sitterId: string): Promise<Booking[]> {
     const sitterBookings = await this.getSitterBookings(sitterId);
-    // Include both 'completed' and 'active' bookings since active bookings are paid
-    return sitterBookings.filter(b => b.status === 'completed' || b.status === 'active');
+    // Only include 'completed' bookings - 'active' bookings are still in progress
+    return sitterBookings.filter(b => b.status === 'completed');
+  }
+
+  // Get active bookings for a sitter (sessions in progress)
+  async getActiveSitterBookings(sitterId: string): Promise<Booking[]> {
+    const sitterBookings = await this.getSitterBookings(sitterId);
+    return sitterBookings.filter(b => b.status === 'active');
   }
 
   // Calculate total earnings for a sitter
@@ -895,25 +974,37 @@ class BookingService {
     total: number;
     completedJobs: number;
   }> {
+    // Check cache first
+    const now = Date.now();
+    const cached = this.cachedEarnings[sitterId];
+    if (cached && now < cached.expiry) {
+      console.log('💰 Using cached earnings for sitter:', sitterId);
+      return cached.data;
+    }
+
+    console.log('💰 Calculating fresh earnings for sitter:', sitterId);
     const completedBookings = await this.getCompletedSitterBookings(sitterId);
-    console.log('💰 getSitterEarnings - Found completed/active bookings:', completedBookings.length);
-    completedBookings.forEach(booking => {
+    const activeBookings = await this.getActiveSitterBookings(sitterId);
+    const allEarningBookings = [...completedBookings, ...activeBookings];
+    console.log('💰 getSitterEarnings - Found completed bookings:', completedBookings.length);
+    console.log('💰 getSitterEarnings - Found active bookings:', activeBookings.length);
+    allEarningBookings.forEach(booking => {
       console.log(`  - Booking ${booking.id}: Status=${booking.status}, Amount=${booking.totalAmount || 'N/A'}, HourlyRate=${booking.hourlyRate}`);
     });
     
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
+    const currentDate = new Date();
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
 
-    const thisWeekBookings = completedBookings.filter(b => {
+    const thisWeekBookings = allEarningBookings.filter(b => {
       const bookingDate = new Date(b.date);
       return bookingDate >= startOfWeek;
     });
 
-    const thisMonthBookings = completedBookings.filter(b => {
+    const thisMonthBookings = allEarningBookings.filter(b => {
       const bookingDate = new Date(b.date);
       return bookingDate >= startOfMonth;
     });
@@ -923,17 +1014,68 @@ class BookingService {
       return bookings.reduce((total, booking) => {
         // Use totalAmount if available, otherwise calculate from duration × hourlyRate
         const bookingEarnings = booking.totalAmount || ((booking.duration || 3) * booking.hourlyRate);
-        console.log(`  - Booking ${booking.id}: Status=${booking.status}, TotalAmount=${booking.totalAmount}, Duration=${booking.duration || 3}, HourlyRate=${booking.hourlyRate}, Earnings=${bookingEarnings}`);
-        return total + bookingEarnings;
+        const safeEarnings = typeof bookingEarnings === 'number' ? bookingEarnings : 0;
+        // Apply 90% sitter commission (same as dashboardService)
+        const sitterEarnings = safeEarnings * 0.9;
+        console.log(`  - Booking ${booking.id}: Status=${booking.status}, TotalAmount=${booking.totalAmount}, Duration=${booking.duration || 3}, HourlyRate=${booking.hourlyRate}, RawEarnings=${safeEarnings}, SitterEarnings=${sitterEarnings}`);
+        return total + sitterEarnings;
       }, 0);
     };
 
-    return {
+    // Get wallet balance to include in total earnings
+    let walletBalance = 0;
+    try {
+      const { makeApiCall } = await import('./networkService');
+      const user = await this.getCurrentUser();
+      if (user?.token) {
+        const walletResponse = await makeApiCall('/api/wallet', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${user.token}`,
+          },
+        });
+        if (walletResponse.ok) {
+          const walletData = await walletResponse.json();
+          walletBalance = parseFloat(walletData.balance) || 0;
+          console.log('💰 Wallet balance found:', walletBalance, 'Type:', typeof walletBalance);
+        }
+      }
+    } catch (error) {
+      console.log('💰 Could not fetch wallet balance:', error);
+    }
+
+    const calculatedEarnings = {
       thisWeek: calculateEarnings(thisWeekBookings),
       thisMonth: calculateEarnings(thisMonthBookings),
-      total: calculateEarnings(completedBookings),
-      completedJobs: completedBookings.length,
+      total: calculateEarnings(allEarningBookings),
+      completedJobs: allEarningBookings.length,
     };
+
+    // Ensure walletBalance is a number
+    const safeWalletBalance = typeof walletBalance === 'number' ? walletBalance : 0;
+    
+    // If no earnings from bookings but wallet has balance, use wallet balance (consistent with dashboardService)
+    const earningsData = {
+      thisWeek: calculatedEarnings.thisWeek === 0 && safeWalletBalance > 0 ? safeWalletBalance : calculatedEarnings.thisWeek,
+      thisMonth: calculatedEarnings.thisMonth === 0 && safeWalletBalance > 0 ? safeWalletBalance : calculatedEarnings.thisMonth,
+      total: calculatedEarnings.total === 0 && safeWalletBalance > 0 ? safeWalletBalance : calculatedEarnings.total,
+      completedJobs: calculatedEarnings.completedJobs,
+    };
+
+    console.log('💰 Final earnings calculation:', {
+      calculated: calculatedEarnings,
+      walletBalance,
+      final: earningsData
+    });
+
+    // Cache the results
+    this.cachedEarnings[sitterId] = {
+      data: earningsData,
+      expiry: now + this.earningsCacheDurationMs
+    };
+
+    console.log('💰 Cached earnings for sitter:', sitterId, earningsData);
+    return earningsData;
   }
 
   // Delete booking
@@ -964,6 +1106,41 @@ class BookingService {
       await AsyncStorage.setItem('weeklyBookings', JSON.stringify(bookings));
     } catch (error) {
       console.error('Error saving weekly bookings:', error);
+    }
+  }
+
+  /**
+   * Auto-complete sessions that have ended
+   */
+  async autoCompleteSessions(): Promise<{ success: boolean; completed_count: number }> {
+    try {
+      const { makeApiCall } = await import('./networkService');
+      const authService = (await import('./authService')).default;
+      const user = await authService.getCurrentUser();
+      const token = user?.token;
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      const response = await makeApiCall('/api/bookings/auto-complete', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to auto-complete sessions');
+      }
+
+      const data = await response.json();
+      console.log('✅ Auto-completed sessions:', data);
+      return data;
+    } catch (error) {
+      console.error('Error auto-completing sessions:', error);
+      return { success: false, completed_count: 0 };
     }
   }
 }

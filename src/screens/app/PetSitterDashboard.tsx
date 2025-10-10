@@ -92,9 +92,21 @@ const PetSitterDashboard = () => {
     }
   }, [currentUserId]);
 
+  // Auto-refresh dashboard data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 PetSitterDashboard: Screen focused, refreshing data...');
+      if (currentUserId) {
+        loadDashboardMetrics();
+        loadDashboardData();
+      }
+    }, [currentUserId])
+  );
+
   // Subscribe to dashboard updates
   useEffect(() => {
     const unsubscribe = dashboardService.subscribe((metrics) => {
+      console.log('📊 Dashboard metrics updated:', metrics);
       setDashboardMetrics(metrics);
       if (metrics.walletBalance !== undefined) {
         setWalletBalance(metrics.walletBalance);
@@ -103,6 +115,40 @@ const PetSitterDashboard = () => {
 
     return unsubscribe;
   }, []);
+
+  // Subscribe to real-time events for immediate updates
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const unsubscribeWallet = realtimeService.subscribe('wallet.updated', (data) => {
+      console.log('💳 Real-time wallet update received:', data);
+      // Trigger immediate refresh of dashboard data
+      loadDashboardMetrics();
+      loadDashboardData();
+    });
+
+    const unsubscribeDashboard = realtimeService.subscribe('dashboard.updated', (data) => {
+      console.log('📊 Real-time dashboard update received:', data);
+      // Update metrics immediately
+      setDashboardMetrics(prev => ({ ...prev, ...data }));
+      if (data.wallet_balance !== undefined) {
+        setWalletBalance(data.wallet_balance);
+      }
+    });
+
+    const unsubscribePayment = realtimeService.subscribe('payment.received', (data) => {
+      console.log('💰 Real-time payment received:', data);
+      // Trigger immediate refresh
+      loadDashboardMetrics();
+      loadDashboardData();
+    });
+
+    return () => {
+      unsubscribeWallet();
+      unsubscribeDashboard();
+      unsubscribePayment();
+    };
+  }, [currentUserId]);
 
   // Initialize real-time service
   const initializeRealtimeService = async () => {
@@ -294,11 +340,17 @@ const PetSitterDashboard = () => {
         total: earnings.total,
         completedJobs: earnings.completedJobs
       });
+      // Ensure earnings values are numbers and provide fallbacks
+      const safeThisWeek = typeof earnings.thisWeek === 'number' ? earnings.thisWeek : 0;
+      const safeThisMonth = typeof earnings.thisMonth === 'number' ? earnings.thisMonth : 0;
+      const safeTotal = typeof earnings.total === 'number' ? earnings.total : 0;
+      const safeCompletedJobs = typeof earnings.completedJobs === 'number' ? earnings.completedJobs : 0;
+      
       const newEarningsData = {
-        thisWeek: `₱${earnings.thisWeek.toFixed(0)}`,
-        thisMonth: `₱${earnings.thisMonth.toFixed(0)}`,
-        totalEarnings: `₱${earnings.total.toFixed(0)}`,
-        completedJobs: earnings.completedJobs,
+        thisWeek: `₱${safeThisWeek.toFixed(0)}`,
+        thisMonth: `₱${safeThisMonth.toFixed(0)}`,
+        totalEarnings: `₱${safeTotal.toFixed(0)}`,
+        completedJobs: safeCompletedJobs,
       };
       console.log('💰 Setting earnings data state:', newEarningsData);
       setEarningsData(newEarningsData);
@@ -315,11 +367,19 @@ const PetSitterDashboard = () => {
     console.log('🔄 Refreshing sitter dashboard data...');
     
     try {
-      // Refresh dashboard data
-      await loadDashboardData();
+      // Force refresh all data
+      await Promise.all([
+        loadDashboardData(),
+        loadDashboardMetrics()
+      ]);
       
-      // Refresh dashboard metrics
-      await loadDashboardMetrics();
+      // Force refresh real-time connection
+      try {
+        await realtimeService.forceRefresh();
+        console.log('🔌 Real-time connection refreshed');
+      } catch (error) {
+        console.log('🔌 Real-time refresh failed, continuing with API data:', error);
+      }
     } catch (error) {
       console.error('❌ Error refreshing dashboard data:', error);
     } finally {
@@ -413,8 +473,11 @@ const PetSitterDashboard = () => {
               </View>
               <Text style={styles.totalIncomeAmount}>
                 {(() => {
-                  console.log('💰 Rendering total income:', earningsData.totalEarnings);
-                  return earningsData.totalEarnings || '₱0.00';
+                  console.log('💰 Rendering total income from dashboardService:', dashboardMetrics.totalIncome);
+                  console.log('💰 Rendering total income from earningsData:', earningsData.totalEarnings);
+                  // Use dashboardService metrics if available, fallback to earningsData
+                  const totalIncome = typeof dashboardMetrics.totalIncome === 'number' ? dashboardMetrics.totalIncome : 0;
+                  return totalIncome > 0 ? `₱${totalIncome.toFixed(0)}` : (earningsData.totalEarnings || '₱0.00');
                 })()}
               </Text>
               <View style={styles.totalIncomeHint}>
@@ -443,8 +506,10 @@ const PetSitterDashboard = () => {
             </View>
             <Text style={styles.statsValueWhite}>
               {(() => {
-                console.log('💰 Rendering completed jobs:', earningsData.completedJobs);
-                return earningsData.completedJobs || 0;
+                console.log('💰 Rendering completed jobs from dashboardService:', dashboardMetrics.completedJobs);
+                console.log('💰 Rendering completed jobs from earningsData:', earningsData.completedJobs);
+                // Use dashboardService metrics if available, fallback to earningsData
+                return typeof dashboardMetrics.completedJobs === 'number' ? dashboardMetrics.completedJobs : (earningsData.completedJobs || 0);
               })()}
             </Text>
             <Text style={styles.statsLabelWhite}>Jobs Completed</Text>
@@ -466,7 +531,12 @@ const PetSitterDashboard = () => {
               <Ionicons name="calendar" size={24} color="#fff" />
             </View>
             <Text style={styles.statsValueWhite}>
-              {upcomingBookings.length || 0}
+              {(() => {
+                console.log('📅 Rendering upcoming jobs from dashboardService:', dashboardMetrics.upcomingBookings);
+                console.log('📅 Rendering upcoming jobs from upcomingBookings:', upcomingBookings.length);
+                // Use dashboardService metrics if available, fallback to upcomingBookings
+                return typeof dashboardMetrics.upcomingBookings === 'number' ? dashboardMetrics.upcomingBookings : (upcomingBookings.length || 0);
+              })()}
             </Text>
             <Text style={styles.statsLabelWhite}>Upcoming Jobs</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
@@ -488,8 +558,11 @@ const PetSitterDashboard = () => {
             </View>
             <Text style={styles.statsValueWhite}>
               {(() => {
-                console.log('💰 Rendering this week:', earningsData.thisWeek);
-                return earningsData.thisWeek || '₱0.00';
+                console.log('💰 Rendering this week from dashboardService:', dashboardMetrics.thisWeekIncome);
+                console.log('💰 Rendering this week from earningsData:', earningsData.thisWeek);
+                // Use dashboardService metrics if available, fallback to earningsData
+                const thisWeekIncome = typeof dashboardMetrics.thisWeekIncome === 'number' ? dashboardMetrics.thisWeekIncome : 0;
+                return thisWeekIncome > 0 ? `₱${thisWeekIncome.toFixed(0)}` : (earningsData.thisWeek || '₱0.00');
               })()}
             </Text>
             <Text style={styles.statsLabelWhite}>This Week</Text>

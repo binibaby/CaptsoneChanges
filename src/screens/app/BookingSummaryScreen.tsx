@@ -63,7 +63,42 @@ const BookingSummaryScreen: React.FC = () => {
 
   // Calculate total amount with proper validation
   const hourlyRate = parseFloat(sitterRate || '25') || 25; // Fallback to 25 if NaN
-  const hours = duration ? (parseFloat(duration.toString()) / 60) || 2 : 2; // Default to 2 hours if not specified or invalid
+  
+  // Calculate duration from start and end times if not provided
+  const calculateDurationFromTimes = (startTime: string, endTime: string): number => {
+    const convertToMinutes = (timeStr: string): number => {
+      if (timeStr.includes('AM') || timeStr.includes('PM')) {
+        const [time, period] = timeStr.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour24 = parseInt(hours, 10);
+        
+        if (period === 'PM' && hour24 !== 12) {
+          hour24 += 12;
+        } else if (period === 'AM' && hour24 === 12) {
+          hour24 = 0;
+        }
+        
+        return hour24 * 60 + parseInt(minutes || '0', 10);
+      } else {
+        const [hours, minutes] = timeStr.split(':');
+        return parseInt(hours, 10) * 60 + parseInt(minutes || '0', 10);
+      }
+    };
+
+    const startTimeMinutes = convertToMinutes(startTime);
+    const endTimeMinutes = convertToMinutes(endTime);
+    let durationMinutes = endTimeMinutes - startTimeMinutes;
+    
+    if (durationMinutes < 0) {
+      durationMinutes += 24 * 60;
+    }
+    
+    return durationMinutes / 60;
+  };
+
+  // Use provided duration or calculate from start/end times
+  const hours = duration ? parseFloat(duration.toString()) : 
+    (startTime && endTime ? calculateDurationFromTimes(startTime, endTime) : 2);
   const totalAmount = hourlyRate * hours;
   const appFee = totalAmount * 0.1; // 10% app fee
   const sitterAmount = totalAmount * 0.9; // 90% to sitter
@@ -339,18 +374,6 @@ const BookingSummaryScreen: React.FC = () => {
 
           <View style={styles.detailRow}>
             <View style={styles.detailIcon}>
-              <Ionicons name="paw-outline" size={20} color="#3B82F6" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Pet</Text>
-              <Text style={styles.detailValue}>
-                {petName || 'My Pet'} ({petType || 'Dog'})
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.detailRow}>
-            <View style={styles.detailIcon}>
               <Ionicons name="construct-outline" size={20} color="#3B82F6" />
             </View>
             <View style={styles.detailContent}>
@@ -361,44 +384,66 @@ const BookingSummaryScreen: React.FC = () => {
             </View>
           </View>
 
-          {description && (
-            <View style={styles.detailRow}>
-              <View style={styles.detailIcon}>
-                <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
-              </View>
-              <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Notes</Text>
-                <Text style={styles.detailValue}>{description}</Text>
-              </View>
+          <View style={styles.detailRow}>
+            <View style={styles.detailIcon}>
+              <Ionicons name="time-outline" size={20} color="#3B82F6" />
             </View>
-          )}
+            <View style={styles.detailContent}>
+              <Text style={styles.detailLabel}>Duration</Text>
+              <Text style={styles.detailValue}>
+                {hours.toFixed(1)} hours
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.detailRow}>
+            <View style={styles.detailIcon}>
+              <Ionicons name="cash-outline" size={20} color="#3B82F6" />
+            </View>
+            <View style={styles.detailContent}>
+              <Text style={styles.detailLabel}>Hourly Rate</Text>
+              <Text style={styles.detailValue}>
+                ₱{hourlyRate.toFixed(0)}/hour
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Payment Breakdown */}
         <View style={styles.paymentCard}>
-          <Text style={styles.cardTitle}>Payment Breakdown</Text>
+          <Text style={styles.cardTitle}>Total Computation</Text>
           
           <View style={styles.paymentRow}>
-            <Text style={styles.paymentLabel}>Service Fee ({formatCurrency(hours)} hours)</Text>
-            <Text style={styles.paymentValue}>₱{formatCurrency(totalAmount)}</Text>
+            <Text style={styles.paymentLabel}>Base Rate</Text>
+            <Text style={styles.paymentValue}>₱{hourlyRate.toFixed(0)}/hour</Text>
+          </View>
+          
+          <View style={styles.paymentRow}>
+            <Text style={styles.paymentLabel}>Duration</Text>
+            <Text style={styles.paymentValue}>{hours.toFixed(1)} hours</Text>
+          </View>
+          
+          <View style={styles.paymentRow}>
+            <Text style={styles.paymentLabel}>Subtotal (Rate × Duration)</Text>
+            <Text style={styles.paymentValue}>₱{(hourlyRate * hours).toFixed(2)}</Text>
           </View>
           
           <View style={styles.paymentRow}>
             <Text style={styles.paymentLabel}>Platform Fee (10%)</Text>
-            <Text style={styles.paymentValue}>₱{formatCurrency(appFee)}</Text>
+            <Text style={styles.paymentValue}>₱{appFee.toFixed(2)}</Text>
           </View>
           
           <View style={styles.divider} />
           
           <View style={styles.paymentRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>₱{formatCurrency(totalAmount)}</Text>
+            <Text style={styles.totalLabel}>Total Amount (You Pay)</Text>
+            <Text style={styles.totalValue}>₱{totalAmount.toFixed(2)}</Text>
           </View>
           
           <View style={styles.sitterNote}>
             <Ionicons name="information-circle-outline" size={16} color="#10B981" />
             <Text style={styles.sitterNoteText}>
-              Sitter will receive ₱{formatCurrency(sitterAmount)} after platform fee
+              Sitter will receive ₱{sitterAmount.toFixed(2)} (90% of total)
             </Text>
           </View>
         </View>

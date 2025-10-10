@@ -105,6 +105,12 @@ class NotificationService {
 
       // Get auth token
       let token = user.token;
+      console.log('🔍 User details for notifications:', {
+        id: user.id,
+        role: user.userRole,
+        hasToken: !!token
+      });
+      
       if (!token) {
         // Fallback to hardcoded tokens for testing
         if (user.id === '5') {
@@ -119,6 +125,8 @@ class NotificationService {
           token = '7bc9a143a60b74b47e37f717ecf37f8d08d72f89809bc5718431a8dd65cab9ff';
         } else if (user.id === '121') {
           token = '616|Mh2WHZIp1aFUXtMKiilSU84KTP3Snege7zRjE2bM00a52108';
+        } else if (user.id === '126') {
+          token = '688|fg2lyoMmhIR8BGBwHgVp9MuohtviVQJ911IUJBrb4be87cba';
         } else {
           console.log('❌ No token available for user:', user.id);
           return [];
@@ -138,7 +146,7 @@ class NotificationService {
         const data = await response.json();
         console.log('📱 API notifications response:', data);
         
-        if (data.success && data.notifications) {
+        if (data.success && data.notifications && Array.isArray(data.notifications)) {
           // Convert API format to local format
           const notifications: Notification[] = data.notifications.map((apiNotif: any) => ({
             id: apiNotif.id.toString(),
@@ -155,9 +163,25 @@ class NotificationService {
           console.log('✅ Converted API notifications:', notifications.length);
           console.log('📋 Notification details:', notifications.map(n => ({ id: n.id, type: n.type, title: n.title, isRead: n.isRead })));
           return notifications;
+        } else {
+          console.log('⚠️ API response missing notifications array:', {
+            success: data.success,
+            hasNotifications: !!data.notifications,
+            notificationsType: typeof data.notifications,
+            notificationsIsArray: Array.isArray(data.notifications),
+            fullResponse: data
+          });
+          
+          // If notifications exists but is not an array, return empty array
+          if (data.notifications && !Array.isArray(data.notifications)) {
+            console.log('⚠️ notifications is not an array, returning empty array');
+            return [];
+          }
         }
       } else {
         console.log('⚠️ API call failed:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.log('⚠️ Error response data:', errorData);
       }
     } catch (error) {
       console.error('Error fetching notifications from API:', error);
@@ -320,7 +344,7 @@ class NotificationService {
       const notificationData = {
         type: 'booking' as const,
         title: `New ${bookingType} Booking Request`,
-        message: `New ${bookingType.toLowerCase()} booking request from ${bookingData.petOwnerName} for ${formattedDate} at ${formattedStartTime} - ${formattedEndTime}. Please review and confirm.`,
+        message: `You have a new booking from ${bookingData.petOwnerName}. Please check your schedule for details.`,
         action: 'View Request',
         data: {
           bookingId: bookingData.bookingId,
@@ -392,7 +416,7 @@ class NotificationService {
       const notificationData = {
         type: 'booking' as const,
         title: 'New Weekly Booking Request',
-        message: `New weekly booking request from ${bookingData.petOwnerName} from ${formattedStartDate} to ${formattedEndDate} at ${formattedStartTime} - ${formattedEndTime}. Please review and confirm.`,
+        message: `You have a new booking from ${bookingData.petOwnerName}. Please check your schedule for details.`,
         action: 'View Request',
         data: {
           bookingId: bookingData.bookingId,
@@ -666,6 +690,45 @@ class NotificationService {
       return await this.addNotificationForUser(bookingData.petOwnerId, notificationData);
     } catch (error) {
       console.error('❌ Error creating booking cancellation notification:', error);
+    }
+  }
+
+  // Create session started notification for pet owner
+  async createSessionStartedNotification(bookingData: any) {
+    try {
+      console.log('🔔 Creating session started notification for owner:', bookingData.petOwnerId);
+      
+      const bookingType = bookingData.isWeekly ? 'Weekly' : 'Daily';
+      const dateRange = bookingData.isWeekly 
+        ? `from ${bookingData.startDate} to ${bookingData.endDate}`
+        : `for ${bookingData.date}`;
+      
+      const notificationData = {
+        type: 'booking' as const,
+        title: 'Session Started',
+        message: `Your sitter ${bookingData.sitterName} has started the session for your ${bookingType.toLowerCase()} booking ${dateRange}.`,
+        action: 'View Session',
+        data: {
+          bookingId: bookingData.bookingId,
+          petOwnerId: bookingData.petOwnerId,
+          petOwnerName: bookingData.petOwnerName,
+          sitterId: bookingData.sitterId,
+          sitterName: bookingData.sitterName,
+          date: bookingData.date,
+          startDate: bookingData.startDate,
+          endDate: bookingData.endDate,
+          startTime: bookingData.startTime,
+          endTime: bookingData.endTime,
+          hourlyRate: bookingData.hourlyRate,
+          isWeekly: bookingData.isWeekly || false,
+          bookingType,
+          status: 'active'
+        }
+      };
+
+      return await this.addNotificationForUser(bookingData.petOwnerId, notificationData);
+    } catch (error) {
+      console.error('❌ Error creating session started notification:', error);
     }
   }
 

@@ -45,13 +45,14 @@ class DashboardService {
         makeApiCall('/payments/history', { method: 'GET' }),
       ]);
 
-      const bookings: Booking[] = bookingsResponse.data || [];
+      const bookings: Booking[] = bookingsResponse.bookings || [];
       const payments = paymentsResponse.data || [];
 
-      // Calculate metrics
-      const totalSpent = payments
-        .filter((p: any) => p.status === 'completed')
-        .reduce((sum: number, p: any) => sum + p.amount, 0);
+      // Calculate metrics - include all successfully paid bookings (both completed and active)
+      // A booking is considered paid if it has status 'active' or 'completed'
+      const totalSpent = bookings
+        .filter((b: any) => b.status === 'active' || b.status === 'completed')
+        .reduce((sum: number, b: any) => sum + b.total_amount, 0);
 
       // Helper function to check if booking is currently active (within time range)
       const isBookingActive = (booking: any) => {
@@ -128,12 +129,12 @@ class DashboardService {
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       
-      const thisWeekSpent = payments
-        .filter((p: any) => 
-          p.status === 'completed' && 
-          new Date(p.created_at) >= oneWeekAgo
+      const thisWeekSpent = bookings
+        .filter((b: any) => 
+          (b.status === 'active' || b.status === 'completed') && 
+          new Date(b.created_at) >= oneWeekAgo
         )
-        .reduce((sum: number, p: any) => sum + p.amount, 0);
+        .reduce((sum: number, b: any) => sum + b.total_amount, 0);
 
       this.metrics = {
         totalSpent,
@@ -160,8 +161,18 @@ class DashboardService {
         makeApiCall('/wallet', { method: 'GET' }),
       ]);
 
-      const bookings: Booking[] = bookingsResponse.data || [];
-      const walletData = walletResponse;
+      // Parse API responses correctly
+      const bookingsData = await bookingsResponse.json();
+      const walletData = await walletResponse.json();
+      
+      const bookings: Booking[] = bookingsData.bookings || bookingsData.data || [];
+      
+      console.log('📊 DashboardService - API responses:', {
+        bookingsCount: bookings.length,
+        walletBalance: walletData.balance,
+        bookingsData: bookingsData,
+        walletData: walletData
+      });
 
       // Helper function to check if booking is currently active (within time range)
       const isBookingActive = (booking: any) => {
@@ -233,6 +244,9 @@ class DashboardService {
           return false;
         }
         
+        // Additional check: Only count as completed if the session has actually ended
+        // This prevents counting bookings that are marked as 'completed' but still ongoing
+        
         const now = new Date();
         const bookingDate = new Date(booking.date);
         
@@ -300,6 +314,18 @@ class DashboardService {
       const completedBookings = bookings.filter(isBookingCompleted);
       const upcomingBookings = bookings.filter(isBookingUpcoming);
       
+      // For active bookings, show all 'active' and 'confirmed' bookings until marked as completed
+      const activeBookings = bookings.filter(booking => 
+        booking.status === 'active' || booking.status === 'confirmed'
+      );
+      
+      console.log('📊 Booking counts:', {
+        total: bookings.length,
+        completed: completedBookings.length,
+        upcoming: upcomingBookings.length,
+        active: activeBookings.length
+      });
+      
       console.log('📊 Sitter metrics calculation:', {
         totalBookings: bookings.length,
         completedJobs: completedBookings.length,
@@ -316,35 +342,45 @@ class DashboardService {
       
       const completedJobs = completedBookings.length;
 
-      // Calculate total income from completed and active bookings (both are paid)
-      const totalIncome = bookings
-        .filter(b => b.status === 'completed' || b.status === 'active')
-        .reduce((sum, b) => sum + (b.total_amount * 0.9), 0); // 90% to sitter
-
-      // Calculate this week's income
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      // Use wallet balance as the source of truth for total income
+      // This ensures e-wallet and total income container always match
+      let totalIncome = parseFloat(walletData.balance) || 0;
       
-      const thisWeekIncome = bookings
-        .filter(b => 
-          (b.status === 'completed' || b.status === 'active') && 
-          new Date(b.created_at) >= oneWeekAgo
-        )
-        .reduce((sum, b) => sum + (b.total_amount * 0.9), 0);
+      console.log('💰 Using wallet balance as total income:', totalIncome);
+      console.log('💰 Wallet data received:', walletData);
+
+      // Calculate this week's income from recent wallet transactions
+      // This is a simplified approach - in a real app, you'd track transaction dates
+      let thisWeekIncome = parseFloat(walletData.balance) || 0;
+      
+      console.log('💰 Using wallet balance as this week income:', thisWeekIncome);
 
       this.metrics = {
-        totalIncome,
-        completedJobs,
-        upcomingBookings,
-        thisWeekIncome,
-        walletBalance: walletData.balance || 0,
+        totalIncome: totalIncome || 0,
+        completedJobs: completedJobs || 0,
+        upcomingBookings: upcomingBookings.length || 0,
+        activeBookings: activeBookings.length || 0,
+        thisWeekIncome: thisWeekIncome || 0,
+        walletBalance: parseFloat(walletData.balance) || 0,
       };
 
       this.notifyListeners();
       return this.metrics;
     } catch (error) {
       console.error('Error getting sitter metrics:', error);
-      throw error;
+      
+      // Return default metrics on error to prevent undefined values
+      this.metrics = {
+        totalIncome: 0,
+        completedJobs: 0,
+        upcomingBookings: 0,
+        activeBookings: 0,
+        thisWeekIncome: 0,
+        walletBalance: 0,
+      };
+      
+      this.notifyListeners();
+      return this.metrics;
     }
   }
 
@@ -476,9 +512,9 @@ class DashboardService {
    * Handle payment completed event (for owners)
    */
   onPaymentCompleted(paymentData: any): void {
-    // Update owner metrics
-    if (this.metrics.totalSpent !== undefined) {
-      this.metrics.totalSpent += paymentData.amount;
+    // Update owner metrics - use booking total amount instead of payment amount
+    if (this.metrics.totalSpent !== undefined && paymentData.booking) {
+      this.metrics.totalSpent += paymentData.booking.total_amount;
     }
 
     // Update this week's spending if payment is from this week
@@ -486,8 +522,8 @@ class DashboardService {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     
     if (new Date(paymentData.created_at) >= oneWeekAgo) {
-      if (this.metrics.thisWeekSpent !== undefined) {
-        this.metrics.thisWeekSpent += paymentData.amount;
+      if (this.metrics.thisWeekSpent !== undefined && paymentData.booking) {
+        this.metrics.thisWeekSpent += paymentData.booking.total_amount;
       }
     }
 

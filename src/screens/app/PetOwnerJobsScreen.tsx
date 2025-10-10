@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import ReviewModal from '../../components/ReviewModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { Booking, bookingService } from '../../services/bookingService';
 
@@ -38,6 +39,10 @@ const PetOwnerJobsScreen = () => {
   ]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Review modal state
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<Booking | null>(null);
 
   // Check if user is logged out and redirect to onboarding
   useEffect(() => {
@@ -60,6 +65,15 @@ const PetOwnerJobsScreen = () => {
   useEffect(() => {
     if (user?.id) {
       loadBookings();
+      
+      // Subscribe to booking updates for real-time notifications
+      const unsubscribe = bookingService.subscribe(() => {
+        if (!loading) {
+          loadBookings();
+        }
+      });
+
+      return unsubscribe;
     }
   }, [user?.id]);
 
@@ -91,6 +105,24 @@ const PetOwnerJobsScreen = () => {
     } catch (error) {
       return dateString;
     }
+  };
+
+  // Handle opening review modal for completed bookings
+  const handleOpenReviewModal = (booking: Booking) => {
+    setSelectedBookingForReview(booking);
+    setReviewModalVisible(true);
+  };
+
+  // Handle closing review modal
+  const handleCloseReviewModal = () => {
+    setReviewModalVisible(false);
+    setSelectedBookingForReview(null);
+  };
+
+  // Handle review submission
+  const handleReviewSubmitted = () => {
+    // Refresh bookings to show updated data
+    loadBookings();
   };
 
   const loadBookings = async () => {
@@ -315,7 +347,9 @@ const PetOwnerJobsScreen = () => {
                         </View>
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-                        <Text style={styles.statusText}>{getStatusText(job.status)}</Text>
+                        <Text style={styles.statusText}>
+                          {job.status === 'completed' ? 'Marked as Completed' : getStatusText(job.status)}
+                        </Text>
                       </View>
                     </View>
 
@@ -359,6 +393,16 @@ const PetOwnerJobsScreen = () => {
                           <Text style={styles.cancelButtonText}>Cancel</Text>
                         </TouchableOpacity>
                       )}
+                      
+                      {job.status === 'completed' && isBooking && (
+                        <TouchableOpacity 
+                          style={styles.reviewButton}
+                          onPress={() => handleOpenReviewModal(item)}
+                        >
+                          <Ionicons name="star-outline" size={16} color="#F59E0B" />
+                          <Text style={styles.reviewButtonText}>Rate & Review</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </>
                 )}
@@ -396,6 +440,16 @@ const PetOwnerJobsScreen = () => {
           </View>
         )}
       </ScrollView>
+      
+      {/* Review Modal */}
+      <ReviewModal
+        visible={reviewModalVisible}
+        onClose={handleCloseReviewModal}
+        bookingId={selectedBookingForReview?.id || ''}
+        sitterName={selectedBookingForReview?.sitterName || ''}
+        petName={selectedBookingForReview?.petName || ''}
+        onReviewSubmitted={handleReviewSubmitted}
+      />
     </SafeAreaView>
   );
 };
@@ -607,6 +661,20 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#FF4444',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  reviewButtonText: {
+    color: '#F59E0B',
     fontSize: 12,
     fontWeight: '600',
   },

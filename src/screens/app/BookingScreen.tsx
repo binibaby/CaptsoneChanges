@@ -335,7 +335,7 @@ const BookingScreen: React.FC = () => {
         startTime: selectedTimeRange.startTime,
         endTime: selectedTimeRange.endTime,
         hourlyRate: parseFloat(sitterRate || '25'),
-        status: 'pending',
+        status: 'confirmed',
       });
       
       // Create booking using the service (which handles API call)
@@ -348,7 +348,7 @@ const BookingScreen: React.FC = () => {
         startTime: selectedTimeRange.startTime,
         endTime: selectedTimeRange.endTime,
         hourlyRate: parseFloat(sitterRate || '25'),
-        status: 'pending',
+        status: 'confirmed', // Auto-confirmed - no manual confirmation needed
       });
       
       console.log('✅ New booking created:', newBooking);
@@ -368,10 +368,43 @@ const BookingScreen: React.FC = () => {
         hourlyRate: parseFloat(sitterRate || '25'),
       });
 
-      // Calculate duration in minutes
-      const startTimeMinutes = selectedTimeRange.startTime.split(':').reduce((acc, time) => (60 * acc) + +time, 0);
-      const endTimeMinutes = selectedTimeRange.endTime.split(':').reduce((acc, time) => (60 * acc) + +time, 0);
-      const duration = endTimeMinutes - startTimeMinutes;
+      // Calculate duration in hours
+      const calculateDurationInHours = (startTime: string, endTime: string): number => {
+        // Convert 12-hour format to 24-hour format and then to minutes
+        const convertToMinutes = (timeStr: string): number => {
+          // Handle both 12-hour (AM/PM) and 24-hour formats
+          if (timeStr.includes('AM') || timeStr.includes('PM')) {
+            const [time, period] = timeStr.split(' ');
+            const [hours, minutes] = time.split(':');
+            let hour24 = parseInt(hours, 10);
+            
+            if (period === 'PM' && hour24 !== 12) {
+              hour24 += 12;
+            } else if (period === 'AM' && hour24 === 12) {
+              hour24 = 0;
+            }
+            
+            return hour24 * 60 + parseInt(minutes || '0', 10);
+          } else {
+            // Already in 24-hour format
+            const [hours, minutes] = timeStr.split(':');
+            return parseInt(hours, 10) * 60 + parseInt(minutes || '0', 10);
+          }
+        };
+
+        const startTimeMinutes = convertToMinutes(startTime);
+        const endTimeMinutes = convertToMinutes(endTime);
+        let durationMinutes = endTimeMinutes - startTimeMinutes;
+        
+        // Handle overnight bookings (end time is next day)
+        if (durationMinutes < 0) {
+          durationMinutes += 24 * 60; // Add 24 hours
+        }
+        
+        return durationMinutes / 60; // Convert to hours
+      };
+
+      const duration = calculateDurationInHours(selectedTimeRange.startTime, selectedTimeRange.endTime);
 
       // Redirect to booking summary screen for payment
       router.push({
