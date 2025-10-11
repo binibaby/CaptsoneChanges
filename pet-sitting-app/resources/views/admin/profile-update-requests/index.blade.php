@@ -1,105 +1,158 @@
 @extends('admin.layouts.app')
 
 @section('content')
-<div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Profile Update Requests</h1>
-            <p class="text-gray-600">Review and manage user profile update requests</p>
-            <div id="autoRefreshIndicator" class="text-xs text-green-600 mt-1 hidden">
-                <span class="inline-flex items-center">
-                    <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    Auto-refreshing every 5 seconds
-                </span>
+<div class="space-y-8">
+    <!-- Page Header -->
+    <div class="relative overflow-hidden bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl shadow-2xl">
+        <div class="absolute inset-0 bg-black opacity-10"></div>
+        <div class="relative px-8 py-8">
+            <div class="flex items-center justify-between">
+                <div class="text-white">
+                    <h1 class="text-3xl font-bold mb-2">Profile Update Requests 📝</h1>
+                    <p class="text-indigo-100 text-lg">Review and manage user profile update requests</p>
+                    <div class="flex items-center mt-4 space-x-6">
+                        <div class="flex items-center text-indigo-100">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            <span class="text-sm">Profile Management</span>
+                        </div>
+                        <div class="flex items-center text-indigo-100">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span class="text-sm">Real-time Updates</span>
+                        </div>
+                    </div>
+                    <div id="autoRefreshIndicator" class="text-xs text-indigo-200 mt-2 hidden">
+                        <span class="inline-flex items-center">
+                            <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            Auto-refreshing every 5 seconds
+                        </span>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="w-24 h-24 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="flex space-x-3">
-            <button id="refreshButton" onclick="loadRequests()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
-                <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    </div>
+
+    <!-- Action Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-4">
+            <h2 class="text-xl font-semibold text-gray-900">Profile Request Actions</h2>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button id="refreshButton" onclick="loadRequests()" class="bg-gradient-to-r from-indigo-50 to-indigo-100 hover:from-indigo-100 hover:to-indigo-200 text-indigo-700 px-4 py-2 rounded-xl border border-indigo-200 transition-all duration-200 flex items-center shadow-sm hover:shadow-md">
+                <svg id="refreshIcon" class="w-4 h-4 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
                 <span id="refreshText">Refresh</span>
+            </button>
+            <button id="exportRequests" class="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white px-4 py-2 rounded-xl transition-all duration-200 flex items-center shadow-lg hover:shadow-xl">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Export Data
             </button>
         </div>
     </div>
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-gradient-to-br from-indigo-50 to-purple-100 rounded-2xl shadow-lg border border-indigo-200 hover-lift p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500">Total Requests</p>
-                    <p id="totalRequests" class="text-2xl font-semibold text-gray-900">-</p>
+                    <p class="text-sm font-medium text-indigo-700">Total Requests</p>
+                    <p id="totalRequests" class="text-2xl font-bold text-indigo-800">-</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-gradient-to-br from-amber-50 to-yellow-100 rounded-2xl shadow-lg border border-amber-200 hover-lift p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500">Pending</p>
-                    <p id="pendingRequests" class="text-2xl font-semibold text-yellow-600">-</p>
+                    <p class="text-sm font-medium text-amber-700">Pending</p>
+                    <p id="pendingRequests" class="text-2xl font-bold text-amber-800">-</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl shadow-lg border border-emerald-200 hover-lift p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500">Approved</p>
-                    <p id="approvedRequests" class="text-2xl font-semibold text-green-600">-</p>
+                    <p class="text-sm font-medium text-emerald-700">Approved</p>
+                    <p id="approvedRequests" class="text-2xl font-bold text-emerald-800">-</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-gradient-to-br from-rose-50 to-red-100 rounded-2xl shadow-lg border border-rose-200 hover-lift p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-12 h-12 bg-gradient-to-br from-rose-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500">Rejected</p>
-                    <p id="rejectedRequests" class="text-2xl font-semibold text-red-600">-</p>
+                    <p class="text-sm font-medium text-rose-700">Rejected</p>
+                    <p id="rejectedRequests" class="text-2xl font-bold text-rose-800">-</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div class="flex flex-wrap gap-4">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 hover-lift p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Filter Requests</h3>
+                    <p class="text-sm text-gray-600">Search and filter profile update requests</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">Filter by Status</label>
                 <select id="statusFilter" onchange="filterRequests()" 
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500">
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
                     <option value="all">All Requests</option>
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
@@ -124,9 +177,19 @@
     </div>
 
     <!-- Requests Table -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Profile Update Requests</h3>
+    <div class="bg-gradient-to-br from-indigo-50 to-purple-100 rounded-2xl shadow-lg border border-indigo-200 hover-lift">
+        <div class="px-6 py-4 border-b border-indigo-200 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-t-2xl">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-indigo-800">Profile Update Requests</h3>
+                    <p class="text-sm text-indigo-600">Review and manage user profile update requests</p>
+                </div>
+            </div>
         </div>
         
         <div class="overflow-x-auto">

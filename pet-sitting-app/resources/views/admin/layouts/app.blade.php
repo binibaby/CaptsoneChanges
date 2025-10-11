@@ -16,7 +16,7 @@
     
     <style>
         .sidebar-transition {
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .sidebar-collapsed {
             width: 4rem;
@@ -30,21 +30,77 @@
         .content-collapsed {
             margin-left: 4rem;
         }
+        
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Removed glass effect to show colors */
+        
+        /* Gradient backgrounds */
+        .gradient-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .gradient-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .gradient-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .gradient-warning {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        /* Hover effects */
+        .hover-lift {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Animation keyframes */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+        }
     </style>
 </head>
 <body class="font-sans antialiased bg-gray-100">
     <div class="min-h-screen flex">
         <!-- Sidebar -->
-        <div id="sidebar" class="sidebar-expanded sidebar-transition bg-gray-900 text-white fixed h-full z-50">
+        <div id="sidebar" class="sidebar-expanded sidebar-transition bg-white text-gray-900 fixed h-full z-50 shadow-2xl border-r border-gray-200">
             <!-- Brand -->
-            <div class="flex items-center justify-between h-16 px-4 border-b border-gray-800">
+            <div class="flex items-center justify-between h-16 px-4 border-b border-gray-200">
                 <div class="flex items-center">
-                    <div class="w-6 h-6 bg-orange-500 rounded-lg flex items-center justify-center mr-3">
+                    <div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
                         <span class="text-white font-bold text-sm">PS</span>
                     </div>
-                    <span id="brand-text" class="text-xl font-bold text-white">PetSitConnect</span>
+                    <span id="brand-text" class="text-xl font-bold text-gray-900 tracking-tight">PetSitConnect</span>
                 </div>
-                <button id="sidebar-toggle" class="text-gray-400 hover:text-white transition-colors">
+                <button id="sidebar-toggle" class="text-gray-500 hover:text-gray-700 transition-all duration-200 p-1 rounded-lg hover:bg-gray-100">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                     </svg>
@@ -52,151 +108,140 @@
             </div>
 
             <!-- Navigation -->
-            <nav class="mt-6 px-4">
+            <nav class="mt-6 px-4 custom-scrollbar overflow-y-auto h-[calc(100vh-8rem)]">
                 <!-- Dashboard -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.dashboard') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.dashboard') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.dashboard') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5v14m8-14v14"></path>
                         </svg>
-                        <span id="nav-text">Dashboard</span>
+                        <span id="nav-text" class="font-medium">Dashboard</span>
                     </a>
                 </div>
 
                 <!-- Users -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.users.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.users.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.users.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
                         </svg>
-                        <span id="nav-text">Users</span>
+                        <span id="nav-text" class="font-medium">Users</span>
                     </a>
                 </div>
 
                 <!-- Name Updates -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.name-updates.users') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.name-updates.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.name-updates.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                         </svg>
-                        <span id="nav-text">Name Updates</span>
+                        <span id="nav-text" class="font-medium">Name Updates</span>
                     </a>
                 </div>
 
                 <!-- Profile Update Requests -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.profile-update-requests.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.profile-update-requests*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.profile-update-requests.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
-                        <span id="nav-text">Profile Requests</span>
+                        <span id="nav-text" class="font-medium">Profile Requests</span>
                     </a>
                 </div>
 
                 <!-- Bookings -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.bookings.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.bookings.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.bookings.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
-                        <span id="nav-text">Bookings</span>
+                        <span id="nav-text" class="font-medium">Bookings</span>
                     </a>
                 </div>
 
                 <!-- Verifications -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.verifications.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.verifications.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.verifications.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <span id="nav-text">Verifications</span>
+                        <span id="nav-text" class="font-medium">Verifications</span>
                     </a>
                 </div>
 
                 <!-- Payments -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.payments.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.payments.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.payments.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
                         </svg>
-                        <span id="nav-text">Payments</span>
+                        <span id="nav-text" class="font-medium">Payments</span>
                     </a>
                 </div>
 
                 <!-- Reports -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.reports.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.reports.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.reports.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                         </svg>
-                        <span id="nav-text">Reports</span>
+                        <span id="nav-text" class="font-medium">Reports</span>
                     </a>
                 </div>
 
-                <!-- Support -->
-                <div class="mb-4">
-                    <a href="{{ route('admin.support.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.support.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <span id="nav-text">Support</span>
-                    </a>
-                </div>
 
                 <!-- Notifications -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.notifications.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.notifications.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.notifications.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                         </svg>
-                        <span id="nav-text">Notifications</span>
+                        <span id="nav-text" class="font-medium">Notifications</span>
                     </a>
                 </div>
 
                 <!-- Announcements -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.announcements') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.announcements') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.announcements*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
                         </svg>
-                        <span id="nav-text">Announcements</span>
+                        <span id="nav-text" class="font-medium">Announcements</span>
                     </a>
                 </div>
 
                 <!-- Settings -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <a href="{{ route('admin.settings.index') }}" 
-                       class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200
-                              {{ request()->routeIs('admin.settings.*') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                              {{ request()->routeIs('admin.settings.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                         </svg>
-                        <span id="nav-text">Settings</span>
+                        <span id="nav-text" class="font-medium">Settings</span>
                     </a>
                 </div>
             </nav>
@@ -205,44 +250,53 @@
         <!-- Main Content -->
         <div id="main-content" class="content-expanded sidebar-transition flex-1">
             <!-- Top Header -->
-            <header class="bg-white shadow-sm border-b border-gray-200">
+            <header class="bg-gradient-to-r from-blue-100 to-indigo-200 shadow-lg border-b border-blue-300">
                 <div class="flex items-center justify-between h-16 px-6">
                     <!-- Breadcrumb -->
-                    <div class="flex items-center space-x-2 text-sm text-gray-600">
-                        <span class="text-gray-400">Home</span>
-                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="flex items-center space-x-2 text-sm">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center shadow-md">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                                </svg>
+                            </div>
+                            <span class="text-blue-700 font-medium">Admin Panel</span>
+                        </div>
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                         </svg>
-                        <span class="text-gray-900 font-medium">{{ ucfirst(request()->route()?->getName() ?? 'Dashboard') }}</span>
+                        <span class="text-blue-900 font-bold text-lg bg-white px-3 py-1 rounded-lg shadow-sm border border-blue-200">{{ ucfirst(str_replace(['admin.', '.'], ['', ' '], request()->route()?->getName() ?? 'Dashboard')) }}</span>
                     </div>
 
                     <!-- Right Side -->
                     <div class="flex items-center space-x-4">
+                        <!-- Search -->
+                        <div class="relative hidden md:block">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </div>
+                            <input type="text" placeholder="Search..." class="block w-64 pl-10 pr-3 py-2 bg-white border border-blue-300 rounded-lg text-sm placeholder-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm">
+                        </div>
+
                         <!-- Notifications -->
-                        <button class="text-gray-400 hover:text-gray-600 transition-colors">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button class="relative p-2 text-blue-600 hover:text-blue-800 transition-all duration-200 hover:bg-white rounded-lg shadow-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                             </svg>
-                        </button>
-
-                        <!-- Messages -->
-                        <button class="text-gray-400 hover:text-gray-600 transition-colors">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                            </svg>
+                            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                         </button>
 
                         <!-- User Menu -->
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-3 pl-3 border-l border-blue-300">
                             <div class="text-right">
-                                <div class="text-sm font-medium text-gray-900">{{ Auth::user()->name ?? 'Admin' }}</div>
-                                <div class="text-xs text-gray-500">Administrator</div>
+                                <div class="text-sm font-semibold text-blue-900">{{ Auth::user()->name ?? 'Admin' }}</div>
+                                <div class="text-xs text-blue-600">Administrator</div>
                             </div>
-                            <div class="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
-                                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
+                            <div class="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full flex items-center justify-center shadow-lg">
+                                <span class="text-white font-semibold text-sm">{{ substr(Auth::user()->name ?? 'A', 0, 1) }}</span>
                             </div>
                         </div>
                     </div>
@@ -250,8 +304,10 @@
             </header>
 
             <!-- Page Content -->
-            <main class="p-6">
-                @yield('content')
+            <main class="p-6 bg-transparent min-h-[calc(100vh-4rem)]">
+                <div class="fade-in-up">
+                    @yield('content')
+                </div>
             </main>
         </div>
     </div>
