@@ -48,7 +48,7 @@ class SemaphoreService
             Log::info("📱 SEMAPHORE SMS - Request data: " . json_encode($data));
 
             // Send the request to Semaphore API
-               $response = Http::timeout(30)->post($this->baseUrl . '/otp', $data);
+            $response = Http::timeout(30)->post($this->baseUrl . '/otp', $data);
 
             Log::info("📱 SEMAPHORE SMS - Response status: " . $response->status());
             Log::info("📱 SEMAPHORE SMS - Response body: " . $response->body());

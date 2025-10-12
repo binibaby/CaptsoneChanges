@@ -700,7 +700,7 @@ class AuthController extends Controller
         // Send SMS using Semaphore service
         try {
             $semaphoreService = new SemaphoreService();
-            $message = "Petsit Connect code: {$verificationCode}. Valid for 10 mins.";
+            $message = $verificationCode; // Send only the 6-digit code
             
             \Log::info("📱 SEMAPHORE SMS - Attempting to send SMS via Semaphore");
             \Log::info("📱 SEMAPHORE SMS - Phone: {$phone}");
@@ -852,8 +852,8 @@ class AuthController extends Controller
     private function isSimulationMode(): bool
     {
         // Check environment variable or config for simulation mode
-        $simulationMode = env('SMS_SIMULATION_MODE', true); // Default to true for development
-        $semaphoreEnabled = env('SEMAPHORE_ENABLED', false); // Default to false until approved
+        $simulationMode = env('SMS_SIMULATION_MODE', false); // Default to false for production
+        $semaphoreEnabled = env('SEMAPHORE_ENABLED', true); // Default to true since API is approved
         
         // Enable simulation if explicitly set or if Semaphore is not enabled
         return $simulationMode || !$semaphoreEnabled;
@@ -877,7 +877,7 @@ class AuthController extends Controller
         \Log::info("🎭 Code: {$verificationCode}");
         \Log::info("🎭 Code: {$verificationCode}");
         \Log::info("🎭 Code: {$verificationCode}");
-        \Log::info("🎭 Message: Petsit Connect code: {$verificationCode}. Valid for 10 mins.");
+        \Log::info("🎭 Message: {$verificationCode} (6-digit code only)");
         \Log::info("🎭 ========================================");
         \Log::info("🎭 COPY THIS CODE: {$verificationCode}");
         \Log::info("🎭 ========================================");
