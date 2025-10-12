@@ -2,7 +2,9 @@
 
 ## API Key Setup
 
-Add these environment variables to your `.env` file in the `pet-sitting-app` directory:
+✅ **COMPLETED**: Environment variables have been added to your `.env` file!
+
+The following variables are now configured in your `.env` file:
 
 ```env
 # Semaphore SMS API Configuration
@@ -14,6 +16,8 @@ SMS_SIMULATION_MODE=false
 SEMAPHORE_BASE_URL=https://api.semaphore.co/api/v4
 SEMAPHORE_SENDER_NAME=PetsitConnect
 ```
+
+**Note**: The `.env` file is not tracked in git for security reasons. If you need to set up the environment on another server, copy these variables to the new `.env` file.
 
 ## What Changed
 
