@@ -196,8 +196,20 @@ class User extends Authenticatable
 
     public function isVerified()
     {
-        return $this->email_verified_at !== null && 
-               ($this->phone_verified_at !== null || empty($this->phone));
+        if ($this->role === 'pet_owner') {
+            // Pet owners only need phone verification
+            return $this->email_verified_at !== null && 
+                   ($this->phone_verified_at !== null || empty($this->phone));
+        } elseif ($this->role === 'pet_sitter') {
+            // Pet sitters need both phone and ID verification
+            return $this->email_verified_at !== null && 
+                   ($this->phone_verified_at !== null || empty($this->phone)) &&
+                   $this->hasVerifiedId();
+        } else {
+            // Admin or other roles
+            return $this->email_verified_at !== null && 
+                   ($this->phone_verified_at !== null || empty($this->phone));
+        }
     }
 
     public function isPhoneVerified()
@@ -207,7 +219,16 @@ class User extends Authenticatable
 
     public function isFullyVerified()
     {
-        return $this->isVerified() && $this->hasVerifiedId();
+        if ($this->role === 'pet_owner') {
+            // Pet owners are fully verified with just phone verification
+            return $this->isPhoneVerified();
+        } elseif ($this->role === 'pet_sitter') {
+            // Pet sitters need both phone and ID verification
+            return $this->isPhoneVerified() && $this->hasVerifiedId();
+        } else {
+            // Admin or other roles
+            return $this->isPhoneVerified();
+        }
     }
 
     public function hasVerifiedId()
