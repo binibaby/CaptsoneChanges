@@ -95,12 +95,32 @@ class UserController extends Controller
 
     private function getVerificationBadge($user)
     {
-        if ($user->id_verified && $user->verification_status === 'verified') {
+        // Check if user has phone verification (phone_verified_at is not null)
+        $hasPhoneVerification = !is_null($user->phone_verified_at);
+        
+        // Check if user has ID verification
+        $hasIdVerification = $user->id_verified && $user->verification_status === 'verified';
+        
+        if ($hasPhoneVerification && $hasIdVerification) {
             return [
-                'status' => 'verified',
-                'label' => 'Verified',
+                'status' => 'fully_verified',
+                'label' => 'Fully Verified',
                 'color' => 'success',
                 'icon' => 'check-circle'
+            ];
+        } elseif ($hasPhoneVerification && !$hasIdVerification) {
+            return [
+                'status' => 'phone_verified',
+                'label' => 'Phone Verified',
+                'color' => 'success',
+                'icon' => 'phone-check'
+            ];
+        } elseif (!$hasPhoneVerification && $hasIdVerification) {
+            return [
+                'status' => 'id_verified',
+                'label' => 'ID Verified',
+                'color' => 'success',
+                'icon' => 'id-check'
             ];
         } elseif ($user->verification_status === 'rejected') {
             return [

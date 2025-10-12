@@ -825,11 +825,29 @@ class AuthController extends Controller
         \Cache::forget($cacheKey);
         \Log::info("✅ VERIFY SMS - Code verified successfully for phone: {$phone}");
         \Log::info("🧹 Cache cleared for key: {$cacheKey}");
+        
+        // Update user verification status
+        if ($user) {
+            $user->update([
+                'phone_verified_at' => now(),
+                'verification_status' => 'verified',
+                'status' => 'active' // Change from 'pending' to 'active' when phone is verified
+            ]);
+            
+            \Log::info("✅ USER UPDATE - Phone verification status updated to verified");
+            \Log::info("✅ USER UPDATE - User status changed to active");
+            \Log::info("✅ USER UPDATE - Phone verified at: " . now()->format('Y-m-d H:i:s'));
+        } else {
+            \Log::warning("⚠️ USER UPDATE - No authenticated user found to update verification status");
+        }
+        
         \Log::info("🎉 PHONE VERIFICATION COMPLETED SUCCESSFULLY");
 
         return response()->json([
             'success' => true,
             'message' => 'Phone number verified successfully!',
+            'verification_status' => 'verified',
+            'user_status' => 'active'
         ]);
     }
 

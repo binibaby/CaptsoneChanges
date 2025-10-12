@@ -200,6 +200,16 @@ class User extends Authenticatable
                ($this->phone_verified_at !== null || empty($this->phone));
     }
 
+    public function isPhoneVerified()
+    {
+        return $this->phone_verified_at !== null;
+    }
+
+    public function isFullyVerified()
+    {
+        return $this->isVerified() && $this->hasVerifiedId();
+    }
+
     public function hasVerifiedId()
     {
         return $this->verifications()->where('verification_status', 'approved')->exists();
