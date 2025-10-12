@@ -98,8 +98,8 @@ class UserController extends Controller
         // Check if user has phone verification (phone_verified_at is not null)
         $hasPhoneVerification = !is_null($user->phone_verified_at);
         
-        // Check if user has ID verification
-        $hasIdVerification = $user->id_verified && $user->verification_status === 'verified';
+        // Check if user has ID verification (has verifications with approved status)
+        $hasIdVerification = $user->verifications()->where('status', 'approved')->exists();
         
         if ($hasPhoneVerification && $hasIdVerification) {
             return [
@@ -122,7 +122,7 @@ class UserController extends Controller
                 'color' => 'success',
                 'icon' => 'id-check'
             ];
-        } elseif ($user->verification_status === 'rejected') {
+        } elseif ($user->verifications()->where('status', 'rejected')->exists()) {
             return [
                 'status' => 'rejected',
                 'label' => 'Rejected',

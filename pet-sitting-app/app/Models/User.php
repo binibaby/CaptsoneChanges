@@ -212,7 +212,7 @@ class User extends Authenticatable
 
     public function hasVerifiedId()
     {
-        return $this->verifications()->where('verification_status', 'approved')->exists();
+        return $this->verifications()->where('status', 'approved')->exists();
     }
 
     public function canAcceptBookings()
