@@ -295,7 +295,7 @@ class ProfileUpdateRequestController extends Controller
                 $user->notifications()->create([
                     'type' => 'profile_update_rejected',
                     'title' => 'Profile Update Rejected',
-                    'message' => 'Your profile update request has been rejected. Please review the admin notes and submit a new request if needed.',
+                    'message' => 'Your profile update request has been rejected. Please email the admin at petsitconnectph@gmail.com for assistance.',
                     'data' => json_encode([
                         'request_id' => $profileRequest->id,
                         'rejected_fields' => $this->getApprovedFields($profileRequest),

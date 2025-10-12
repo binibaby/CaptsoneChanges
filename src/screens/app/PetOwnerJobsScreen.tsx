@@ -4,13 +4,12 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     Alert,
-    Image,
     SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import ReviewModal from '../../components/ReviewModal';
 import { useAuth } from '../../contexts/AuthContext';
@@ -132,17 +131,58 @@ const PetOwnerJobsScreen = () => {
       setLoading(true);
       console.log('🔄 Loading bookings for pet owner:', user.id);
       
-      // Get all bookings for this pet owner
-      const allBookings = await bookingService.getBookings();
-      const ownerBookings = allBookings.filter(booking => booking.petOwnerId === user.id);
+      // Clear booking cache to ensure fresh data
+      console.log('🧹 Clearing booking cache to ensure fresh data...');
+      await bookingService.clearCache();
+      
+      // Get all bookings for this pet owner using the dedicated method
+      console.log('🔍 About to call bookingService.getPetOwnerBookings with user ID:', user.id);
+      const ownerBookings = await bookingService.getPetOwnerBookings(user.id);
       
       console.log('📊 Owner bookings found:', ownerBookings.length);
       console.log('💰 Booking hourly rates:', ownerBookings.map(b => ({ id: b.id, sitter: b.sitterName, rate: b.hourlyRate })));
+      
+      // Debug: Check if we're getting the same data as the dashboard
+      console.log('🔍 Raw booking data from service:', ownerBookings.map(b => ({
+        id: b.id,
+        status: b.status,
+        sitterName: b.sitterName,
+        date: b.date,
+        petOwnerId: b.petOwnerId,
+        userId: user.id
+      })));
+      
+      // Debug: Check if bookings have the expected structure
+      if (ownerBookings.length > 0) {
+        console.log('🔍 First booking structure:', {
+          id: ownerBookings[0].id,
+          status: ownerBookings[0].status,
+          sitterName: ownerBookings[0].sitterName,
+          petOwnerId: ownerBookings[0].petOwnerId,
+          date: ownerBookings[0].date,
+          startTime: ownerBookings[0].startTime,
+          endTime: ownerBookings[0].endTime,
+          hourlyRate: ownerBookings[0].hourlyRate
+        });
+      }
       
       // Debug: Check if we have the correct booking data
       if (ownerBookings.length > 0) {
         console.log('🔍 First booking details:', ownerBookings[0]);
         console.log('🔍 All booking fields:', Object.keys(ownerBookings[0]));
+        
+        // Log booking statuses for debugging
+        const statusCounts = ownerBookings.reduce((acc, booking) => {
+          acc[booking.status] = (acc[booking.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log('📊 Booking status counts:', statusCounts);
+        
+        // Log all bookings with their details
+        console.log('📋 All owner bookings details:');
+        ownerBookings.forEach((booking, index) => {
+          console.log(`  ${index + 1}. ID: ${booking.id}, Status: ${booking.status}, Date: ${booking.date}, Sitter: ${booking.sitterName}`);
+        });
       }
       
       setBookings(ownerBookings);
@@ -230,11 +270,57 @@ const PetOwnerJobsScreen = () => {
 
   // Updated filtering logic for new categories
   const activeBookings = bookings.filter(booking => booking.status === 'active');
-  const upcomingBookings = bookings.filter(booking => booking.status === 'confirmed');
-  const pastBookings = bookings.filter(booking => booking.status === 'completed');
+  const upcomingBookings = bookings.filter(booking => 
+    booking.status !== 'completed' && 
+    booking.status !== 'cancelled' && 
+    booking.status !== 'active'
+  );
+  const pastBookings = bookings.filter(booking => booking.status === 'completed' || booking.status === 'cancelled');
+
+  // Debug logging for booking categories
+  console.log('📊 Booking categories:', {
+    total: bookings.length,
+    active: activeBookings.length,
+    upcoming: upcomingBookings.length,
+    past: pastBookings.length,
+    selectedTab
+  });
+
+  // Debug active bookings specifically
+  if (activeBookings.length > 0) {
+    console.log('🔍 Active bookings details:', activeBookings.map(b => ({
+      id: b.id,
+      status: b.status,
+      sitterName: b.sitterName,
+      petName: b.petName,
+      date: b.date
+    })));
+  }
 
   const currentJobs = selectedTab === 'active' ? activeBookings : 
                      selectedTab === 'upcoming' ? upcomingBookings : pastBookings;
+
+  // Debug current jobs being displayed
+  console.log('🎯 Current jobs to display:', {
+    selectedTab,
+    currentJobsCount: currentJobs.length,
+    currentJobs: currentJobs.map(job => ({
+      id: job.id,
+      status: job.status,
+      sitterName: 'sitterName' in job ? job.sitterName : 'N/A'
+    }))
+  });
+
+  // Additional debugging for the rendering logic
+  console.log('🔍 Rendering debug info:', {
+    bookingsLength: bookings.length,
+    activeBookingsLength: activeBookings.length,
+    upcomingBookingsLength: upcomingBookings.length,
+    pastBookingsLength: pastBookings.length,
+    selectedTab,
+    currentJobsLength: currentJobs.length,
+    willRenderJobs: currentJobs.length > 0
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -284,16 +370,16 @@ const PetOwnerJobsScreen = () => {
             const isBooking = 'sitterName' in item;
             const job = isBooking ? {
               id: item.id,
-              petSitterName: item.sitterName,
+              petSitterName: item.sitterName || 'Unknown Sitter',
               petName: item.petName || 'Pet',
               date: formatDate(item.date), // Format date to readable format
-              time: `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`, // Format time to 12-hour format
+              time: item.startTime && item.endTime ? `${formatTime(item.startTime)} - ${formatTime(item.endTime)}` : 'Time not set',
               duration: item.duration ? `${item.duration} hours` : 'N/A',
               rate: item.hourlyRate ? `₱${item.hourlyRate}/hour` : 'Rate not set',
               status: item.status,
               avatar: { uri: 'https://via.placeholder.com/50x50/cccccc/666666?text=U' },
               petImage: { uri: 'https://via.placeholder.com/50x50/cccccc/666666?text=P' },
-              location: 'Location',
+              location: item.location || 'Location not set',
               // Store the actual hourly rate for easy access
               actualHourlyRate: item.hourlyRate
             } : item;
@@ -304,108 +390,56 @@ const PetOwnerJobsScreen = () => {
                 id: item.id,
                 sitterName: item.sitterName,
                 hourlyRate: item.hourlyRate,
+                status: item.status,
+                date: item.date,
                 formattedRate: item.hourlyRate ? `₱${item.hourlyRate}/hour` : 'Rate not set'
               });
             }
 
             return (
               <View key={job.id} style={styles.jobCard}>
-                {selectedTab === 'active' ? (
-                  // Simplified active card
-                  <>
-                    <View style={styles.pendingCardHeader}>
-                      <Text style={styles.pendingSitterName}>{job.petSitterName}</Text>
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-                        <Text style={styles.statusText}>Active</Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.pendingDateTime}>
-                      <Text style={styles.pendingDate}>{job.date}</Text>
-                      <Text style={styles.pendingTime}>{job.time}</Text>
-                    </View>
+                {/* Simplified card design for all tabs */}
+                <View style={styles.pendingCardHeader}>
+                  <Text style={styles.pendingSitterName}>{job.petSitterName}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
+                    <Text style={styles.statusText}>
+                      {job.status === 'completed' ? 'Completed' : 
+                       job.status === 'cancelled' ? 'Cancelled' :
+                       job.status === 'confirmed' ? 'Confirmed' :
+                       job.status === 'pending' ? 'Pending' :
+                       job.status === 'active' ? 'Active' : 
+                       getStatusText(job.status)}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.pendingDateTime}>
+                  <Text style={styles.pendingDate}>{job.date}</Text>
+                  <Text style={styles.pendingTime}>{job.time}</Text>
+                </View>
 
-                    <View style={styles.pendingActions}>
-                      <TouchableOpacity 
-                        style={styles.contactButton}
-                        onPress={() => handleContactSitter(job)}
-                      >
-                        <Ionicons name="chatbubbles-outline" size={16} color="#3B82F6" />
-                        <Text style={styles.contactButtonText}>Message</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                ) : (
-                  // Full card for other tabs
-                  <>
-                    <View style={styles.jobHeader}>
-                      <View style={styles.sitterInfo}>
-                        <Image source={job.avatar} style={styles.sitterAvatar} />
-                        <View style={styles.sitterDetails}>
-                          <Text style={styles.sitterName}>{job.petSitterName}</Text>
-                          <Text style={styles.locationText}>📍 {job.location}</Text>
-                        </View>
-                      </View>
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-                        <Text style={styles.statusText}>
-                          {job.status === 'completed' ? 'Marked as Completed' : getStatusText(job.status)}
-                        </Text>
-                      </View>
-                    </View>
+                <View style={styles.bookingDetails}>
+                  <View style={styles.detailItem}>
+                    <Ionicons name="time-outline" size={16} color="#666" />
+                    <Text style={styles.detailText}>{job.duration}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons name="cash-outline" size={16} color="#666" />
+                    <Text style={styles.detailText}>{job.rate}</Text>
+                  </View>
+                </View>
 
-                    <View style={styles.petInfo}>
-                      <Image source={job.petImage} style={styles.petImage} />
-                      <View style={styles.petDetails}>
-                        <Text style={styles.petName}>{job.petName}</Text>
-                        <Text style={styles.bookingDate}>{job.date}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.bookingDetails}>
-                      <View style={styles.detailItem}>
-                        <Ionicons name="time-outline" size={16} color="#666" />
-                        <Text style={styles.detailText}>{job.time}</Text>
-                      </View>
-                      <View style={styles.detailItem}>
-                        <Ionicons name="calendar-outline" size={16} color="#666" />
-                        <Text style={styles.detailText}>{job.duration}</Text>
-                      </View>
-                      <View style={styles.detailItem}>
-                        <Ionicons name="cash-outline" size={16} color="#666" />
-                        <Text style={styles.detailText}>{job.rate}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity 
-                        style={styles.contactButton}
-                        onPress={() => handleContactSitter(job)}
-                      >
-                        <Ionicons name="chatbubbles-outline" size={16} color="#3B82F6" />
-                        <Text style={styles.contactButtonText}>Message</Text>
-                      </TouchableOpacity>
-                      
-                      {job.status === 'confirmed' && (
-                        <TouchableOpacity 
-                          style={styles.cancelButton}
-                          onPress={() => handleCancelJob(job.id)}
-                        >
-                          <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                      )}
-                      
-                      {job.status === 'completed' && isBooking && (
-                        <TouchableOpacity 
-                          style={styles.reviewButton}
-                          onPress={() => handleOpenReviewModal(item)}
-                        >
-                          <Ionicons name="star-outline" size={16} color="#F59E0B" />
-                          <Text style={styles.reviewButtonText}>Rate & Review</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </>
-                )}
+                <View style={styles.pendingActions}>
+                  {job.status === 'completed' && isBooking && (
+                    <TouchableOpacity 
+                      style={styles.reviewButton}
+                      onPress={() => handleOpenReviewModal(item)}
+                    >
+                      <Ionicons name="star-outline" size={16} color="#F59E0B" />
+                      <Text style={styles.reviewButtonText}>Rate & Review</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             );
           })

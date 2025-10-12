@@ -3,19 +3,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -396,9 +396,13 @@ const ProfileScreen = () => {
           email: user.email || '',
           phone: user.phone || '',
           address: user.address || '',
+          age: String(user.age || ''),
+          gender: user.gender || '',
           hourlyRate: user.hourlyRate || '',
           experience: user.experience || '',
           aboutMe: user.aboutMe || '',
+          specialties: user.specialties || [],
+          petBreeds: (user as any).pet_breeds || [],
         });
       }
     } catch (error) {
@@ -743,7 +747,7 @@ const ProfileScreen = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView 
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
+          contentContainerStyle={[styles.scrollContent]}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

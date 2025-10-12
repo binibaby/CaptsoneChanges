@@ -3,7 +3,7 @@ import { makeApiCall } from './networkService';
 
 export interface Notification {
   id: string;
-  type: 'booking' | 'message' | 'review' | 'system';
+  type: 'booking' | 'message' | 'review' | 'system' | 'payment_success';
   title: string;
   message: string;
   time: string;
@@ -40,10 +40,75 @@ class NotificationService {
     this.listeners.forEach(listener => listener(notifications));
   }
 
+  // Clean up notifications with incorrect timestamps and format
+  private async cleanupInvalidTimestamps(): Promise<void> {
+    try {
+      const stored = await AsyncStorage.getItem('notifications');
+      if (!stored) return;
+      
+      const notifications: Notification[] = JSON.parse(stored);
+      const now = new Date();
+      const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+      
+      let hasInvalidTimestamps = false;
+      
+      const cleanedNotifications = notifications.map(notification => {
+        try {
+          const notificationDate = new Date(notification.time);
+          
+          // Check if time is in 24-hour format (contains "AM" or "PM" means 12-hour format)
+          const is24HourFormat = !notification.time.includes('AM') && !notification.time.includes('PM');
+          
+          // If the notification time is in the future (more than 1 year from now), fix it
+          if (notificationDate > oneYearFromNow || isNaN(notificationDate.getTime())) {
+            console.log('🔧 Fixing invalid timestamp for notification:', notification.id);
+            hasInvalidTimestamps = true;
+            
+            return {
+              ...notification,
+              time: this.formatToPhilippinesTime(new Date())
+            };
+          }
+          
+          // If it's in 12-hour format, convert to 24-hour format
+          if (is24HourFormat && !isNaN(notificationDate.getTime())) {
+            console.log('🔧 Converting 12-hour format to 24-hour format for notification:', notification.id);
+            hasInvalidTimestamps = true;
+            
+            return {
+              ...notification,
+              time: this.formatToPhilippinesTime(notificationDate)
+            };
+          }
+          
+          return notification;
+        } catch (error) {
+          console.log('🔧 Error parsing notification time, fixing:', notification.id);
+          hasInvalidTimestamps = true;
+          
+          return {
+            ...notification,
+            time: this.formatToPhilippinesTime(new Date())
+          };
+        }
+      });
+      
+      if (hasInvalidTimestamps) {
+        await AsyncStorage.setItem('notifications', JSON.stringify(cleanedNotifications));
+        console.log('✅ Cleaned up notifications with invalid timestamps and converted to 12-hour format');
+      }
+    } catch (error) {
+      console.error('❌ Error cleaning up invalid timestamps:', error);
+    }
+  }
+
   // Get all notifications
   async getNotifications(): Promise<Notification[]> {
     try {
       console.log('🔔 Getting notifications...');
+      
+      // Clean up any notifications with invalid timestamps first
+      await this.cleanupInvalidTimestamps();
       
       // First try to get from API
       const apiNotifications = await this.fetchNotificationsFromAPI();
@@ -54,15 +119,18 @@ class NotificationService {
         const localNotifications = stored ? JSON.parse(stored) : [];
       console.log('📱 Local notifications:', localNotifications.length);
       
-      // Merge API and local notifications, preserving read status from local storage
+      // Merge API and local notifications, prioritizing local storage for read status
       const allNotifications = [...apiNotifications];
       
-      // Update API notifications with read status from local storage
+      // Update API notifications with read status from local storage (local storage takes priority)
       allNotifications.forEach(apiNotif => {
         const localNotif = localNotifications.find(local => local.id === apiNotif.id);
-        if (localNotif && localNotif.isRead) {
-          console.log(`📱 Preserving read status for notification ${apiNotif.id}`);
-          apiNotif.isRead = true;
+        if (localNotif) {
+          // If notification exists in local storage, use local read status
+          console.log(`📱 Using local read status for notification ${apiNotif.id}: ${localNotif.isRead}`);
+          apiNotif.isRead = localNotif.isRead;
+        } else if (apiNotif.isRead) {
+          console.log(`📱 Using API read status for notification ${apiNotif.id}`);
         }
       });
       
@@ -79,6 +147,11 @@ class NotificationService {
       
       // Save merged notifications to local storage
         await this.saveNotifications(allNotifications);
+      
+      // Sync any locally read notifications to API in background
+      this.syncReadStatusToAPI(allNotifications).catch(error => {
+        console.warn('⚠️ Failed to sync read status to API:', error);
+      });
       
       // Filter and return notifications for current user
       const filtered = await this.filterNotificationsByUserType(allNotifications);
@@ -148,20 +221,59 @@ class NotificationService {
         
         if (data.success && data.notifications && Array.isArray(data.notifications)) {
           // Convert API format to local format
-          const notifications: Notification[] = data.notifications.map((apiNotif: any) => ({
-            id: apiNotif.id.toString(),
-            type: apiNotif.type || 'system',
-            title: apiNotif.title || 'Notification',
-            message: apiNotif.message || '',
-            time: this.formatTimeTo24Hour(apiNotif.created_at),
-            isRead: !!apiNotif.read_at,
-            action: apiNotif.action || 'View Request', // Add action field
-            data: apiNotif.data || null,
-            userId: user.id, // Add userId field for proper filtering
-          }));
+          const notifications: Notification[] = data.notifications.map((apiNotif: any) => {
+            // Parse the data field if it's a JSON string
+            let parsedData = null;
+            if (apiNotif.data) {
+              try {
+                parsedData = typeof apiNotif.data === 'string' ? JSON.parse(apiNotif.data) : apiNotif.data;
+              } catch (error) {
+                console.log('⚠️ Error parsing notification data:', error);
+                parsedData = apiNotif.data;
+              }
+            }
+            
+            return {
+              id: apiNotif.id.toString(),
+              type: apiNotif.type || 'system',
+              title: apiNotif.title || 'Notification',
+              message: apiNotif.message || '',
+              time: this.formatTimeTo24Hour(apiNotif.created_at),
+              isRead: !!apiNotif.read_at,
+              action: apiNotif.action || 'View Request', // Add action field
+              data: parsedData,
+              userId: user.id, // Add userId field for proper filtering
+            };
+          });
           
           console.log('✅ Converted API notifications:', notifications.length);
           console.log('📋 Notification details:', notifications.map(n => ({ id: n.id, type: n.type, title: n.title, isRead: n.isRead })));
+          
+          // Debug payment success notifications specifically
+          const paymentNotifications = notifications.filter(n => n.type === 'payment_success');
+          if (paymentNotifications.length > 0) {
+            console.log('💰 Payment success notifications found:', paymentNotifications.length);
+            paymentNotifications.forEach(notif => {
+              console.log('💰 Payment notification data:', {
+                id: notif.id,
+                title: notif.title,
+                message: notif.message,
+                data: notif.data,
+                sitterName: notif.data?.sitter_name,
+                sitterAddress: notif.data?.sitter_address,
+                sitterPhone: notif.data?.sitter_phone
+              });
+              
+              // Check if data is properly parsed
+              if (notif.data && typeof notif.data === 'object') {
+                console.log('✅ Data is properly parsed as object');
+                console.log('🔍 Available keys:', Object.keys(notif.data));
+              } else {
+                console.log('❌ Data is not properly parsed:', typeof notif.data);
+              }
+            });
+          }
+          
           return notifications;
         } else {
           console.log('⚠️ API response missing notifications array:', {
@@ -231,7 +343,7 @@ class NotificationService {
           console.log(`🔍 Pet sitter notification ${notification.id} (${notification.type}): ${matches}`);
           return matches;
         } else {
-          // Pet owners see: booking confirmations/cancellations, messages, system notifications, profile updates
+          // Pet owners see: booking confirmations/cancellations, messages, system notifications, profile updates, payment success
           const isBookingWithStatus = notification.type === 'booking' && 
                  (notification.data?.status === 'confirmed' || 
                   notification.data?.status === 'cancelled' ||
@@ -239,7 +351,8 @@ class NotificationService {
                   notification.title?.includes('cancelled'));
           const isMessageOrSystem = notification.type === 'message' || notification.type === 'system';
           const isProfileUpdate = notification.type === 'profile_update_approved' || notification.type === 'profile_update_rejected';
-          const matches = isBookingWithStatus || isMessageOrSystem || isProfileUpdate;
+          const isPaymentSuccess = notification.type === 'payment_success';
+          const matches = isBookingWithStatus || isMessageOrSystem || isProfileUpdate || isPaymentSuccess;
           console.log(`🔍 Pet owner notification ${notification.id} (${notification.type}): ${matches}`);
           return matches;
         }
@@ -268,23 +381,59 @@ class NotificationService {
     }
   }
 
-  // Format time to 24-hour format
+  // Format time to 24-hour format in Philippines timezone
   private formatTimeTo24Hour(dateString: string): string {
     try {
+      console.log('🕐 Formatting time for notification:', dateString);
+      
+      // If dateString is null, undefined, or empty, use current time
+      if (!dateString) {
+        console.log('⚠️ Empty dateString, using current time');
+        dateString = new Date().toISOString();
+      }
+      
       const date = new Date(dateString);
-      return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false // Use 24-hour format
-      });
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.log('⚠️ Invalid date, using current time');
+        return this.formatToPhilippinesTime(new Date());
+      }
+      
+      // Check if date is in the future (more than 1 year from now) - likely a bug
+      const now = new Date();
+      const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+      
+      if (date > oneYearFromNow) {
+        console.log('⚠️ Date is in the future, using current time instead');
+        return this.formatToPhilippinesTime(new Date());
+      }
+      
+      const formattedTime = this.formatToPhilippinesTime(date);
+      console.log('✅ Formatted time (Philippines):', formattedTime);
+      return formattedTime;
     } catch (error) {
       console.error('❌ Error formatting time:', error);
-      return dateString; // Return original if formatting fails
+      // Return current time as fallback
+      return this.formatToPhilippinesTime(new Date());
     }
+  }
+
+  // Helper function to format time to Philippines timezone
+  private formatToPhilippinesTime(date: Date): string {
+    // If the time is showing 8:42 but should be 4:42, we need to subtract 4 hours
+    // This suggests the server time is already in a different timezone
+    const philippinesTime = new Date(date.getTime() - (4 * 60 * 60 * 1000)); // Subtract 4 hours
+    
+    const year = philippinesTime.getFullYear();
+    const month = String(philippinesTime.getMonth() + 1).padStart(2, '0');
+    const day = String(philippinesTime.getDate()).padStart(2, '0');
+    const hours = String(philippinesTime.getHours()).padStart(2, '0');
+    const minutes = String(philippinesTime.getMinutes()).padStart(2, '0');
+    const seconds = String(philippinesTime.getSeconds()).padStart(2, '0');
+    
+    
+    return `${month}/${day}/${year}, ${hours}:${minutes}:${seconds}`;
   }
 
   // Add notification for specific user
@@ -295,7 +444,7 @@ class NotificationService {
     const newNotification: Notification = {
         ...notificationData,
       id: Date.now().toString(),
-      time: this.formatTimeTo24Hour(new Date().toISOString()),
+      time: this.formatToPhilippinesTime(new Date()),
       isRead: false,
         userId: userId,
       };
@@ -458,28 +607,90 @@ class NotificationService {
       const notification = notifications.find((n: Notification) => n.id === notificationId);
       if (notification) {
         notification.isRead = true;
+        notification.readAt = new Date().toISOString(); // Add timestamp for tracking
         await this.saveNotifications(notifications);
         this.notifyListeners(notifications);
-        console.log('📖 Notification marked as read locally');
+        console.log('📖 Notification marked as read locally with timestamp:', notification.readAt);
       }
       
       // Try to mark as read via API (in background)
-      this.markAsReadViaAPI(notificationId).catch(error => {
-        console.log('⚠️ API call failed, but local update succeeded:', error);
-      });
+      const apiSuccess = await this.markAsReadViaAPI(notificationId);
+      if (!apiSuccess) {
+        console.warn('⚠️ API call failed, but local update succeeded');
+        // Don't throw error here as local update succeeded
+      }
       
     } catch (error) {
       console.error('❌ Error marking notification as read:', error);
+      throw error; // Re-throw to allow calling code to handle
+    }
+  }
+
+  // Sync read status to API for notifications that are read locally but not on server
+  private async syncReadStatusToAPI(notifications: Notification[]): Promise<void> {
+    try {
+      const user = await this.getCurrentUser();
+      if (!user) return;
+
+      // Get auth token
+      let token = user.token;
+      if (!token) {
+        // Fallback to hardcoded tokens for testing
+        if (user.id === '5') {
+          token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
+        } else if (user.id === '21') {
+          token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
+        } else if (user.id === '74') {
+          token = '287|HOTtxWRw3lHKLL7j2e6GQbvORaLsbq2W5lS0vWJcfdab31c9';
+        } else {
+          return;
+        }
+      }
+
+      // Find notifications that are read locally but might not be synced to API
+      const readNotifications = notifications.filter(n => n.isRead && n.readAt);
+      
+      if (readNotifications.length === 0) {
+        console.log('📱 No read notifications to sync to API');
+        return;
+      }
+
+      console.log(`📱 Syncing ${readNotifications.length} read notifications to API`);
+
+      // Sync each read notification to API
+      const syncPromises = readNotifications.map(async (notification) => {
+        try {
+          const response = await makeApiCall(`/api/notifications/${notification.id}/read`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (response.ok) {
+            console.log(`✅ Synced read status for notification ${notification.id}`);
+          } else {
+            console.log(`⚠️ Failed to sync read status for notification ${notification.id}:`, response.status);
+          }
+        } catch (error) {
+          console.log(`⚠️ Error syncing notification ${notification.id}:`, error);
+        }
+      });
+
+      await Promise.allSettled(syncPromises);
+      console.log('📱 Read status sync to API completed');
+    } catch (error) {
+      console.error('❌ Error syncing read status to API:', error);
     }
   }
 
   // Mark notification as read via API
-  private async markAsReadViaAPI(notificationId: string) {
+  private async markAsReadViaAPI(notificationId: string): Promise<boolean> {
     try {
       const user = await this.getCurrentUser();
       if (!user) {
         console.log('❌ No user found for API call');
-        return;
+        return false;
       }
 
       // Get auth token
@@ -494,7 +705,7 @@ class NotificationService {
           token = '287|HOTtxWRw3lHKLL7j2e6GQbvORaLsbq2W5lS0vWJcfdab31c9';
         } else {
           console.log('❌ No token available for user:', user.id);
-          return;
+          return false;
         }
       }
 
@@ -509,11 +720,14 @@ class NotificationService {
 
       if (response.ok) {
         console.log('✅ Notification marked as read via API');
+        return true;
       } else {
         console.log('⚠️ API call failed:', response.status, response.statusText);
+        return false;
       }
     } catch (error) {
       console.error('Error marking notification as read via API:', error);
+      return false;
     }
   }
 
@@ -615,6 +829,17 @@ class NotificationService {
     }
   }
 
+  // Clear notification cache to force fresh data
+  async clearCache(): Promise<void> {
+    try {
+      console.log('🧹 Clearing notification cache...');
+      await AsyncStorage.removeItem('notifications');
+      console.log('✅ Notification cache cleared');
+    } catch (error) {
+      console.error('❌ Error clearing notification cache:', error);
+    }
+  }
+
   // Create booking confirmation notification for pet owner
   async createBookingConfirmationNotification(bookingData: any) {
     try {
@@ -651,6 +876,40 @@ class NotificationService {
       return await this.addNotificationForUser(bookingData.petOwnerId, notificationData);
     } catch (error) {
       console.error('❌ Error creating booking confirmation notification:', error);
+    }
+  }
+
+  // Create payment success notification for pet owner with sitter details
+  async createPaymentSuccessNotification(paymentData: any) {
+    try {
+      console.log('🔔 Creating payment success notification for owner:', paymentData.petOwnerId);
+      
+      const notificationData = {
+        type: 'payment_success' as const,
+        title: 'Payment Successful',
+        message: `Your payment of ₱${paymentData.amount} for booking with ${paymentData.sitterName} has been processed successfully. Your booking is now confirmed!`,
+        action: 'View Booking',
+        data: {
+          paymentId: paymentData.paymentId,
+          bookingId: paymentData.bookingId,
+          petOwnerId: paymentData.petOwnerId,
+          petOwnerName: paymentData.petOwnerName,
+          sitterId: paymentData.sitterId,
+          sitterName: paymentData.sitterName,
+          sitterAddress: paymentData.sitterAddress || 'Address not available',
+          sitterPhone: paymentData.sitterPhone || 'Phone not available',
+          petName: paymentData.petName,
+          date: paymentData.date,
+          startTime: paymentData.startTime,
+          endTime: paymentData.endTime,
+          amount: paymentData.amount,
+          status: 'completed'
+        }
+      };
+
+      return await this.addNotificationForUser(paymentData.petOwnerId, notificationData);
+    } catch (error) {
+      console.error('❌ Error creating payment success notification:', error);
     }
   }
 

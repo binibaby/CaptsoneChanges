@@ -105,7 +105,7 @@ class RealtimeNotificationService {
         this.handleRealtimeNotification({
           type: 'profile_change_rejected',
           title: 'Profile Update Rejected',
-          message: data.message || 'Your profile update request has been rejected.',
+          message: data.message || 'Your profile update request has been rejected. Please email the admin at petsitconnectph@gmail.com for assistance.',
           data: data.profile_request || data,
           user_id: userId,
           timestamp: new Date().toISOString()
@@ -120,7 +120,7 @@ class RealtimeNotificationService {
         this.handleRealtimeNotification({
           type: isApproved ? 'id_verification_approved' : 'id_verification_rejected',
           title: isApproved ? 'ID Verification Approved' : 'ID Verification Rejected',
-          message: data.message || (isApproved ? '🎉 Congratulations! Your ID verification has been approved! You can now start accepting jobs and bookings.' : 'Your ID verification has been rejected. Please contact the admin at barnacheajp.228.stud@cdd.edu.ph for further assistance in resolving this issue.'),
+          message: data.message || (isApproved ? '🎉 Congratulations! Your ID verification has been approved! You can now start accepting jobs and bookings.' : 'Your ID verification has been rejected. Please contact the admin at petsitconnectph@gmail.com for further assistance in resolving this issue.'),
           data: data.verification || data,
           user_id: userId,
           timestamp: new Date().toISOString()
@@ -181,7 +181,7 @@ class RealtimeNotificationService {
           case 'rejected':
             type = 'id_verification_rejected';
             title = 'ID Verification Rejected';
-            message = data.message || 'Your ID verification has been rejected. Please email admin at barnacheajp.228.stud@cdd.edu.ph to fix it.';
+            message = data.message || 'Your ID verification has been rejected. Please email admin at petsitconnectph@gmail.com to fix it.';
             break;
           default:
             type = 'id_verification_updated';

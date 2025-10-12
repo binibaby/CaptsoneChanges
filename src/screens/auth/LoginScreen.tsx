@@ -20,9 +20,10 @@ interface LoginScreenProps {
   onRegister?: () => void;
   onBack?: () => void;
   selectedUserRole?: 'Pet Owner' | 'Pet Sitter' | null;
+  autoPassword?: string; // For auto-populating password after reset
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, onBack, selectedUserRole }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, onBack, selectedUserRole, autoPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +32,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const { login } = useAuth();
+
+  // Auto-populate password if provided (after password reset)
+  useEffect(() => {
+    if (autoPassword) {
+      setPassword(autoPassword);
+    }
+  }, [autoPassword]);
   
   // Refs for TextInput focus management
   const emailInputRef = useRef<TextInput>(null);
@@ -67,6 +75,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    Alert.alert(
+      'Forgot Password?',
+      'Please contact the admin at petsitconnectph@gmail.com if you want to change your password or if you forgot your password.\n\nWe will help you reset your password within 24 hours.',
+      [
+        {
+          text: 'OK',
+          style: 'default'
+        }
+      ]
+    );
   };
 
   return (
@@ -175,7 +196,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
               />
               <Text style={styles.rememberMeText}>Remember me</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => console.log('Forgot Password pressed')}>
+            <TouchableOpacity onPress={handleForgotPassword}>
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
           </View>
@@ -190,15 +211,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.signUpTextContainer}
-            onPress={onRegister}
-          >
-            <Text style={styles.signUpText}>
-              <Text>Don't have an account? </Text>
-              <Text style={styles.signUpLink}>Create Account</Text>
-            </Text>
-          </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

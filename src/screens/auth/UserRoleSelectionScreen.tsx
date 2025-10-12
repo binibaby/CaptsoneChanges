@@ -13,12 +13,18 @@ interface UserRoleSelectionScreenProps {
   onRoleSelected: (role: 'Pet Owner' | 'Pet Sitter') => void;
   onLogin: (role?: 'Pet Owner' | 'Pet Sitter') => void;
   onRegister: (role?: 'Pet Owner' | 'Pet Sitter') => void;
+  onBack?: () => void;
+  onPrivacyPolicy?: () => void;
+  onTermsAndConditions?: () => void;
 }
 
 const UserRoleSelectionScreen: React.FC<UserRoleSelectionScreenProps> = ({
   onRoleSelected,
   onLogin,
   onRegister,
+  onBack,
+  onPrivacyPolicy,
+  onTermsAndConditions,
 }) => {
   const [selectedRole, setSelectedRole] = useState<'Pet Owner' | 'Pet Sitter' | null>(null);
 
@@ -32,6 +38,11 @@ const UserRoleSelectionScreen: React.FC<UserRoleSelectionScreenProps> = ({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
+        {onBack && (
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+        )}
         <View style={styles.header}>
           <Image
             source={require('../../assets/images/logo.png')}
@@ -71,6 +82,22 @@ const UserRoleSelectionScreen: React.FC<UserRoleSelectionScreenProps> = ({
             <Text style={styles.signInButtonText}>Sign In</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.legalSection}>
+          <TouchableOpacity 
+            style={styles.legalLink} 
+            onPress={onPrivacyPolicy}
+          >
+            <Text style={styles.legalLinkText}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalSeparator}>•</Text>
+          <TouchableOpacity 
+            style={styles.legalLink} 
+            onPress={onTermsAndConditions}
+          >
+            <Text style={styles.legalLinkText}>Terms & Conditions</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -81,6 +108,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    zIndex: 1,
+    padding: 8,
   },
   content: {
     flex: 1,
@@ -163,6 +197,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  legalSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 30,
+    paddingHorizontal: 20,
+  },
+  legalLink: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  legalLinkText: {
+    fontSize: 14,
+    color: '#007AFF',
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    fontSize: 16,
+    color: '#999',
+    marginHorizontal: 8,
   },
 });
 

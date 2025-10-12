@@ -85,26 +85,6 @@ Route::get('/admin-support', function () {
     ]);
 })->name('admin.support.simple');
 
-// Admin Payments Page
-Route::get('/admin-payments', function () {
-    return view('admin.payments', [
-        'payments' => collect([]),
-    ]);
-})->name('admin.payments.simple');
-
-// Admin Bookings Page
-Route::get('/admin-bookings', function () {
-    return view('admin.bookings', [
-        'bookings' => collect([]),
-    ]);
-})->name('admin.bookings.simple');
-
-// Admin Notifications Page
-Route::get('/admin-notifications', function () {
-    return view('admin.notifications', [
-        'notifications' => collect([]),
-    ]);
-})->name('admin.notifications.simple');
 
 // Admin Users Page
 Route::get('/admin-users', function () {

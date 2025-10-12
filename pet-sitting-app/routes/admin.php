@@ -5,12 +5,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\VerificationController;
 use App\Http\Controllers\Admin\SupportController;
-use App\Http\Controllers\Admin\BookingController;
-use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\NameUpdateController;
+use App\Http\Controllers\Admin\PasswordResetController;
 
 // Handle admin redirect for unauthenticated users
 Route::get('/admin', function () {
@@ -56,6 +54,13 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::post('/api/{user}/status', [UserController::class, 'updateStatus'])->name('api.update-status');
     });
 
+    // Password Reset Management
+    Route::prefix('password-reset')->name('password-reset.')->group(function () {
+        Route::get('/', [PasswordResetController::class, 'index'])->name('index');
+        Route::post('/search-user', [PasswordResetController::class, 'searchUser'])->name('search-user');
+        Route::post('/reset', [PasswordResetController::class, 'resetPassword'])->name('reset');
+    });
+
     // Name Update Management
     Route::prefix('name-updates')->name('name-updates.')->group(function () {
         Route::get('/users', [NameUpdateController::class, 'index'])->name('users');
@@ -80,15 +85,6 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::get('/profile-update-requests/stats', [App\Http\Controllers\Admin\ProfileUpdateRequestController::class, 'getStats'])->name('profile-update-requests.stats');
     });
 
-    // Payment Management
-    Route::prefix('payments')->name('payments.')->group(function () {
-        Route::get('/', [PaymentController::class, 'index'])->name('index');
-        Route::get('/{payment}', [PaymentController::class, 'show'])->name('show');
-        Route::post('/process', [PaymentController::class, 'processPayment'])->name('process');
-        Route::post('/{payment}/refund', [PaymentController::class, 'processRefund'])->name('refund');
-        Route::get('/analytics', [PaymentController::class, 'analytics'])->name('analytics');
-        Route::get('/export', [PaymentController::class, 'export'])->name('export');
-    });
 
     // ID Verification Management
     Route::prefix('verifications')->name('verifications.')->group(function () {
@@ -133,34 +129,7 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::get('/analytics', [SupportController::class, 'analytics'])->name('analytics');
     });
 
-    // Booking Management
-    Route::prefix('bookings')->name('bookings.')->group(function () {
-        Route::get('/', [BookingController::class, 'index'])->name('index');
-        Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
-        Route::post('/{booking}/confirm', [BookingController::class, 'confirm'])->name('confirm');
-        Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
-        Route::post('/bulk-confirm', [BookingController::class, 'bulkConfirm'])->name('bulk-confirm');
-        Route::get('/analytics', [BookingController::class, 'analytics'])->name('analytics');
-        Route::get('/export', [BookingController::class, 'export'])->name('export');
-    });
 
-    // Notification Management
-    Route::prefix('notifications')->name('notifications.')->group(function () {
-        Route::get('/', [NotificationController::class, 'index'])->name('index');
-        Route::post('/send', [NotificationController::class, 'send'])->name('send');
-        Route::post('/bulk-send', [NotificationController::class, 'bulkSend'])->name('bulk-send');
-        Route::post('/template-send', [NotificationController::class, 'templateSend'])->name('template-send');
-        Route::get('/templates', [NotificationController::class, 'templates'])->name('templates');
-        Route::get('/analytics', [NotificationController::class, 'analytics'])->name('analytics');
-        Route::get('/scheduled', [NotificationController::class, 'scheduled'])->name('scheduled');
-        
-        // AJAX routes for real-time notifications
-        Route::post('/{id}/mark-read', [NotificationController::class, 'markAsRead'])->name('mark-read');
-        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
-        Route::get('/unread-count', [NotificationController::class, 'getUnreadCount'])->name('unread-count');
-        Route::get('/scheduled', [NotificationController::class, 'scheduled'])->name('scheduled');
-        Route::delete('/scheduled/{notification}', [NotificationController::class, 'cancelScheduled'])->name('cancel-scheduled');
-    });
 
     // System Settings
     Route::prefix('settings')->name('settings.')->group(function () {
@@ -192,13 +161,6 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
             return view('admin.reports.users');
         })->name('users');
         
-        Route::get('/bookings', function () {
-            return view('admin.reports.bookings');
-        })->name('bookings');
-        
-        Route::get('/payments', function () {
-            return view('admin.reports.payments');
-        })->name('payments');
         
         Route::get('/support', function () {
             return view('admin.reports.support');
@@ -217,9 +179,6 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         // User actions
         Route::post('/users/{user}/status', [UserController::class, 'updateStatus'])->name('users.status');
         
-        // Payment processing
-        Route::post('/payments/process', [PaymentController::class, 'processPayment'])->name('payments.process');
-        Route::post('/payments/{payment}/refund', [PaymentController::class, 'processRefund'])->name('payments.refund');
         
         // Verification actions
         Route::post('/verifications/{verification}/review', [VerificationController::class, 'review'])->name('verifications.review');
@@ -232,9 +191,6 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::post('/support/chat/{ticket}/message', [SupportController::class, 'sendChatMessage'])->name('support.chat.message');
         Route::get('/support/chat/{ticket}/messages', [SupportController::class, 'getChatMessages'])->name('support.chat.messages');
         
-        // Notifications
-        Route::post('/notifications/send', [NotificationController::class, 'send'])->name('notifications.send');
-        Route::post('/notifications/bulk-send', [NotificationController::class, 'bulkSend'])->name('notifications.bulk-send');
         
         // Name Update Management
         Route::get('/users', [NameUpdateController::class, 'getUsers'])->name('users');

@@ -15,6 +15,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
 import { ReverbConversation, ReverbMessage, reverbMessagingService } from '../../services/reverbMessagingService';
 
 interface Message {
@@ -44,6 +45,7 @@ interface SupportMessage {
 const PetSitterMessagesScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { isLocationTracking, user } = useAuth();
   const [conversations, setConversations] = useState<ReverbConversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ReverbConversation | null>(null);
   const [messages, setMessages] = useState<ReverbMessage[]>([]);
@@ -56,6 +58,21 @@ const PetSitterMessagesScreen = () => {
   const [supportMessage, setSupportMessage] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [hasAutoOpenedConversation, setHasAutoOpenedConversation] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+
+  // Filter conversations based on search query
+  const filteredConversations = conversations.filter(conversation =>
+    conversation.other_user.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Toggle search visibility
+  const toggleSearch = () => {
+    setIsSearchVisible(!isSearchVisible);
+    if (isSearchVisible) {
+      setSearchQuery('');
+    }
+  };
 
   // Load conversations
   const loadConversations = useCallback(async () => {
@@ -306,7 +323,7 @@ const PetSitterMessagesScreen = () => {
               </Text>
             </View>
           )}
-          <View style={styles.onlineIndicator} />
+          {isLocationTracking && <View style={styles.onlineIndicator} />}
         </View>
       
         <View style={styles.conversationContent}>
@@ -333,6 +350,7 @@ const PetSitterMessagesScreen = () => {
 
   const renderChatMessage = ({ item }: { item: ReverbMessage }) => {
     // For sitter screen: current user is "me", others are "them"
+    // Use currentUserId state for consistency with PetOwnerMessagesScreen
     const isFromMe = currentUserId ? item.sender_id.toString() === currentUserId.toString() : false;
     const messageTime = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
@@ -340,9 +358,11 @@ const PetSitterMessagesScreen = () => {
     console.log('🔍 Message debug (Sitter):', {
       messageId: item.id,
       senderId: item.sender_id,
+      senderIdType: typeof item.sender_id,
       currentUserId: currentUserId,
       isFromMe: isFromMe,
-      message: item.message.substring(0, 20) + '...'
+      message: item.message.substring(0, 20) + '...',
+      comparison: currentUserId ? `${item.sender_id.toString()} === ${currentUserId.toString()} = ${item.sender_id.toString() === currentUserId.toString()}` : 'No currentUserId'
     });
     
     return (
@@ -404,9 +424,11 @@ const PetSitterMessagesScreen = () => {
               <Image source={{ uri: selectedConversation.other_user.profile_image || 'https://via.placeholder.com/50' }} style={styles.chatAvatar} />
               <View style={styles.chatHeaderText}>
                 <Text style={styles.chatHeaderName}>{selectedConversation.other_user.name}</Text>
-                <Text style={styles.chatHeaderStatus}>
-                  Online
-                </Text>
+                {isLocationTracking && (
+                  <Text style={styles.chatHeaderStatus}>
+                    Online
+                  </Text>
+                )}
               </View>
             </View>
             
@@ -521,19 +543,28 @@ const PetSitterMessagesScreen = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.supportButton} onPress={handleSupportChat}>
-            <Ionicons name="headset" size={20} color="#4A90E2" />
-            <Text style={styles.supportButtonText}>Support</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.searchButton}>
-            <Ionicons name="search" size={24} color="#333" />
+          <TouchableOpacity style={styles.searchButton} onPress={toggleSearch}>
+            <Ionicons name={isSearchVisible ? "close" : "search"} size={24} color="#333" />
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Search Input */}
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+        </View>
+      )}
+
       {/* Messages List */}
       <FlatList
-        data={conversations}
+        data={filteredConversations}
         renderItem={renderConversationItem}
         keyExtractor={(item) => item.conversation_id}
         style={styles.messagesList}
@@ -901,6 +932,38 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#666',
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchInput: {
+    height: 50,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    fontSize: 16,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
 });
 

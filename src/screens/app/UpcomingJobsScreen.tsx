@@ -83,58 +83,8 @@ const UpcomingJobsScreen = () => {
     router.back();
   };
 
-  const handleViewAll = () => {
-    console.log('🔵 View All button clicked!');
-    console.log('🔵 Navigating to all-bookings screen...');
-    
-    try {
-      // Navigate to the all-bookings screen
-      router.push('/all-bookings');
-      console.log('✅ Navigation to all-bookings successful');
-    } catch (error) {
-      console.error('❌ Navigation error:', error);
-      // Try alternative navigation
-      try {
-        router.replace('/all-bookings');
-        console.log('✅ Navigation replace successful');
-      } catch (error2) {
-        console.error('❌ Navigation replace also failed:', error2);
-        // Last resort - try to navigate to a different screen
-        router.push('/pet-sitter-dashboard');
-      }
-    }
-  };
 
 
-  const handleJobPress = (job: Booking) => {
-    console.log('🔴 JOB CARD PRESSED!');
-    console.log('🔴 Job ID:', job.id);
-    console.log('🔴 Job details:', job);
-    
-    // For now, let's navigate to the booking screen with the job details
-    // You can change this to navigate to a specific job details screen later
-    try {
-      router.push({
-        pathname: '/booking',
-        params: {
-          jobId: job.id,
-          petOwnerName: job.petOwnerName,
-          date: job.date,
-          startTime: job.startTime,
-          endTime: job.endTime,
-          status: job.status,
-          petName: job.petName,
-          specialInstructions: job.specialInstructions || '',
-          hourlyRate: job.hourlyRate?.toString() || '0'
-        }
-      });
-      console.log('✅ Navigation to booking screen successful');
-    } catch (error) {
-      console.error('❌ Navigation error:', error);
-      // Fallback: try to navigate to a simple booking screen
-      router.push('/booking');
-    }
-  };
 
   // Removed handleAcceptJob - bookings are now auto-confirmed when payment is successful
   // No manual confirmation step needed anymore
@@ -254,10 +204,7 @@ const UpcomingJobsScreen = () => {
     console.log('🎨 Rendering job card:', item);
     
     return (
-      <TouchableOpacity 
-        style={styles.jobCard} 
-        onPress={() => handleJobPress(item)}
-      >
+      <View style={styles.jobCard}>
         <View style={styles.jobContent}>
           <View style={styles.jobInfo}>
             <Text style={styles.petOwnerName}>{item.petOwnerName || 'Unknown Owner'}</Text>
@@ -275,7 +222,7 @@ const UpcomingJobsScreen = () => {
             </View>
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -322,15 +269,7 @@ const UpcomingJobsScreen = () => {
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Upcoming Jobs</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.viewAllButton} 
-          onPress={() => {
-            console.log('🔵 View All button pressed!');
-            handleViewAll();
-          }}
-        >
-          <Text style={styles.viewAllText}>View All</Text>
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Summary Stats */}
@@ -381,20 +320,9 @@ const styles = StyleSheet.create({
   headerCenter: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 50, // Space for back button and view all button
   },
-  viewAllButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#3B82F6',
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  viewAllText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+  headerSpacer: {
+    width: 40, // Same width as back button to center the title
   },
   backButton: {
     padding: 8,

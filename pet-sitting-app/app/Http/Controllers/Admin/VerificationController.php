@@ -497,7 +497,7 @@ class VerificationController extends Controller
             ]);
 
             // Broadcast real-time update to user (with error handling)
-            $rejectionMessage = "Your ID verification has been rejected. Please contact the admin at barnacheajp.228.stud@cdd.edu.ph for further assistance in resolving this issue.";
+            $rejectionMessage = "Your ID verification has been rejected. Please contact the admin at petsitconnectph@gmail.com for further assistance in resolving this issue.";
 
             try {
                 broadcast(new IdVerificationStatusUpdated(
@@ -519,7 +519,7 @@ class VerificationController extends Controller
             $verification->user->notifications()->create([
                 'type' => 'id_verification_rejected',
                 'title' => 'ID Verification Rejected',
-                'message' => 'Your ID verification has been rejected. Please contact the admin at barnacheajp.228.stud@cdd.edu.ph for further assistance in resolving this issue.',
+                'message' => 'Your ID verification has been rejected. Please contact the admin at petsitconnectph@gmail.com for further assistance in resolving this issue.',
                 'data' => json_encode([
                     'verification_id' => $verification->id,
                     'rejected_at' => now()->toISOString(),

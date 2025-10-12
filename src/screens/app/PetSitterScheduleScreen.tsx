@@ -632,10 +632,6 @@ const PetSitterScheduleScreen = () => {
                 </View>
 
                 <View style={styles.bookingInfo}>
-                  <View style={styles.petInfo}>
-                    <Text style={styles.petName}>{item.petName || 'Pet Name TBD'}</Text>
-                  </View>
-                  
                   <View style={styles.ownerInfo}>
                     <Text style={styles.ownerName}>Owner: {item.petOwnerName}</Text>
                   </View>
@@ -697,47 +693,6 @@ const PetSitterScheduleScreen = () => {
           )}
         </View>
 
-        {/* Daily Summary */}
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>
-            {isToday() ? "Today's Summary" : `${selectedDate}'s Summary`}
-          </Text>
-          <View style={styles.summaryStats}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                {filteredSchedule.length}
-              </Text>
-              <Text style={styles.summaryLabel}>Total Bookings</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                {filteredSchedule.filter(item => item.status === 'pending' || item.status === 'confirmed').length}
-              </Text>
-              <Text style={styles.summaryLabel}>Upcoming</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                {filteredSchedule.filter(item => item.status === 'active').length}
-              </Text>
-              <Text style={styles.summaryLabel}>Active</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                {filteredSchedule.filter(item => item.status === 'completed').length}
-              </Text>
-              <Text style={styles.summaryLabel}>Completed</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>
-                ₱{filteredSchedule
-                  .filter(item => item.status === 'completed')
-                  .reduce((total, item) => total + (item.totalAmount || 0), 0)
-                }
-              </Text>
-              <Text style={styles.summaryLabel}>Earned</Text>
-            </View>
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

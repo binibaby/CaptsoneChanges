@@ -5,7 +5,6 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
-    RefreshControl,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -32,33 +31,25 @@ const PetSitterNotificationsScreen: React.FC = () => {
   const navigation = useNavigation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
+
 
   // Load notifications
   const loadNotifications = useCallback(async () => {
     if (!user) return;
 
     try {
-      console.log('🔔 Loading notifications for user:', user.id);
+      console.log('🔔 Loading notifications for pet sitter:', user.id);
       setLoading(true);
       
       const fetchedNotifications = await notificationService.getNotifications();
       console.log('📱 Fetched notifications:', fetchedNotifications.length);
-      console.log('📋 Notification details:', fetchedNotifications.map(n => ({ 
-        id: n.id, 
-        type: n.type, 
-        title: n.title, 
-        message: n.message?.substring(0, 50) + '...', 
-        isRead: n.isRead 
-      })));
       
       setNotifications(fetchedNotifications);
       
-      // Log unread count for debugging
+      // Update unread count
       const unread = fetchedNotifications.filter(n => !n.isRead).length;
-      console.log('📊 Unread count:', unread);
-      console.log('📊 All notifications:', fetchedNotifications.map(n => ({ id: n.id, title: n.title, isRead: n.isRead, action: n.action })));
+      // Removed unread count setting
       
     } catch (error) {
       console.error('❌ Error loading notifications:', error);
@@ -68,19 +59,16 @@ const PetSitterNotificationsScreen: React.FC = () => {
     }
   }, [user]);
 
+
   // Auto-refresh notifications when screen is focused
   useFocusEffect(
     useCallback(() => {
+      console.log('🔄 PetSitterNotificationsScreen: Screen focused, loading notifications');
       loadNotifications();
     }, [loadNotifications])
   );
 
-  // Refresh notifications
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadNotifications();
-    setRefreshing(false);
-  }, [loadNotifications]);
+
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
@@ -144,18 +132,34 @@ const PetSitterNotificationsScreen: React.FC = () => {
       id: notification.id,
       title: notification.title,
       type: notification.type,
-      data: notification.data
+      data: notification.data,
+      isRead: notification.isRead
     });
     
     // Mark as read when notification is pressed
     if (!notification.isRead) {
-      await markAsRead(notification.id);
-      // Update local state to immediately reflect the change
+      console.log('📖 Marking notification as read:', notification.id);
+      
+      // Update local state immediately for instant UI feedback
       setNotifications(prev => 
         prev.map(n => 
           n.id === notification.id ? { ...n, isRead: true } : n
         )
       );
+      
+      // Mark as read via API in background
+      try {
+        await markAsRead(notification.id);
+        console.log('✅ Notification marked as read successfully');
+      } catch (error) {
+        console.error('❌ Error marking notification as read:', error);
+        // Revert the local state if API call fails
+        setNotifications(prev => 
+          prev.map(n => 
+            n.id === notification.id ? { ...n, isRead: false } : n
+          )
+        );
+      }
     }
   };
 
@@ -244,7 +248,6 @@ const PetSitterNotificationsScreen: React.FC = () => {
 
   // Render notification item
   const renderNotification = ({ item }: { item: Notification }) => {
-    console.log('🎨 Rendering notification:', item.id, item.title);
     return (
     <TouchableOpacity 
       style={[
@@ -315,15 +318,6 @@ const PetSitterNotificationsScreen: React.FC = () => {
           )}
         </View>
         
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={onRefresh}
-            style={styles.refreshButton}
-          >
-            <Ionicons name="refresh" size={20} color="#007AFF" />
-          </TouchableOpacity>
-          
-        </View>
       </View>
 
       {/* Unread count banner */}
@@ -335,14 +329,6 @@ const PetSitterNotificationsScreen: React.FC = () => {
         renderItem={renderNotification}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
-          />
-        }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />

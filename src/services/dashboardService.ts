@@ -1,3 +1,4 @@
+import { bookingService } from './bookingService';
 import { makeApiCall } from './networkService';
 import { paymentService } from './paymentService';
 
@@ -34,23 +35,80 @@ class DashboardService {
   private metrics: DashboardMetrics = {};
   private listeners: ((metrics: DashboardMetrics) => void)[] = [];
   private isListening = false;
+  private cacheExpiry = 0;
+  private cacheDuration = 30000; // 30 seconds cache
+
+  /**
+   * Clear cache to force fresh data
+   */
+  clearCache(): void {
+    this.cacheExpiry = 0;
+    this.metrics = {};
+    console.log('🧹 Dashboard service cache cleared');
+  }
 
   /**
    * Get dashboard metrics for pet owners
    */
-  async getOwnerMetrics(): Promise<DashboardMetrics> {
+  async getOwnerMetrics(userId: string): Promise<DashboardMetrics> {
     try {
       const [bookingsResponse, paymentsResponse] = await Promise.all([
         makeApiCall('/bookings', { method: 'GET' }),
         makeApiCall('/payments/history', { method: 'GET' }),
       ]);
 
-      const bookings: Booking[] = bookingsResponse.bookings || [];
-      const payments = paymentsResponse.data || [];
+      if (!bookingsResponse || !bookingsResponse.ok) {
+        console.error('❌ Bookings API call failed:', bookingsResponse);
+        return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
+      }
+
+      if (!paymentsResponse || !paymentsResponse.ok) {
+        console.error('❌ Payments API call failed:', paymentsResponse);
+        return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
+      }
+
+      const bookingsData = await bookingsResponse.json();
+      const paymentsData = await paymentsResponse.json();
+      
+      const bookings: Booking[] = bookingsData.bookings || [];
+      const payments = paymentsData.data || [];
+      
+      // Filter bookings for the specific user
+      const userBookings = bookings.filter((booking: any) => {
+        // Check multiple possible field names for user ID
+        const isUserBooking = 
+          booking.pet_owner_id === userId || 
+          booking.petOwnerId === userId ||
+          booking.user_id === userId ||
+          booking.pet_owner?.id === userId ||
+          booking.pet_owner?.user_id === userId ||
+          booking.user?.id === userId;
+        
+        console.log(`🔍 Dashboard Service - Checking if booking ${booking.id} belongs to user ${userId}:`, {
+          pet_owner_id: booking.pet_owner_id,
+          petOwnerId: booking.petOwnerId,
+          user_id: booking.user_id,
+          pet_owner: booking.pet_owner,
+          user: booking.user,
+          userId: userId,
+          isUserBooking
+        });
+        return isUserBooking;
+      });
+      
+      console.log('🔍 Owner metrics - Total bookings:', bookings.length);
+      console.log('🔍 Owner metrics - User bookings for user', userId, ':', userBookings.length);
+      console.log('🔍 Owner metrics - User bookings details:', userBookings.map(b => ({
+        id: b.id,
+        status: b.status,
+        date: b.date,
+        pet_owner_id: b.pet_owner_id,
+        petOwnerId: b.petOwnerId
+      })));
 
       // Calculate metrics - include all successfully paid bookings (both completed and active)
       // A booking is considered paid if it has status 'active' or 'completed'
-      const totalSpent = bookings
+      const totalSpent = userBookings
         .filter((b: any) => b.status === 'active' || b.status === 'completed')
         .reduce((sum: number, b: any) => sum + b.total_amount, 0);
 
@@ -92,7 +150,10 @@ class DashboardService {
       const isBookingUpcoming = (booking: any) => {
         // Include confirmed, pending, and active bookings that are in the future
         // 'active' means payment is successful but job hasn't started yet
-        if (booking.status !== 'confirmed' && booking.status !== 'pending' && booking.status !== 'active') return false;
+        if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
+          console.log(`  - ${booking.date} (${booking.status}): excluded status`);
+          return false;
+        }
         
         const now = new Date();
         const bookingDate = new Date(booking.date);
@@ -104,7 +165,17 @@ class DashboardService {
           const fullDateTime = new Date(bookingDate);
           fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
           
-          return fullDateTime > now;
+          // Use a more lenient comparison - consider bookings as upcoming if they're today or future
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const bookingDay = new Date(bookingDate);
+          bookingDay.setHours(0, 0, 0, 0);
+          
+          const isTodayOrFuture = bookingDay >= today;
+          const isNotStarted = booking.status !== 'active';
+          
+          console.log(`  - ${booking.date} ${startTime} (${booking.status}): isTodayOrFuture=${isTodayOrFuture}, isNotStarted=${isNotStarted}`);
+          return isTodayOrFuture && isNotStarted;
         }
         
         // If no time, just check if date is today or future
@@ -115,14 +186,32 @@ class DashboardService {
         return bookingDate >= today;
       };
 
-      const activeBookings = bookings.filter(isBookingActive).length;
-      const upcomingBookings = bookings.filter(isBookingUpcoming).length;
+      // Use the same filtering logic as My Bookings screen
+      const activeBookings = userBookings.filter((booking: any) => booking.status === 'active').length;
+      const upcomingBookings = userBookings.filter((booking: any) => 
+        booking.status !== 'completed' && 
+        booking.status !== 'cancelled' && 
+        booking.status !== 'active'
+      ).length;
+      
+      console.log('🔍 Owner metrics - Active bookings count:', activeBookings);
+      console.log('🔍 Owner metrics - Upcoming bookings count:', upcomingBookings);
+      console.log('🔍 Owner metrics - Active bookings details:', userBookings.filter(b => b.status === 'active').map(b => ({ id: b.id, status: b.status, date: b.date })));
+      console.log('🔍 Owner metrics - Upcoming bookings details:', userBookings.filter(b => 
+        b.status !== 'completed' && 
+        b.status !== 'cancelled' && 
+        b.status !== 'active'
+      ).map(b => ({ id: b.id, status: b.status, date: b.date })));
       
       console.log('📊 Owner metrics calculation:', {
         totalBookings: bookings.length,
         activeBookings: activeBookings,
         upcomingBookings: upcomingBookings,
-        upcomingBookingIds: bookings.filter(isBookingUpcoming).map(b => b.id)
+        upcomingBookingIds: userBookings.filter((booking: any) => 
+          booking.status !== 'completed' && 
+          booking.status !== 'cancelled' && 
+          booking.status !== 'active'
+        ).map(b => b.id)
       });
 
       // Calculate this week's spending
@@ -154,12 +243,22 @@ class DashboardService {
   /**
    * Get dashboard metrics for pet sitters
    */
-  async getSitterMetrics(): Promise<DashboardMetrics> {
+  async getSitterMetrics(userId: string): Promise<DashboardMetrics> {
     try {
       const [bookingsResponse, walletResponse] = await Promise.all([
         makeApiCall('/bookings', { method: 'GET' }),
         makeApiCall('/wallet', { method: 'GET' }),
       ]);
+
+      if (!bookingsResponse || !bookingsResponse.ok) {
+        console.error('❌ Bookings API call failed:', bookingsResponse);
+        return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
+      }
+
+      if (!walletResponse || !walletResponse.ok) {
+        console.error('❌ Wallet API call failed:', walletResponse);
+        return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
+      }
 
       // Parse API responses correctly
       const bookingsData = await bookingsResponse.json();
@@ -212,7 +311,10 @@ class DashboardService {
       const isBookingUpcoming = (booking: any) => {
         // Include confirmed, pending, and active bookings that are in the future
         // 'active' means payment is successful but job hasn't started yet
-        if (booking.status !== 'confirmed' && booking.status !== 'pending' && booking.status !== 'active') return false;
+        if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
+          console.log(`  - ${booking.date} (${booking.status}): excluded status`);
+          return false;
+        }
         
         const now = new Date();
         const bookingDate = new Date(booking.date);
@@ -224,7 +326,17 @@ class DashboardService {
           const fullDateTime = new Date(bookingDate);
           fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
           
-          return fullDateTime > now;
+          // Use a more lenient comparison - consider bookings as upcoming if they're today or future
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const bookingDay = new Date(bookingDate);
+          bookingDay.setHours(0, 0, 0, 0);
+          
+          const isTodayOrFuture = bookingDay >= today;
+          const isNotStarted = booking.status !== 'active';
+          
+          console.log(`  - ${booking.date} ${startTime} (${booking.status}): isTodayOrFuture=${isTodayOrFuture}, isNotStarted=${isNotStarted}`);
+          return isTodayOrFuture && isNotStarted;
         }
         
         // If no time, just check if date is today or future
@@ -310,14 +422,10 @@ class DashboardService {
         return false;
       };
 
-      // Calculate metrics with debugging
-      const completedBookings = bookings.filter(isBookingCompleted);
-      const upcomingBookings = bookings.filter(isBookingUpcoming);
-      
-      // For active bookings, show all 'active' and 'confirmed' bookings until marked as completed
-      const activeBookings = bookings.filter(booking => 
-        booking.status === 'active' || booking.status === 'confirmed'
-      );
+      // Use the same methods as My Schedule screen for consistency
+      const completedBookings = await bookingService.getCompletedSitterBookings(userId);
+      const upcomingBookings = await bookingService.getUpcomingSitterBookings(userId);
+      const activeBookings = await bookingService.getActiveSitterBookings(userId);
       
       console.log('📊 Booking counts:', {
         total: bookings.length,

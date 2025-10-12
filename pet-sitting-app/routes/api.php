@@ -11,6 +11,7 @@ use App\Http\Controllers\API\VerificationController;
 use App\Http\Controllers\API\PetController;
 use App\Http\Controllers\API\PaymentController;
 use App\Http\Controllers\API\WalletController;
+use App\Http\Controllers\API\PasswordResetController;
 
 // Health check endpoint
 Route::get('/health', function () {
@@ -75,6 +76,12 @@ Route::post('/send-verification-code', [AuthController::class, 'sendPhoneVerific
 Route::post('/verify-phone', [AuthController::class, 'verifyPhone']);
 Route::post('/verify-phone-code', [AuthController::class, 'verifyPhoneCode']); // Alias for frontend compatibility
 
+// Password reset routes (no auth required)
+Route::get('/password-reset/lookup-email/{mobileNumber}', [PasswordResetController::class, 'lookupEmail']);
+Route::post('/password-reset/send-otp', [PasswordResetController::class, 'sendOTP']);
+Route::post('/password-reset/verify-otp', [PasswordResetController::class, 'verifyOTP']);
+Route::post('/password-reset/reset', [PasswordResetController::class, 'resetPassword']);
+
 // Profile routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
@@ -129,6 +136,52 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/reviews', [App\Http\Controllers\API\ReviewController::class, 'store']);
     Route::get('/sitters/{id}/reviews', [App\Http\Controllers\API\ReviewController::class, 'getSitterReviews']);
     Route::get('/reviews/owner', [App\Http\Controllers\API\ReviewController::class, 'getOwnerReviews']);
+});
+
+// Test endpoint for debugging
+Route::get('/messages/test', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'Messages API is working',
+        'timestamp' => now()->toISOString(),
+    ]);
+});
+
+// Test endpoint with authentication debugging
+Route::get('/messages/test-auth', function (Request $request) {
+    $authHeader = $request->header('Authorization');
+    $bearerToken = $request->bearerToken();
+    $user = Auth::user();
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Auth test endpoint',
+        'auth_header_present' => !empty($authHeader),
+        'bearer_token_present' => !empty($bearerToken),
+        'user_authenticated' => !is_null($user),
+        'user_id' => $user ? $user->id : null,
+        'headers' => $request->headers->all(),
+        'timestamp' => now()->toISOString(),
+    ]);
+});
+
+// Test endpoint with auth:sanctum middleware
+Route::middleware('auth:sanctum')->get('/messages/test-auth-middleware', function (Request $request) {
+    $authHeader = $request->header('Authorization');
+    $bearerToken = $request->bearerToken();
+    $user = Auth::user();
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Auth middleware test endpoint',
+        'auth_header_present' => !empty($authHeader),
+        'bearer_token_present' => !empty($bearerToken),
+        'user_authenticated' => !is_null($user),
+        'user_id' => $user ? $user->id : null,
+        'user_name' => $user ? $user->name : null,
+        'headers' => $request->headers->all(),
+        'timestamp' => now()->toISOString(),
+    ]);
 });
 
 // Messaging routes

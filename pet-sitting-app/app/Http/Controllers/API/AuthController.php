@@ -19,9 +19,9 @@ class AuthController extends Controller
     {
         // Add debugging
         \Log::info('🔔 USER REGISTRATION REQUEST RECEIVED');
-        \Log::info('📝 Request data:', $request->all());
-        \Log::info('🌐 Request IP: ' . $request->ip());
-        \Log::info('👤 User Agent: ' . $request->userAgent());
+        \Log::info('📝 Request data:', ['data' => $request->all()]);
+        \Log::info('🌐 Request IP:', ['ip' => $request->ip()]);
+        \Log::info('👤 User Agent:', ['user_agent' => $request->userAgent()]);
 
         try {
             $request->validate([
@@ -837,6 +837,10 @@ class AuthController extends Controller
             \Log::info("✅ USER UPDATE - Phone verification status updated to verified");
             \Log::info("✅ USER UPDATE - User status changed to active");
             \Log::info("✅ USER UPDATE - Phone verified at: " . now()->format('Y-m-d H:i:s'));
+            
+            // Dispatch real-time event for admin panel updates
+            event(new \App\Events\UserVerificationUpdated($user, 'phone', 'verified'));
+            \Log::info("📡 REAL-TIME EVENT - UserVerificationUpdated dispatched for user: {$user->id}");
         } else {
             \Log::warning("⚠️ USER UPDATE - No authenticated user found to update verification status");
         }

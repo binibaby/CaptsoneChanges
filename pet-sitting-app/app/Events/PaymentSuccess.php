@@ -50,7 +50,7 @@ class PaymentSuccess implements ShouldBroadcast
     {
         return [
             'type' => 'payment_success',
-            'message' => "Your payment of ₱{$this->payment->amount} for booking with {$this->booking->sitter->first_name} {$this->booking->sitter->last_name} has been processed successfully!",
+            'message' => "Your payment of ₱{$this->payment->amount} for booking with {$this->booking->sitter->name} has been processed successfully!",
             'payment' => [
                 'id' => $this->payment->id,
                 'amount' => $this->payment->amount,
@@ -68,7 +68,7 @@ class PaymentSuccess implements ShouldBroadcast
             ],
             'sitter' => [
                 'id' => $this->booking->sitter->id,
-                'name' => "{$this->booking->sitter->first_name} {$this->booking->sitter->last_name}",
+                'name' => $this->booking->sitter->name,
             ],
             'timestamp' => now()->toISOString(),
         ];

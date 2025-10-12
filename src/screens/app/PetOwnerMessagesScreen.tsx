@@ -16,6 +16,7 @@ import {
     View
 } from 'react-native';
 import ReviewModal from '../../components/ReviewModal';
+import { useAuth } from '../../contexts/AuthContext';
 import { bookingService } from '../../services/bookingService';
 import { ReverbConversation, ReverbMessage, reverbMessagingService } from '../../services/reverbMessagingService';
 
@@ -47,6 +48,7 @@ interface SupportMessage {
 const PetOwnerMessagesScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { isLocationTracking } = useAuth();
   const [conversations, setConversations] = useState<ReverbConversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ReverbConversation | null>(null);
   const [messages, setMessages] = useState<ReverbMessage[]>([]);
@@ -63,6 +65,22 @@ const PetOwnerMessagesScreen = () => {
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<any>(null);
   const [availableBookings, setAvailableBookings] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+
+  // Filter conversations based on search query
+  const filteredConversations = conversations.filter(conversation =>
+    conversation.other_user.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Toggle search visibility
+  const toggleSearch = () => {
+    setIsSearchVisible(!isSearchVisible);
+    if (isSearchVisible) {
+      setSearchQuery('');
+    }
+  };
+  
 
   // Load conversations
   const loadConversations = useCallback(async () => {
@@ -348,7 +366,7 @@ const PetOwnerMessagesScreen = () => {
     >
       <View style={styles.avatarContainer}>
         <Image source={item.avatar} style={styles.avatar} />
-        {item.isOnline && <View style={styles.onlineIndicator} />}
+        {item.isOnline && isLocationTracking && <View style={styles.onlineIndicator} />}
       </View>
       
       <View style={styles.messageContent}>
@@ -375,7 +393,7 @@ const PetOwnerMessagesScreen = () => {
   );
 
   const renderChatMessage = ({ item }: { item: ReverbMessage }) => {
-    // For owner screen: current user is "me", others are "them"
+    // For owner screen: sent messages on right, received messages on left
     const isFromMe = currentUserId ? item.sender_id.toString() === currentUserId.toString() : false;
     const messageTime = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
@@ -464,7 +482,7 @@ const PetOwnerMessagesScreen = () => {
               </Text>
             </View>
           )}
-          <View style={styles.onlineIndicator} />
+          {isLocationTracking && <View style={styles.onlineIndicator} />}
         </View>
       
         <View style={styles.conversationContent}>
@@ -507,15 +525,20 @@ const PetOwnerMessagesScreen = () => {
               <Image source={{ uri: selectedConversation.other_user.profile_image || 'https://via.placeholder.com/50' }} style={styles.chatAvatar} />
               <View style={styles.chatHeaderText}>
                 <Text style={styles.chatHeaderName}>{selectedConversation.other_user.name}</Text>
-                <Text style={styles.chatHeaderStatus}>
-                  Online
-                </Text>
+                {isLocationTracking && (
+                  <Text style={styles.chatHeaderStatus}>
+                    Online
+                  </Text>
+                )}
               </View>
             </View>
             
-            <TouchableOpacity style={styles.moreButton}>
-              <Ionicons name="ellipsis-vertical" size={24} color="#333" />
-            </TouchableOpacity>
+            {/* Rate & Review Button - Owner Side Only */}
+            {availableBookings.length > 0 && !reviewModalVisible && (
+              <TouchableOpacity style={styles.reviewButton} onPress={handleReviewPress}>
+                <Ionicons name="star" size={20} color="#F59E0B" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Chat Messages */}
@@ -533,6 +556,7 @@ const PetOwnerMessagesScreen = () => {
               </View>
             }
           />
+
 
           {/* Message Input */}
           <View style={styles.messageInput}>
@@ -558,25 +582,6 @@ const PetOwnerMessagesScreen = () => {
 
         </KeyboardAvoidingView>
 
-        {/* Floating Rate & Review Button - Owner Side Only */}
-        {(() => {
-          console.log('🔍 Checking floating button visibility:', {
-            availableBookingsLength: availableBookings.length,
-            availableBookings: availableBookings.map(b => ({ id: b.id, status: b.status, sitterName: b.sitterName })),
-            reviewModalVisible: reviewModalVisible
-          });
-          // Show button when there are any bookings available (for testing all booking statuses)
-          // Hide button when review modal is open to avoid interference
-          return availableBookings.length > 0 && !reviewModalVisible;
-        })() && (
-          <TouchableOpacity 
-            style={styles.floatingReviewButton}
-            onPress={handleReviewPress}
-          >
-            <Ionicons name="star" size={20} color="#fff" />
-            <Text style={styles.floatingReviewButtonText}>Rate & Review</Text>
-          </TouchableOpacity>
-        )}
 
         {/* Review Modal */}
         {selectedBookingForReview && (
@@ -657,19 +662,28 @@ const PetOwnerMessagesScreen = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.supportButton} onPress={handleSupportChat}>
-            <Ionicons name="headset" size={20} color="#4A90E2" />
-            <Text style={styles.supportButtonText}>Support</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.searchButton}>
-            <Ionicons name="search" size={24} color="#333" />
+          <TouchableOpacity style={styles.searchButton} onPress={toggleSearch}>
+            <Ionicons name={isSearchVisible ? "close" : "search"} size={24} color="#333" />
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Search Input */}
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+        </View>
+      )}
+
       {/* Messages List */}
       <FlatList
-        data={conversations}
+        data={filteredConversations}
         renderItem={renderConversationItem}
         keyExtractor={(item) => item.conversation_id}
         style={styles.messagesList}
@@ -1038,31 +1052,55 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#666',
   },
-  floatingReviewButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#F59E0B',
-    flexDirection: 'row',
+  reviewButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 25,
-    elevation: 8,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    gap: 8,
-    zIndex: 1000,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  floatingReviewButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  searchInput: {
+    height: 50,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    fontSize: 16,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
 });
 

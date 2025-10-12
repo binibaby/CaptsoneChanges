@@ -130,9 +130,13 @@ class BookingService {
         },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to confirm booking');
+      if (!response || !response.ok) {
+        if (response) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to confirm booking');
+        } else {
+          throw new Error('No response received from server');
+        }
       }
 
       const result = await response.json();
@@ -182,9 +186,13 @@ class BookingService {
         },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to cancel booking');
+      if (!response || !response.ok) {
+        if (response) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to cancel booking');
+        } else {
+          throw new Error('No response received from server');
+        }
       }
 
       const result = await response.json();
@@ -198,6 +206,15 @@ class BookingService {
       console.error('❌ Error cancelling booking:', error);
       throw error;
     }
+  }
+
+  // Clear cache to force fresh data
+  async clearCache(): Promise<void> {
+    console.log('🧹 Clearing booking cache...');
+    this.cachedBookings = null;
+    this.cacheExpiry = 0;
+    this.lastApiCallTime = 0;
+    this.pendingApiCall = null;
   }
 
   // Get all bookings
@@ -889,8 +906,89 @@ class BookingService {
 
   // Get bookings for a specific pet owner
   async getPetOwnerBookings(petOwnerId: string): Promise<Booking[]> {
+    console.log('🔍 Getting bookings for pet owner:', petOwnerId);
     const bookings = await this.getBookings();
-    return bookings.filter(b => b.petOwnerId === petOwnerId);
+    console.log('📊 All bookings in system:', bookings.length);
+    
+    const ownerBookings = bookings.filter(b => b.petOwnerId === petOwnerId);
+    console.log('👤 Pet owner bookings found:', ownerBookings.length);
+    
+    // Log booking details for debugging
+    ownerBookings.forEach(booking => {
+      console.log(`  - Booking ${booking.id}: ${booking.date} (${booking.status}) - ${booking.sitterName} - ${booking.petName}`);
+    });
+    
+    return ownerBookings;
+  }
+
+  // Get active bookings for a pet owner
+  async getActivePetOwnerBookings(petOwnerId: string): Promise<Booking[]> {
+    console.log('🔍 Getting active bookings for pet owner:', petOwnerId);
+    const ownerBookings = await this.getPetOwnerBookings(petOwnerId);
+    const activeBookings = ownerBookings.filter(booking => booking.status === 'active');
+    console.log('🔄 Active pet owner bookings found:', activeBookings.length);
+    return activeBookings;
+  }
+
+  // Get upcoming bookings for a pet owner
+  async getUpcomingPetOwnerBookings(petOwnerId: string): Promise<Booking[]> {
+    console.log('🔍 Getting upcoming bookings for pet owner:', petOwnerId);
+    const ownerBookings = await this.getPetOwnerBookings(petOwnerId);
+    
+    const now = new Date();
+    console.log('📅 Current time:', now.toISOString());
+
+    // Helper function to check if booking is upcoming (future schedule)
+    const isBookingUpcoming = (booking: any) => {
+      // Include all non-completed, non-cancelled, non-active bookings
+      if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
+        console.log(`  - ${booking.date} (${booking.status}): excluded status`);
+        return false;
+      }
+      
+      const bookingDate = new Date(booking.date);
+      const startTime = booking.startTime || booking.start_time || booking.time;
+      
+      if (startTime) {
+        // Parse time and create full datetime
+        const [hours, minutes] = startTime.split(':');
+        const fullDateTime = new Date(bookingDate);
+        fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        // Use a more lenient comparison - consider bookings as upcoming if they're today or future
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const bookingDay = new Date(bookingDate);
+        bookingDay.setHours(0, 0, 0, 0);
+        
+        const isTodayOrFuture = bookingDay >= today;
+        const isNotStarted = booking.status !== 'active';
+        
+        console.log(`  - ${booking.date} ${startTime} (${booking.status}): isTodayOrFuture=${isTodayOrFuture}, isNotStarted=${isNotStarted}`);
+        return isTodayOrFuture && isNotStarted;
+      }
+      
+      // If no time, just check if date is today or future
+      bookingDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      console.log(`  - ${booking.date} (${booking.status}): ${bookingDate.toISOString()} >= ${today.toISOString()} = ${bookingDate >= today}`);
+      return bookingDate >= today;
+    };
+
+    // Filter upcoming bookings
+    const upcoming = ownerBookings.filter(isBookingUpcoming)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    console.log('📅 Upcoming pet owner bookings result:', upcoming.length);
+    console.log('📋 Upcoming bookings details:', upcoming.map(b => ({
+      id: b.id,
+      status: b.status,
+      date: b.date,
+      sitterName: b.sitterName
+    })));
+    return upcoming;
   }
 
   // Get upcoming bookings for a sitter
@@ -904,9 +1002,11 @@ class BookingService {
 
     // Helper function to check if booking is upcoming (future schedule)
     const isBookingUpcoming = (booking: any) => {
-      // Include only confirmed and pending bookings that are in the future
-      // 'active' bookings should only appear after sitter manually starts the session
-      if (booking.status !== 'confirmed' && booking.status !== 'pending') return false;
+      // Include all non-completed, non-cancelled, non-active bookings (same logic as owner)
+      if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
+        console.log(`  - ${booking.date} (${booking.status}): excluded status`);
+        return false;
+      }
       
       const bookingDate = new Date(booking.date);
       const startTime = booking.startTime || booking.start_time || booking.time;

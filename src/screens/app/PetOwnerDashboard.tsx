@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
+import { DashboardMetrics } from '../../services/dashboardService';
 // @ts-ignore
 import FindIcon from '../../assets/icons/find.png';
 // @ts-ignore
@@ -17,13 +18,14 @@ import MessageIcon from '../../assets/icons/message.png';
 
 interface Booking {
   id: string;
-  petImage: any;
-  petName: string;
+  petImage?: any;
+  petName?: string;
   sitterName: string;
   status: string;
-  cost: string;
+  cost?: string;
   date: string;
-  time: string;
+  startTime: string;
+  endTime: string;
 }
 
 // These will be replaced with dynamic state
@@ -52,6 +54,7 @@ const PetOwnerDashboard = () => {
     activeBookings: 0,
     thisWeek: '₱0',
   });
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics>({});
   
   console.log('💳 Current ownerStats state:', ownerStats);
   
@@ -84,6 +87,20 @@ const PetOwnerDashboard = () => {
     };
   }, []);
 
+  // Handle pull to refresh
+  const onRefresh = useCallback(async () => {
+    console.log('🔄 Pull to refresh triggered');
+    setRefreshing(true);
+    try {
+      await loadDashboardData();
+      console.log('✅ Dashboard data refreshed successfully');
+    } catch (error) {
+      console.error('❌ Error refreshing dashboard data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   // Load dashboard data
   const loadDashboardData = async () => {
     console.log('🚀 loadDashboardData function called!');
@@ -95,172 +112,126 @@ const PetOwnerDashboard = () => {
       console.log('🔍 User token available:', !!user?.token);
       console.log('🔍 User token (first 20 chars):', user?.token?.substring(0, 20));
       
-      // Load bookings and payments data
-      const { makeApiCall } = await import('../../services/networkService');
+      if (!user?.id) {
+        console.log('❌ No user ID available, skipping dashboard data load');
+        return;
+      }
       
-      // Get user's bookings
-      console.log('💳 About to fetch bookings data...');
-      const bookingsResponse = await makeApiCall('/bookings', {
-        method: 'GET',
-      });
-      console.log('💳 Bookings response received, status:', bookingsResponse.status);
+      // Clear booking service cache to ensure fresh data
+      const { bookingService } = require('../../services/bookingService');
+      await bookingService.clearCache();
+      console.log('🧹 Booking service cache cleared');
       
-      if (bookingsResponse.ok) {
-        const bookingsData = await bookingsResponse.json();
-        console.log('📅 Bookings data:', bookingsData);
+      // Declare variables for use throughout the function
+      let activeBookings: any[] = [];
+      let upcomingBookings: any[] = [];
+      
+      // Load dashboard metrics using the same data source as My Bookings screen
+      if (user?.id) {
+        console.log('🔍 Loading dashboard metrics for user:', user.id);
         
-        // Process bookings data with proper time-based categorization
-        console.log('💳 Processing bookings data...');
-        const now = new Date();
+        // Use the same data source as My Bookings screen
+        const { bookingService } = require('../../services/bookingService');
+        const ownerBookings = await bookingService.getPetOwnerBookings(user.id);
         
-        // Helper function to check if booking is currently active (session in progress)
-        const isBookingActive = (booking: any) => {
-          // Simply check if booking status is 'active' - no time-based filtering
-          // This ensures that when sitter starts a session, it immediately shows in active count
-          return booking.status === 'active';
-        };
-        
-        // Helper function to check if booking is upcoming (future schedule)
-        const isBookingUpcoming = (booking: any) => {
-          console.log(`🔍 Checking if booking ${booking.id} (${booking.date}) is upcoming:`, {
-            status: booking.status,
-            date: booking.date,
-            start_time: booking.start_time,
-            time: booking.time
-          });
-          
-          // Include only confirmed and pending bookings that are in the future
-          // 'active' bookings are sessions in progress and should be counted separately
-          if (booking.status !== 'confirmed' && booking.status !== 'pending') {
-            console.log(`❌ Booking ${booking.id} not upcoming: status is ${booking.status}, not confirmed or pending`);
-            return false;
-          }
-          
-          const bookingDate = new Date(booking.date);
-          const startTime = booking.start_time || booking.time;
-          
-          if (startTime) {
-            // Parse time and create full datetime
-            const [hours, minutes] = startTime.split(':');
-            const fullDateTime = new Date(bookingDate);
-            fullDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-            
-            const isUpcoming = fullDateTime > now;
-            console.log(`🔍 Booking ${booking.id} time check: ${fullDateTime.toISOString()} > ${now.toISOString()} = ${isUpcoming}`);
-            return isUpcoming;
-          }
-          
-          // If no time, just check if date is today or future
-          bookingDate.setHours(0, 0, 0, 0);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          const isUpcoming = bookingDate >= today;
-          console.log(`🔍 Booking ${booking.id} date check: ${bookingDate.toISOString()} >= ${today.toISOString()} = ${isUpcoming}`);
-          return isUpcoming;
-        };
-        
-        // Categorize bookings based on actual schedule timing
-        const activeBookings = bookingsData.bookings?.filter(isBookingActive) || [];
-        console.log('💳 Active bookings found (based on schedule):', activeBookings.length);
-        
-        // Debug: Log all bookings to see what we have
-        console.log('💳 All bookings for debugging:', bookingsData.bookings?.map((b: any) => ({
+        console.log('📊 Owner bookings from bookingService:', ownerBookings.length);
+        console.log('📊 Owner bookings details:', ownerBookings.map((b: any) => ({
           id: b.id,
-          date: b.date,
-          start_time: b.start_time,
-          end_time: b.end_time,
-          time: b.time,
           status: b.status,
-          pet_name: b.pet_name
+          date: b.date,
+          sitterName: b.sitterName
         })));
         
-        // Filter upcoming bookings (confirmed status and future dates/times)
-        const upcomingBookingsData = bookingsData.bookings?.filter(isBookingUpcoming).map((booking: any) => {
-          // Debug: Log booking data to see what we have
-          console.log('🔍 Processing booking for upcoming display:', {
-            id: booking.id,
-            pet_sitter: booking.pet_sitter,
-            sitter: booking.sitter,
-            sitter_name: booking.sitter_name,
-            start_time: booking.start_time,
-            end_time: booking.end_time,
-            time: booking.time
-          });
-          // Format date and time for display
-          const date = new Date(booking.date);
-          const formattedDate = date.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric',
-            year: 'numeric'
-          });
-          
-          // Format time consistently using utility function
-          let formattedTime = '';
-          try {
-            const { formatTimeRange, formatTime24To12 } = require('../../utils/timeUtils');
-            const startTime = booking.start_time || booking.time;
-            const endTime = booking.end_time;
-            
-            if (startTime && endTime) {
-              formattedTime = formatTimeRange(startTime, endTime);
-            } else if (startTime) {
-              formattedTime = formatTime24To12(startTime);
-            } else {
-              formattedTime = 'Time not set';
-            }
-          } catch (error) {
-            console.error('Error formatting time:', error);
-            formattedTime = 'Time not set';
-          }
-          
-          return {
-            ...booking,
-            date: formattedDate,
-            time: formattedTime,
-            sitterName: booking.pet_sitter?.name || booking.sitter?.name || booking.sitter_name || 'Unknown Sitter',
-            petImage: booking.pet_image ? { uri: booking.pet_image } : require('../../assets/images/cat.png')
-          };
-        }) || [];
+        // Use the exact same filtering logic as My Bookings screen
+        activeBookings = ownerBookings.filter((booking: any) => booking.status === 'active');
+        upcomingBookings = ownerBookings.filter((booking: any) => 
+          booking.status !== 'completed' && 
+          booking.status !== 'cancelled' && 
+          booking.status !== 'active'
+        );
         
-        console.log('💳 Setting upcoming bookings:', upcomingBookingsData.length);
-        setUpcomingBookings(upcomingBookingsData);
-        console.log('💳 About to fetch payments data...');
+        console.log('📊 Active bookings count (My Bookings logic):', activeBookings.length);
+        console.log('📊 Upcoming bookings count (My Bookings logic):', upcomingBookings.length);
         
-        // Get payments data
+        // Set dashboard metrics with the same counts as My Bookings screen
+        const metrics = {
+          activeBookings: activeBookings.length,
+          upcomingBookings: upcomingBookings.length,
+          totalSpent: 0, // Will be calculated from payments
+          thisWeekSpent: 0 // Will be calculated from payments
+        };
+        
+        setDashboardMetrics(metrics);
+        console.log('📊 Dashboard metrics set:', metrics);
+        
+        // Set the upcoming bookings state for display
+        setUpcomingBookings(upcomingBookings);
+        console.log('📅 Upcoming bookings set for display:', upcomingBookings.length);
+      } else {
+        console.log('⚠️ No user ID available for dashboard metrics');
+      }
+      
+      // Load payments data for total spent calculation
+      const { makeApiCall } = await import('../../services/networkService');
+      console.log('💳 About to fetch payments data...');
+      
+      try {
         const paymentsResponse = await makeApiCall('/payments/history', {
           method: 'GET',
         });
-        console.log('💳 Payments response received');
+        console.log('💳 Payments response received:', paymentsResponse);
         
-        console.log('💳 Payments API response status:', paymentsResponse.status);
-        console.log('💳 Payments API response ok:', paymentsResponse.ok);
-        
-        if (paymentsResponse.ok) {
+        if (paymentsResponse && paymentsResponse.ok) {
           const paymentsData = await paymentsResponse.json();
           console.log('💳 Payments data:', paymentsData);
           
           // Handle paginated response - payments are in 'data' array
-          const payments = paymentsData.data || paymentsData.payments || [];
+          const payments = paymentsData.data || paymentsData.payments || paymentsData || [];
           console.log('💳 Found payments:', payments.length);
           console.log('💳 Payments array:', payments);
           
+          // Ensure payments is an array
+          if (!Array.isArray(payments)) {
+            console.log('💳 Payments is not an array, setting to empty array');
+            const totalSpent = 0;
+            const thisWeekSpent = 0;
+            
+            const newOwnerStats = {
+              totalSpent: `₱${totalSpent.toLocaleString()}`,
+              activeBookings: activeBookings.length,
+              thisWeek: `₱${thisWeekSpent.toLocaleString()}`,
+            };
+            console.log('💳 Setting owner stats (no payments):', newOwnerStats);
+            setOwnerStats(newOwnerStats);
+            return;
+          }
+          
           // Calculate total spent
           const totalSpent = payments.reduce((total: number, payment: any) => {
-            console.log(`💳 Processing payment ${payment.id}:`, {
-              status: payment.status,
-              amount: payment.amount,
-              amountType: typeof payment.amount,
-              rawAmount: payment.amount
-            });
-            if (payment.status === 'completed') {
-              // Convert amount to number - handle string format like "300000.00"
-              const amount = parseFloat(payment.amount || 0);
-              console.log(`💳 Payment ${payment.id}: Status=${payment.status}, RawAmount="${payment.amount}", ParsedAmount=${amount}, Running total: ${total + amount}`);
-              return total + amount;
+            try {
+              console.log(`💳 Processing payment ${payment?.id}:`, {
+                status: payment?.status,
+                amount: payment?.amount,
+                amountType: typeof payment?.amount,
+                rawAmount: payment?.amount
+              });
+              
+              if (payment && payment.status === 'completed') {
+                // Convert amount to number - handle string format like "300000.00"
+                const amount = parseFloat(payment.amount || 0);
+                if (!isNaN(amount)) {
+                  console.log(`💳 Payment ${payment.id}: Status=${payment.status}, RawAmount="${payment.amount}", ParsedAmount=${amount}, Running total: ${total + amount}`);
+                  return total + amount;
+                } else {
+                  console.log(`💳 Payment ${payment.id}: Invalid amount, skipping`);
+                }
+              }
+              console.log(`💳 Payment ${payment?.id}: Status=${payment?.status}, Skipping (not completed)`);
+              return total;
+            } catch (error) {
+              console.error(`💳 Error processing payment ${payment?.id}:`, error);
+              return total;
             }
-            console.log(`💳 Payment ${payment.id}: Status=${payment.status}, Skipping (not completed)`);
-            return total;
           }, 0);
           
           // Calculate this week's spending
@@ -268,15 +239,22 @@ const PetOwnerDashboard = () => {
           oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
           
           const thisWeekSpent = payments.reduce((total: number, payment: any) => {
-            if (payment.status === 'completed' && payment.processed_at) {
-              const paymentDate = new Date(payment.processed_at);
-              if (paymentDate >= oneWeekAgo) {
-                const amount = parseFloat(payment.amount || 0);
-                console.log(`💳 This week payment ${payment.id}: Amount=${amount}`);
-                return total + amount;
+            try {
+              if (payment && payment.status === 'completed' && payment.processed_at) {
+                const paymentDate = new Date(payment.processed_at);
+                if (!isNaN(paymentDate.getTime()) && paymentDate >= oneWeekAgo) {
+                  const amount = parseFloat(payment.amount || 0);
+                  if (!isNaN(amount)) {
+                    console.log(`💳 This week payment ${payment.id}: Amount=${amount}`);
+                    return total + amount;
+                  }
+                }
               }
+              return total;
+            } catch (error) {
+              console.error(`💳 Error processing this week payment ${payment?.id}:`, error);
+              return total;
             }
-            return total;
           }, 0);
           
           console.log('💳 Calculated totals:', { totalSpent, thisWeekSpent });
@@ -287,16 +265,24 @@ const PetOwnerDashboard = () => {
             thisWeek: `₱${thisWeekSpent.toLocaleString()}`,
           };
           console.log('💳 Setting owner stats:', newOwnerStats);
-          console.log('💳 Calculated values:', { totalSpent, thisWeekSpent, activeBookings: activeBookings.length });
-          
-          // Use calculated values (should be correct now)
-          console.log('💳 Setting owner stats:', newOwnerStats);
           setOwnerStats(newOwnerStats);
         } else {
-          console.log('💳 Payments API response not ok:', paymentsResponse.status);
+          console.log('💳 Payments API response not ok:', paymentsResponse?.status);
+          // Set default values if payments API fails
+          setOwnerStats({
+            totalSpent: '₱0',
+            activeBookings: activeBookings.length,
+            thisWeek: '₱0',
+          });
         }
-      } else {
-        console.log('💳 Bookings API response not ok');
+      } catch (paymentsError) {
+        console.error('❌ Error fetching payments:', paymentsError);
+        // Set default values if payments API fails
+        setOwnerStats({
+          totalSpent: '₱0',
+          activeBookings: activeBookings.length,
+          thisWeek: '₱0',
+        });
       }
     } catch (error) {
       console.error('❌ Error loading dashboard data:', error);
@@ -304,19 +290,6 @@ const PetOwnerDashboard = () => {
     console.log('💳 loadDashboardData function completed');
   };
 
-  // Handle pull to refresh
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    console.log('🔄 Refreshing dashboard data...');
-    
-    try {
-      await loadDashboardData();
-    } catch (error) {
-      console.error('❌ Error refreshing dashboard data:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [user?.token]);
 
   // Check authentication status
   const checkAuthentication = async () => {
@@ -403,6 +376,88 @@ const PetOwnerDashboard = () => {
   // Handle image load success
   const handleImageLoad = () => {
     setImageError(false);
+  };
+
+  // Format date as YYYY/MM/DD
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}/${month}/${day}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Format time in 12-hour format with AM/PM (same as booking summary)
+  const formatTime = (timeString: string) => {
+    if (!timeString) return 'Invalid Time';
+    
+    try {
+      // Handle different time formats
+      let cleanTime = timeString;
+      
+      // If it contains 'T' (ISO format), extract just the time part
+      if (timeString.includes('T')) {
+        const timeMatch = timeString.match(/(\d{1,2}):(\d{2})/);
+        if (timeMatch) {
+          cleanTime = `${timeMatch[1]}:${timeMatch[2]}`;
+        }
+      }
+      
+      // Handle 12-hour format with AM/PM
+      const time12HourRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+      const time24HourRegex = /^(\d{1,2}):(\d{2})$/;
+      
+      let hour, minute, ampm;
+      
+      if (time12HourRegex.test(cleanTime)) {
+        const match = cleanTime.match(time12HourRegex);
+        if (match) {
+          hour = parseInt(match[1], 10);
+          minute = parseInt(match[2], 10);
+          ampm = match[3].toUpperCase();
+        } else {
+          return 'Invalid Time';
+        }
+        
+        // Convert to 24-hour format for validation
+        if (ampm === 'PM' && hour !== 12) {
+          hour += 12;
+        } else if (ampm === 'AM' && hour === 12) {
+          hour = 0;
+        }
+      } else if (time24HourRegex.test(cleanTime)) {
+        const match = cleanTime.match(time24HourRegex);
+        if (match) {
+          hour = parseInt(match[1], 10);
+          minute = parseInt(match[2], 10);
+          ampm = hour >= 12 ? 'PM' : 'AM';
+        } else {
+          return 'Invalid Time';
+        }
+      } else {
+        console.error('Invalid time format:', timeString);
+        return 'Invalid Time';
+      }
+      
+      // Validate hour and minute
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        console.error('Invalid time values:', { hour, minute });
+        return 'Invalid Time';
+      }
+      
+      // Convert to 12-hour format
+      const hour12 = hour % 12 || 12;
+      const formattedMinute = minute.toString().padStart(2, '0');
+      
+      return `${hour12}:${formattedMinute} ${ampm}`;
+    } catch (error) {
+      console.error('Error formatting time:', error, 'Input:', timeString);
+      return 'Invalid Time';
+    }
   };
 
   // Reset image error when profile updates
@@ -504,8 +559,8 @@ const PetOwnerDashboard = () => {
             </View>
             <Text style={styles.statsValueWhite}>
               {(() => {
-                console.log('💳 Rendering active bookings:', ownerStats.activeBookings);
-                return ownerStats.activeBookings || 0;
+                console.log('💳 Rendering active bookings from dashboardMetrics:', dashboardMetrics.activeBookings);
+                return dashboardMetrics.activeBookings || 0;
               })()}
             </Text>
             <Text style={styles.statsLabelWhite}>Active Bookings</Text>
@@ -516,7 +571,12 @@ const PetOwnerDashboard = () => {
             <View style={styles.statsIcon}>
               <Ionicons name="calendar" size={24} color="#fff" />
             </View>
-            <Text style={styles.statsValueWhite}>{upcomingBookings.length}</Text>
+            <Text style={styles.statsValueWhite}>
+              {(() => {
+                console.log('💳 Rendering upcoming bookings from dashboardMetrics:', dashboardMetrics.upcomingBookings);
+                return dashboardMetrics.upcomingBookings || 0;
+              })()}
+            </Text>
             <Text style={styles.statsLabelWhite}>Upcoming</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
           </View>
@@ -554,22 +614,29 @@ const PetOwnerDashboard = () => {
           <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingJobsRow}>
-          {upcomingBookings.map((b, idx) => (
-            <View key={b.id} style={[styles.upcomingJobCard, { backgroundColor: ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'][idx % 4] }]}> 
-              <Text style={styles.jobPetName}>{b.sitterName}</Text>
-              <View style={styles.jobMetaRow}>
-                <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 4 }} />
-                <Text style={styles.jobMetaText}>{b.date}</Text>
+          {upcomingBookings.length > 0 ? (
+            upcomingBookings.map((b, idx) => (
+              <View key={b.id} style={[styles.upcomingJobCard, { backgroundColor: ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'][idx % 4] }]}> 
+                <Text style={styles.jobPetName}>{b.sitterName}</Text>
+                <View style={styles.jobMetaRow}>
+                  <Ionicons name="calendar-outline" size={16} color="#666" style={{ marginRight: 4 }} />
+                  <Text style={styles.jobMetaText}>{formatDate(b.date)}</Text>
+                </View>
+                <View style={styles.jobMetaRow}>
+                  <Ionicons name="time-outline" size={16} color="#666" style={{ marginRight: 4 }} />
+                  <Text style={styles.jobMetaText}>{formatTime(b.startTime)} - {formatTime(b.endTime)}</Text>
+                </View>
+                <View style={styles.jobStatusBadge}>
+                  <Text style={styles.jobStatusText}>{b.status}</Text>
+                </View>
               </View>
-              <View style={styles.jobMetaRow}>
-                <Ionicons name="time-outline" size={16} color="#666" style={{ marginRight: 4 }} />
-                <Text style={styles.jobMetaText}>{b.time}</Text>
-              </View>
-              <View style={styles.jobStatusBadge}>
-                <Text style={styles.jobStatusText}>{b.status}</Text>
-              </View>
+            ))
+          ) : (
+            <View style={[styles.upcomingJobCard, { backgroundColor: '#F3F4F6' }]}>
+              <Text style={[styles.jobPetName, { color: '#6B7280', textAlign: 'center' }]}>No upcoming bookings</Text>
+              <Text style={[styles.jobMetaText, { textAlign: 'center', marginTop: 8 }]}>Book a sitter to see upcoming appointments here</Text>
             </View>
-          ))}
+          )}
         </ScrollView>
       </ScrollView>
     </SafeAreaView>
@@ -769,10 +836,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   upcomingJobCard: {
-    width: 140,
+    width: 180,
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 12,
+    padding: 16,
     marginRight: 12,
     alignItems: 'center',
     shadowColor: '#000',
@@ -780,6 +847,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.10,
     shadowRadius: 8,
     elevation: 4,
+    minHeight: 120,
   },
   sectionRowAligned: {
     flexDirection: 'row',

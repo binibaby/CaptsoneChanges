@@ -101,84 +101,56 @@ class UserController extends Controller
         // Check if user has ID verification (has verifications with approved status)
         $hasIdVerification = $user->verifications()->where('status', 'approved')->exists();
         
-        // Different logic based on user role
+        // Simplified logic based on user role
         if ($user->role === 'pet_owner') {
             // Pet Owners: Only need phone verification
             if ($hasPhoneVerification) {
                 return [
-                    'status' => 'phone_verified',
-                    'label' => 'Phone Verified',
+                    'status' => 'verified',
+                    'label' => 'Verified',
                     'color' => 'success',
-                    'icon' => 'phone-check'
+                    'icon' => 'check-circle'
                 ];
             } else {
                 return [
                     'status' => 'not_verified',
                     'label' => 'Not Verified',
                     'color' => 'warning',
-                    'icon' => 'phone-x'
+                    'icon' => 'x-circle'
                 ];
             }
         } elseif ($user->role === 'pet_sitter') {
             // Pet Sitters: Need both phone and ID verification
             if ($hasPhoneVerification && $hasIdVerification) {
                 return [
-                    'status' => 'fully_verified',
-                    'label' => 'ID Verified & Phone Verified',
+                    'status' => 'verified',
+                    'label' => 'Verified',
                     'color' => 'success',
                     'icon' => 'check-circle'
-                ];
-            } elseif ($hasPhoneVerification && !$hasIdVerification) {
-                return [
-                    'status' => 'phone_verified',
-                    'label' => 'Phone Verified',
-                    'color' => 'success',
-                    'icon' => 'phone-check'
-                ];
-            } elseif (!$hasPhoneVerification && $hasIdVerification) {
-                return [
-                    'status' => 'id_verified',
-                    'label' => 'ID Verified',
-                    'color' => 'success',
-                    'icon' => 'id-check'
-                ];
-            } elseif ($user->verifications()->where('status', 'rejected')->exists()) {
-                return [
-                    'status' => 'rejected',
-                    'label' => 'Rejected',
-                    'color' => 'danger',
-                    'icon' => 'x-circle'
-                ];
-            } elseif ($user->verifications->count() > 0) {
-                return [
-                    'status' => 'pending',
-                    'label' => 'Pending',
-                    'color' => 'warning',
-                    'icon' => 'clock'
-                ];
-            } else {
-                return [
-                    'status' => 'not_submitted',
-                    'label' => 'Not Submitted',
-                    'color' => 'secondary',
-                    'icon' => 'document'
-                ];
-            }
-        } else {
-            // Admin or other roles
-            if ($hasPhoneVerification) {
-                return [
-                    'status' => 'phone_verified',
-                    'label' => 'Phone Verified',
-                    'color' => 'success',
-                    'icon' => 'phone-check'
                 ];
             } else {
                 return [
                     'status' => 'not_verified',
                     'label' => 'Not Verified',
                     'color' => 'warning',
-                    'icon' => 'phone-x'
+                    'icon' => 'x-circle'
+                ];
+            }
+        } else {
+            // Admin or other roles
+            if ($hasPhoneVerification) {
+                return [
+                    'status' => 'verified',
+                    'label' => 'Verified',
+                    'color' => 'success',
+                    'icon' => 'check-circle'
+                ];
+            } else {
+                return [
+                    'status' => 'not_verified',
+                    'label' => 'Not Verified',
+                    'color' => 'warning',
+                    'icon' => 'x-circle'
                 ];
             }
         }

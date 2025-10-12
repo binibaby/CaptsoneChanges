@@ -14,14 +14,17 @@ import SignUpScreen2_PetType from '../src/screens/auth/SignUpScreen2_PetType';
 import SignUpScreen3_BreedPreferences from '../src/screens/auth/SignUpScreen3_BreedPreferences';
 import SignUpScreen4_FinalSteps from '../src/screens/auth/SignUpScreen4_FinalSteps';
 import UserRoleSelectionScreen from '../src/screens/auth/UserRoleSelectionScreen';
+import { PrivacyPolicyScreen, TermsAndConditionsScreen } from '../src/screens/pre-auth';
 
 export default function Auth() {
-  const [authStep, setAuthStep] = useState<'role-selection' | 'login' | 'register' | 'signup1' | 'signup2' | 'signup3' | 'signup4' | 'phone-verification' | 'document-type' | 'front-id' | 'back-id' | 'selfie'>('role-selection');
+  const [authStep, setAuthStep] = useState<'privacy-policy' | 'terms-and-conditions' | 'role-selection' | 'login' | 'register' | 'signup1' | 'signup2' | 'signup3' | 'signup4' | 'phone-verification' | 'document-type' | 'front-id' | 'back-id' | 'selfie'>('role-selection');
   const [selectedUserRole, setSelectedUserRole] = useState<'Pet Owner' | 'Pet Sitter' | null>(null);
   const [signupData, setSignupData] = useState<any>({});
   const router = useRouter();
   const { updateUserProfile, storeUserFromBackend } = useAuth();
 
+  const goToPrivacyPolicy = () => setAuthStep('privacy-policy');
+  const goToTermsAndConditions = () => setAuthStep('terms-and-conditions');
   const goToRoleSelection = () => setAuthStep('role-selection');
   const goToLogin = (role?: 'Pet Owner' | 'Pet Sitter') => {
     if (role) {
@@ -35,7 +38,7 @@ export default function Auth() {
       setSignupData({ ...signupData, userRole: role });
       setAuthStep('signup2');
     } else {
-      setAuthStep('register');
+      setAuthStep('role-selection');
     }
   };
   const goToSignup1 = () => setAuthStep('signup1');
@@ -425,12 +428,28 @@ export default function Auth() {
   };
 
   switch (authStep) {
+    case 'privacy-policy':
+      return (
+        <PrivacyPolicyScreen 
+          onAccept={goToTermsAndConditions}
+        />
+      );
+    case 'terms-and-conditions':
+      return (
+        <TermsAndConditionsScreen 
+          onAccept={goToRoleSelection}
+          onBack={goToPrivacyPolicy}
+        />
+      );
     case 'role-selection':
       return (
         <UserRoleSelectionScreen 
           onRoleSelected={onRoleSelected}
           onLogin={goToLogin}
           onRegister={goToRegister}
+          onBack={goToTermsAndConditions}
+          onPrivacyPolicy={goToPrivacyPolicy}
+          onTermsAndConditions={goToTermsAndConditions}
         />
       );
     case 'login':

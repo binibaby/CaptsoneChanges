@@ -292,6 +292,64 @@
     </div>
 </div>
 
+<!-- Laravel Reverb WebSocket -->
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+<script>
+    // Initialize Pusher for real-time updates with Reverb
+    const pusher = new Pusher('{{ config('broadcasting.connections.reverb.key') }}', {
+        wsHost: '{{ config('broadcasting.connections.reverb.options.host') }}',
+        wsPort: {{ config('broadcasting.connections.reverb.options.port') }},
+        wssPort: {{ config('broadcasting.connections.reverb.options.port') }},
+        forceTLS: {{ config('broadcasting.connections.reverb.options.useTLS') ? 'true' : 'false' }},
+        enabledTransports: ['ws', 'wss'],
+        cluster: 'mt1',
+        encrypted: false,
+    });
+
+    // Subscribe to admin updates channel
+    const channel = pusher.subscribe('admin-updates');
+    
+    // Listen for user verification updates
+    channel.bind('user.verification.updated', function(data) {
+        console.log('📡 Real-time update received:', data);
+        
+        // Show notification
+        showNotification(`User ${data.user_name} (${data.user_email}) has been ${data.status} for ${data.verification_type} verification!`, 'success');
+        
+        // Refresh the page to show updated data
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    });
+
+    // Show notification function
+    function showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm ${
+            type === 'success' ? 'bg-green-500 text-white' : 
+            type === 'error' ? 'bg-red-500 text-white' : 
+            'bg-blue-500 text-white'
+        }`;
+        notification.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+    }
+</script>
+
 <script>
 let refreshInterval = null;
 let isRefreshing = false;

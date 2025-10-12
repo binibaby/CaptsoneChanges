@@ -6,7 +6,7 @@
     <div class="relative overflow-hidden bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl shadow-2xl">
         <div class="absolute inset-0 bg-black opacity-10"></div>
         <div class="relative px-8 py-8">
-            <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between">
                 <div class="text-white">
                     <h1 class="text-3xl font-bold mb-2">Profile Update Requests 📝</h1>
                     <p class="text-indigo-100 text-lg">Review and manage user profile update requests</p>
@@ -25,14 +25,14 @@
                         </div>
                     </div>
                     <div id="autoRefreshIndicator" class="text-xs text-indigo-200 mt-2 hidden">
-                        <span class="inline-flex items-center">
-                            <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                            </svg>
-                            Auto-refreshing every 5 seconds
-                        </span>
-                    </div>
-                </div>
+                <span class="inline-flex items-center">
+                    <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    Auto-refreshing every 5 seconds
+                </span>
+            </div>
+        </div>
                 <div class="hidden md:block">
                     <div class="w-24 h-24 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                         <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

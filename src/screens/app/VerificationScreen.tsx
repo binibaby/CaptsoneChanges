@@ -227,19 +227,61 @@ const VerificationScreen = () => {
   };
 
   const verifyPhone = async () => {
-    if (!phoneCode || phoneCode.length !== 4) {
-      Alert.alert('Error', 'Please enter a valid 4-digit code');
+    if (!phoneCode || phoneCode.length !== 6) {
+      Alert.alert('Error', 'Please enter a valid 6-digit code');
       return;
     }
 
     try {
-      // In a real app, call the API
-      setPhoneVerified(true);
-      setShowPhoneVerification(false);
-      setPhoneCode('');
-      Alert.alert('Success', 'Phone number verified successfully!');
+      // Show loading notification
+      Alert.alert('Verifying Phone', 'Please wait while we verify your phone number...');
+      
+      // Call the real API
+      const { makeApiCall } = await import('../../services/networkService');
+      const response = await makeApiCall('/api/verify-phone-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: user?.phone,
+          code: phoneCode,
+        }),
+      });
+
+      if (response && response.ok) {
+        const data = await response.json();
+        
+        if (data.success) {
+          // Show success notification
+          Alert.alert(
+            'Phone Verified Successfully! 🎉', 
+            'Your phone number has been verified. You can now use all features of the app.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Update local state
+                  setPhoneVerified(true);
+                  setShowPhoneVerification(false);
+                  setPhoneCode('');
+                  
+                  // Navigate to dashboard
+                  navigation.navigate('PetOwnerDashboard' as never);
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Error', data.message || 'Invalid verification code');
+        }
+      } else {
+        const errorData = await response?.json();
+        Alert.alert('Error', errorData?.message || 'Failed to verify phone number');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Invalid verification code');
+      console.error('Phone verification error:', error);
+      Alert.alert('Error', 'Failed to verify phone number. Please try again.');
     }
   };
 
@@ -660,16 +702,16 @@ const VerificationScreen = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Verify Phone</Text>
             <Text style={styles.modalDescription}>
-              Enter the 4-digit code sent to your phone
+              Enter the 6-digit code sent to your phone
             </Text>
             
             <TextInput
               style={styles.codeInput}
-              placeholder="0000"
+              placeholder="000000"
               value={phoneCode}
               onChangeText={setPhoneCode}
               keyboardType="number-pad"
-              maxLength={4}
+              maxLength={6}
             />
             
             <View style={styles.modalButtons}>

@@ -134,7 +134,7 @@ const ProfileChangeRequestScreen = () => {
 
         <ScrollView 
           style={styles.content} 
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >

@@ -2,14 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { notificationService } from '../../services/notificationService';
@@ -31,7 +30,6 @@ const PetOwnerNotificationsScreen: React.FC = () => {
   const navigation = useNavigation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   // Removed unread count for fresh start
 
@@ -60,12 +58,6 @@ const PetOwnerNotificationsScreen: React.FC = () => {
     }
   }, [user]);
 
-  // Refresh notifications
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadNotifications();
-    setRefreshing(false);
-  }, [loadNotifications]);
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
@@ -102,15 +94,32 @@ const PetOwnerNotificationsScreen: React.FC = () => {
 
   // Handle notification press (mark as read)
   const handleNotificationPress = async (notification: Notification) => {
+    console.log('🔔 Notification pressed:', notification.id, 'isRead:', notification.isRead);
+    
     // Mark as read when notification is pressed
     if (!notification.isRead) {
-      await markAsRead(notification.id);
-      // Update local state to immediately reflect the change
+      console.log('📖 Marking notification as read:', notification.id);
+      
+      // Update local state immediately for instant UI feedback
       setNotifications(prev => 
         prev.map(n => 
           n.id === notification.id ? { ...n, isRead: true } : n
         )
       );
+      
+      // Mark as read via API in background
+      try {
+        await markAsRead(notification.id);
+        console.log('✅ Notification marked as read successfully');
+      } catch (error) {
+        console.error('❌ Error marking notification as read:', error);
+        // Revert the local state if API call fails
+        setNotifications(prev => 
+          prev.map(n => 
+            n.id === notification.id ? { ...n, isRead: false } : n
+          )
+        );
+      }
     }
   };
 
@@ -184,6 +193,52 @@ const PetOwnerNotificationsScreen: React.FC = () => {
         
         <Text style={styles.notificationMessage}>{item.message}</Text>
         
+        {/* Enhanced display for payment success notifications with sitter details */}
+        {item.type === 'payment_success' && item.data && (() => {
+          console.log('🔍 Rendering payment notification with data:', {
+            sitter_name: item.data.sitter_name,
+            sitter_address: item.data.sitter_address,
+            sitter_phone: item.data.sitter_phone,
+            sitterName: item.data.sitterName,
+            sitterAddress: item.data.sitterAddress,
+            sitterPhone: item.data.sitterPhone
+          });
+          return (
+            <View style={styles.sitterDetailsContainer}>
+            <View style={styles.sitterDetailsHeader}>
+              <Ionicons name="person-circle" size={20} color="#007AFF" />
+              <Text style={styles.sitterDetailsTitle}>Sitter Information</Text>
+            </View>
+            
+            <View style={styles.sitterDetailsContent}>
+              <View style={styles.sitterDetailRow}>
+                <Ionicons name="person" size={16} color="#666" />
+                <Text style={styles.sitterDetailText}>
+                  <Text style={styles.sitterDetailLabel}>Name: </Text>
+                  {item.data.sitter_name || item.data.sitterName || 'Not available'}
+                </Text>
+              </View>
+              
+              <View style={styles.sitterDetailRow}>
+                <Ionicons name="location" size={16} color="#666" />
+                <Text style={styles.sitterDetailText}>
+                  <Text style={styles.sitterDetailLabel}>Address: </Text>
+                  {item.data.sitter_address || item.data.sitterAddress || 'Not available'}
+                </Text>
+              </View>
+              
+              <View style={styles.sitterDetailRow}>
+                <Ionicons name="call" size={16} color="#666" />
+                <Text style={styles.sitterDetailText}>
+                  <Text style={styles.sitterDetailLabel}>Phone: </Text>
+                  {item.data.sitter_phone || item.data.sitterPhone || 'Not available'}
+                </Text>
+              </View>
+            </View>
+          </View>
+          );
+        })()}
+        
         <View style={styles.notificationFooter}>
           <Text style={styles.notificationTime}>{item.time}</Text>
         </View>
@@ -232,14 +287,6 @@ const PetOwnerNotificationsScreen: React.FC = () => {
           )}
         </View>
         
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={onRefresh}
-            style={styles.refreshButton}
-          >
-            <Ionicons name="refresh" size={20} color="#007AFF" />
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Unread count banner */}
@@ -251,14 +298,6 @@ const PetOwnerNotificationsScreen: React.FC = () => {
         renderItem={renderNotification}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
-          />
-        }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
@@ -317,14 +356,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#4CAF50',
     fontWeight: '600',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  refreshButton: {
-    padding: 8,
   },
   markAllButton: {
     paddingHorizontal: 12,
@@ -426,6 +457,43 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  sitterDetailsContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#007AFF',
+  },
+  sitterDetailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sitterDetailsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginLeft: 6,
+  },
+  sitterDetailsContent: {
+    gap: 6,
+  },
+  sitterDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  sitterDetailText: {
+    fontSize: 13,
+    color: '#333',
+    flex: 1,
+    lineHeight: 18,
+  },
+  sitterDetailLabel: {
+    fontWeight: '600',
+    color: '#555',
   },
 });
 

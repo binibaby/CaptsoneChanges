@@ -32,7 +32,6 @@ interface EarningsData {
 
 const quickActions: { title: string; icon: any; color: string; route: string }[] = [
   { title: 'Set Availability', icon: require('../../assets/icons/availability.png'), color: '#A7F3D0', route: '/pet-sitter-availability' },
-  { title: 'View Requests', icon: require('../../assets/icons/req.png'), color: '#DDD6FE', route: '/pet-sitter-requests' },
   { title: 'My Schedule', icon: require('../../assets/icons/sched.png'), color: '#FDE68A', route: '/pet-sitter-schedule' },
   { title: 'Messages', icon: require('../../assets/icons/message2.png'), color: '#BAE6FD', route: '/pet-sitter-messages' },
   { title: 'E-Wallet', icon: 'wallet-outline', color: '#FDE68A', route: '/e-wallet' },
@@ -163,7 +162,11 @@ const PetSitterDashboard = () => {
   // Load dashboard metrics
   const loadDashboardMetrics = async () => {
     try {
-      const metrics = await dashboardService.getSitterMetrics();
+      // Clear dashboard service cache to ensure fresh data
+      dashboardService.clearCache();
+      console.log('🧹 Dashboard service cache cleared');
+      
+      const metrics = await dashboardService.getSitterMetrics(currentUserId!);
       setDashboardMetrics(metrics);
       if (metrics.walletBalance !== undefined) {
         setWalletBalance(metrics.walletBalance);
@@ -313,6 +316,10 @@ const PetSitterDashboard = () => {
       console.log('🔄 Loading dashboard data for user:', currentUserId);
       console.log('📡 Fetching fresh data from API...');
       
+      // Clear booking service cache to ensure fresh data
+      await bookingService.clearCache();
+      console.log('🧹 Booking service cache cleared');
+      
       // Load all bookings first to debug
       const allBookings = await bookingService.getBookings();
       console.log('📊 All bookings in storage:', allBookings.length);
@@ -330,6 +337,19 @@ const PetSitterDashboard = () => {
         console.log(`  - ${booking.date} (${booking.status}): ${booking.startTime}-${booking.endTime}`);
       });
       setUpcomingBookings(upcoming);
+
+      // Load active bookings
+      const active = await bookingService.getActiveSitterBookings(currentUserId);
+      console.log('🔄 Active bookings found:', active.length);
+      active.forEach(booking => {
+        console.log(`  - ${booking.date} (${booking.status}): ${booking.startTime}-${booking.endTime}`);
+      });
+
+      // Load dashboard metrics
+      const { dashboardService } = require('../../services/dashboardService');
+      const metrics = await dashboardService.getSitterMetrics(currentUserId);
+      setDashboardMetrics(metrics);
+      console.log('📊 Dashboard metrics loaded:', metrics);
 
       // Load earnings data
       const earnings = await bookingService.getSitterEarnings(currentUserId);

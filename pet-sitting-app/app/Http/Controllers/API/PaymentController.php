@@ -178,15 +178,23 @@ class PaymentController extends Controller
 
             // Create notification for the pet owner about successful payment
             $owner = $booking->user;
+            
+            // Get sitter's name, address and phone number
+            $sitterName = $sitter->name ?? 'Name not available';
+            $sitterAddress = $sitter->address ?? 'Address not available';
+            $sitterPhone = $sitter->phone ?? 'Phone not available';
+            
             $owner->notifications()->create([
                 'type' => 'payment_success',
                 'title' => 'Payment Successful',
-                'message' => "Your payment of ₱{$payment->amount} for booking with {$sitter->first_name} {$sitter->last_name} has been processed successfully. Your booking is now confirmed!",
+                'message' => "Your payment of ₱{$payment->amount} for booking with {$sitterName} has been processed successfully. Your booking is now confirmed!",
                 'data' => json_encode([
                     'payment_id' => $payment->id,
                     'booking_id' => $booking->id,
-                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'sitter_name' => $sitterName,
                     'sitter_id' => $sitter->id,
+                    'sitter_address' => $sitterAddress,
+                    'sitter_phone' => $sitterPhone,
                     'pet_name' => $booking->pet_name,
                     'date' => $booking->date->format('Y-m-d'),
                     'start_time' => $booking->start_time,
@@ -279,15 +287,23 @@ class PaymentController extends Controller
 
             // Create notification for the pet owner about successful payment
             $owner = $booking->user;
+            
+            // Get sitter's name, address and phone number
+            $sitterName = $sitter->name ?? 'Name not available';
+            $sitterAddress = $sitter->address ?? 'Address not available';
+            $sitterPhone = $sitter->phone ?? 'Phone not available';
+            
             $owner->notifications()->create([
                 'type' => 'payment_success',
                 'title' => 'Payment Successful',
-                'message' => "Your payment of ₱{$payment->amount} for booking with {$sitter->first_name} {$sitter->last_name} has been processed successfully. Your booking is now confirmed!",
+                'message' => "Your payment of ₱{$payment->amount} for booking with {$sitterName} has been processed successfully. Your booking is now confirmed!",
                 'data' => json_encode([
                     'payment_id' => $payment->id,
                     'booking_id' => $booking->id,
-                    'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                    'sitter_name' => $sitterName,
                     'sitter_id' => $sitter->id,
+                    'sitter_address' => $sitterAddress,
+                    'sitter_phone' => $sitterPhone,
                     'pet_name' => $booking->pet_name,
                     'date' => $booking->date->format('Y-m-d'),
                     'start_time' => $booking->start_time,

@@ -3,18 +3,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import CertificateAlbum from '../../components/CertificateAlbum';
 // import PullToRefreshWrapper from '../../components/PullToRefreshWrapper';
@@ -185,7 +185,7 @@ const PetSitterProfileScreen = () => {
           } else if (data.status === 'rejected') {
             Alert.alert(
               '❌ Verification Rejected',
-              data.message || 'Your ID verification has been rejected. Please contact the admin at barnacheajp.228.stud@cdd.edu.ph for further assistance in resolving this issue.',
+              data.message || 'Your ID verification has been rejected. Please contact the admin at petsitconnectph@gmail.com for further assistance in resolving this issue.',
               [{ text: 'OK' }]
             );
           }
@@ -963,7 +963,7 @@ const PetSitterProfileScreen = () => {
         if (response.cooldown_info && response.cooldown_info.in_cooldown) {
           Alert.alert(
             'Profile Update Cooldown',
-            `You can submit another request in ${response.cooldown_info.remaining_time}.`,
+            'You can submit another request in 14 days because you already submitted.',
             [{ text: 'OK' }]
           );
           setCooldownInfo(response.cooldown_info);
@@ -1195,7 +1195,7 @@ const PetSitterProfileScreen = () => {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
+          contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1265,9 +1265,6 @@ const PetSitterProfileScreen = () => {
                 </View>
               )}
             </View>
-            <View style={styles.ratingContainer}>
-              <Text style={styles.reviewsText}>({profile.reviews} reviews)</Text>
-            </View>
           </View>
         </View>
 
@@ -1332,7 +1329,7 @@ const PetSitterProfileScreen = () => {
             {cooldownInfo && cooldownInfo.in_cooldown && (
               <View style={styles.cooldownWarning}>
                 <Text style={styles.cooldownText}>
-                  You can submit another request in {cooldownInfo.remaining_time}.
+                  You can submit another request in 14 days because you already submitted.
                 </Text>
               </View>
             )}
@@ -1558,12 +1555,6 @@ const PetSitterProfileScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/pet-sitter-requests')}>
-            <Ionicons name="mail-outline" size={24} color="#4CAF50" />
-            <Text style={styles.actionText}>View Requests</Text>
-            <Ionicons name="chevron-forward" size={20} color="#ccc" />
-          </TouchableOpacity>
-          
           <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/pet-sitter-schedule')}>
             <Ionicons name="time-outline" size={24} color="#3B82F6" />
             <Text style={styles.actionText}>My Schedule</Text>
@@ -1572,9 +1563,16 @@ const PetSitterProfileScreen = () => {
         </View>
           </>
         )}
+        {/* PetSit Footer - Only visible when scrolled to bottom */}
+        <View style={styles.footer}>
+          <Image 
+            source={require('../../assets/images/logo.png')} 
+            style={styles.footerLogo} 
+          />
+          <Text style={styles.footerEmail}>petsitconnectph@gmail.com</Text>
+        </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
 
       {/* Certificate Album Modal */}
       <CertificateAlbum
@@ -1830,6 +1828,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 12,
     gap: 12,
+    justifyContent: 'center',
   },
   verifyButton: {
     flex: 1,
@@ -1945,6 +1944,26 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  footer: {
+    backgroundColor: '#F8F9FA',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    marginTop: 10,
+  },
+  footerLogo: {
+    width: 40,
+    height: 40,
+    marginBottom: 5,
+  },
+  footerEmail: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });
 

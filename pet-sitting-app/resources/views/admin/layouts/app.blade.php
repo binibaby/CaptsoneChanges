@@ -33,17 +33,54 @@
         
         /* Custom scrollbar */
         .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
+            background: #f8fafc;
+            border-radius: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #cbd5e1;
-            border-radius: 3px;
+            border-radius: 4px;
+            border: 1px solid #f1f5f9;
+            transition: background-color 0.2s ease;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:active {
+            background: #64748b;
+        }
+        
+        /* Show scrollbar on hover */
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: transparent transparent;
+        }
+        .custom-scrollbar:hover {
+            scrollbar-color: #cbd5e1 #f8fafc;
+        }
+        
+        /* Ensure sidebar navigation is scrollable */
+        .sidebar-nav {
+            max-height: calc(100vh - 8rem);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-bottom: 2rem;
+            position: relative;
+        }
+        
+        /* Add subtle fade effect to indicate scrollable content */
+        .sidebar-nav::after {
+            content: '';
+            position: sticky;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2rem;
+            background: linear-gradient(transparent, rgba(255, 255, 255, 0.8));
+            pointer-events: none;
+            z-index: 10;
         }
         
         /* Removed glass effect to show colors */
@@ -108,7 +145,7 @@
             </div>
 
             <!-- Navigation -->
-            <nav class="mt-6 px-4 custom-scrollbar overflow-y-auto h-[calc(100vh-8rem)]">
+            <nav class="mt-6 px-4 custom-scrollbar sidebar-nav">
                 <!-- Dashboard -->
                 <div class="mb-3">
                     <a href="{{ route('admin.dashboard') }}" 
@@ -158,17 +195,6 @@
                     </a>
                 </div>
 
-                <!-- Bookings -->
-                <div class="mb-3">
-                    <a href="{{ route('admin.bookings.index') }}" 
-                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
-                              {{ request()->routeIs('admin.bookings.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
-                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        <span id="nav-text" class="font-medium">Bookings</span>
-                    </a>
-                </div>
 
                 <!-- Verifications -->
                 <div class="mb-3">
@@ -182,17 +208,18 @@
                     </a>
                 </div>
 
-                <!-- Payments -->
+                <!-- Password Reset -->
                 <div class="mb-3">
-                    <a href="{{ route('admin.payments.index') }}" 
+                    <a href="{{ route('admin.password-reset.index') }}" 
                        class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
-                              {{ request()->routeIs('admin.payments.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                              {{ request()->routeIs('admin.password-reset.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
                         <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
                         </svg>
-                        <span id="nav-text" class="font-medium">Payments</span>
+                        <span id="nav-text" class="font-medium">Password Reset</span>
                     </a>
                 </div>
+
 
                 <!-- Reports -->
                 <div class="mb-3">
@@ -207,18 +234,6 @@
                 </div>
 
 
-                <!-- Notifications -->
-                <div class="mb-3">
-                    <a href="{{ route('admin.notifications.index') }}" 
-                       class="flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
-                              {{ request()->routeIs('admin.notifications.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
-                        <svg class="mr-3 h-5 w-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                        </svg>
-                        <span id="nav-text" class="font-medium">Notifications</span>
-                    </a>
-                </div>
 
                 <!-- Announcements -->
                 <div class="mb-3">

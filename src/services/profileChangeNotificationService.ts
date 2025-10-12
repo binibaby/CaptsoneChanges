@@ -109,7 +109,7 @@ class ProfileChangeNotificationService {
   private handleProfileChangeRejected(notification: ProfileChangeNotification): void {
     Alert.alert(
       '❌ Profile Change Rejected',
-      `Your request to change your ${notification.field_display_name} has been rejected.\n\n` +
+      `Your profile update request has been rejected. Please email the admin at petsitconnectph@gmail.com for assistance.\n\n` +
       `Reason: ${notification.admin_notes || 'No reason provided'}\n\n` +
       `Reviewed by: ${notification.reviewed_by}`,
       [{ text: 'OK' }]

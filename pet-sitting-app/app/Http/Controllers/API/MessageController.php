@@ -17,46 +17,95 @@ class MessageController extends Controller
      */
     public function getConversations(Request $request)
     {
-        $user = Auth::user();
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
         
-        $conversations = Message::where('sender_id', $user->id)
-            ->orWhere('receiver_id', $user->id)
-            ->with(['sender', 'receiver'])
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->groupBy('conversation_id')
-            ->map(function ($messages) use ($user) {
-                $latestMessage = $messages->first();
-                $otherUser = $latestMessage->sender_id === $user->id 
-                    ? $latestMessage->receiver 
-                    : $latestMessage->sender;
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
+        try {
+            // Debug authentication
+            $authHeader = $request->header('Authorization');
+            \Log::info('🔍 Auth header received:', ['status' => $authHeader ? 'Present' : 'Missing']);
+            \Log::info('🔍 Auth header value:', ['value' => $authHeader]);
+            
+            $user = Auth::user();
+            \Log::info('🔍 Auth::user() result:', ['result' => $user ? 'User found' : 'No user']);
+            
+            if (!$user) {
+                \Log::error('❌ No authenticated user found in getConversations');
+                \Log::error('❌ Request headers:', ['headers' => $request->headers->all()]);
+                \Log::error('❌ Request bearer token:', ['token' => $request->bearerToken()]);
                 
-                $unreadCount = $messages->where('receiver_id', $user->id)
-                    ->where('is_read', false)
-                    ->count();
-                
-                return [
-                    'conversation_id' => $latestMessage->conversation_id,
-                    'other_user' => [
-                        'id' => $otherUser->id,
-                        'name' => $otherUser->first_name . ' ' . $otherUser->last_name,
-                        'profile_image' => $otherUser->profile_image ? url('storage/profile_images/' . basename($otherUser->profile_image)) : null,
-                    ],
-                    'latest_message' => [
-                        'id' => $latestMessage->id,
-                        'message' => $latestMessage->message,
-                        'type' => $latestMessage->type,
-                        'created_at' => $latestMessage->created_at->toISOString(),
-                    ],
-                    'unread_count' => $unreadCount,
-                ];
-            })
-            ->values();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                    'debug' => [
+                        'auth_header_present' => !empty($authHeader),
+                        'bearer_token_present' => !empty($request->bearerToken()),
+                        'headers' => $request->headers->all(),
+                    ]
+                ], 401);
+            }
 
-        return response()->json([
-            'success' => true,
-            'conversations' => $conversations,
-        ]);
+            \Log::info('📱 Getting conversations for user:', ['user_id' => $user->id]);
+
+            $conversations = Message::where('sender_id', $user->id)
+                ->orWhere('receiver_id', $user->id)
+                ->with(['sender', 'receiver'])
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->groupBy('conversation_id')
+                ->map(function ($messages) use ($user) {
+                    $latestMessage = $messages->first();
+                    $otherUser = $latestMessage->sender_id === $user->id 
+                        ? $latestMessage->receiver 
+                        : $latestMessage->sender;
+                    
+                    $unreadCount = $messages->where('receiver_id', $user->id)
+                        ->where('is_read', false)
+                        ->count();
+                    
+                    return [
+                        'conversation_id' => $latestMessage->conversation_id,
+                        'other_user' => [
+                            'id' => $otherUser->id,
+                            'name' => $otherUser->first_name . ' ' . $otherUser->last_name,
+                            'profile_image' => $otherUser->profile_image ? url('storage/profile_images/' . basename($otherUser->profile_image)) : null,
+                        ],
+                        'latest_message' => [
+                            'id' => $latestMessage->id,
+                            'message' => $latestMessage->message,
+                            'type' => $latestMessage->type,
+                            'created_at' => $latestMessage->created_at->toISOString(),
+                        ],
+                        'unread_count' => $unreadCount,
+                    ];
+                })
+                ->values();
+
+            \Log::info('📱 Found conversations:', ['count' => $conversations->count()]);
+
+            return response()->json([
+                'success' => true,
+                'conversations' => $conversations,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('❌ Error in getConversations:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load conversations: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -64,6 +113,17 @@ class MessageController extends Controller
      */
     public function getMessages(Request $request, $conversationId)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
         $user = Auth::user();
         
         // Verify user is part of this conversation
@@ -112,6 +172,17 @@ class MessageController extends Controller
      */
     public function sendMessage(Request $request)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
         $validator = Validator::make($request->all(), [
             'receiver_id' => 'required|exists:users,id',
             'message' => 'required|string|max:1000',
@@ -181,6 +252,17 @@ class MessageController extends Controller
      */
     public function markAsRead(Request $request, $conversationId)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
         $user = Auth::user();
         
         // Verify user is part of this conversation
@@ -204,6 +286,17 @@ class MessageController extends Controller
      */
     public function getUnreadCount(Request $request)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
         $user = Auth::user();
         
         $unreadCount = Message::where('receiver_id', $user->id)
@@ -221,6 +314,17 @@ class MessageController extends Controller
      */
     public function startConversation(Request $request)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
         $validator = Validator::make($request->all(), [
             'user_id' => 'required|exists:users,id',
         ]);

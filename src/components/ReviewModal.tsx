@@ -153,7 +153,6 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
               <Text style={styles.subtitle}>
                 How was your experience with {sitterName}?
               </Text>
-              <Text style={styles.petInfo}>Pet: {petName}</Text>
 
               <View style={styles.ratingContainer}>
                 <Text style={styles.ratingLabel}>Rating</Text>

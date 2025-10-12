@@ -13,6 +13,7 @@ import WalkthroughScreen1 from '../src/screens/onboarding/WalkthroughScreen1';
 import WalkthroughScreen2 from '../src/screens/onboarding/WalkthroughScreen2';
 import WalkthroughScreen3 from '../src/screens/onboarding/WalkthroughScreen3';
 import WelcomeScreen from '../src/screens/onboarding/WelcomeScreen';
+import { PrivacyPolicyScreen } from '../src/screens/pre-auth';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -26,6 +27,7 @@ export default function Onboarding() {
     { component: WalkthroughScreen2, key: 'walkthrough2' },
     { component: WalkthroughScreen3, key: 'walkthrough3' },
     { component: WelcomeScreen, key: 'welcome' },
+    { component: PrivacyPolicyScreen, key: 'privacy' },
   ];
 
   const handleScroll = (event: any) => {
@@ -60,10 +62,17 @@ export default function Onboarding() {
 
   const renderScreen = (ScreenComponent: any, index: number) => {
     if (index === screens.length - 1) {
+      // Privacy policy screen (last screen)
+      return (
+        <View key={index} style={styles.screenContainer}>
+          <ScreenComponent onAccept={goToAuth} />
+        </View>
+      );
+    } else if (index === screens.length - 2) {
       // Welcome screen
       return (
         <View key={index} style={styles.screenContainer}>
-          <ScreenComponent onGetStarted={goToAuth} />
+          <ScreenComponent onGetStarted={nextStep} />
         </View>
       );
     } else {
@@ -108,13 +117,13 @@ export default function Onboarding() {
       
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
-        {currentStep < screens.length - 1 && (
+        {currentStep < screens.length - 2 && (
           <TouchableOpacity style={styles.skipButton} onPress={goToAuth}>
             <Text style={styles.skipButtonText}>Skip</Text>
           </TouchableOpacity>
         )}
         
-        {currentStep < screens.length - 1 && (
+        {currentStep < screens.length - 2 && (
           <TouchableOpacity style={styles.nextButton} onPress={nextStep}>
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>

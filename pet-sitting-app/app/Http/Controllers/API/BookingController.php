@@ -218,6 +218,24 @@ class BookingController extends Controller
             'user_id' => $booking->user_id
         ]);
 
+        // Dispatch real-time event for dashboard updates
+        event(new \App\Events\BookingUpdated($user->id, $user->role, [
+            'booking_id' => $booking->id,
+            'status' => $booking->status,
+            'date' => $booking->date,
+            'sitter_id' => $booking->sitter_id,
+            'user_id' => $booking->user_id
+        ]));
+
+        // Also notify the sitter's dashboard
+        event(new \App\Events\BookingUpdated($sitter->id, $sitter->role, [
+            'booking_id' => $booking->id,
+            'status' => $booking->status,
+            'date' => $booking->date,
+            'sitter_id' => $booking->sitter_id,
+            'user_id' => $booking->user_id
+        ]));
+
         // Notify admin about new booking
         $this->notifyAdminNewBooking($booking, $totalAmount, [
             'pet_name' => $request->pet_name,
@@ -358,6 +376,23 @@ class BookingController extends Controller
         // Notify admin about booking confirmation
         $this->notifyAdminBookingConfirmed($booking);
 
+        // Dispatch real-time event for dashboard updates
+        event(new \App\Events\BookingUpdated($booking->user_id, 'pet_owner', [
+            'booking_id' => $booking->id,
+            'status' => $booking->status,
+            'date' => $booking->date,
+            'sitter_id' => $booking->sitter_id,
+            'user_id' => $booking->user_id
+        ]));
+
+        event(new \App\Events\BookingUpdated($booking->sitter_id, 'pet_sitter', [
+            'booking_id' => $booking->id,
+            'status' => $booking->status,
+            'date' => $booking->date,
+            'sitter_id' => $booking->sitter_id,
+            'user_id' => $booking->user_id
+        ]));
+
         return response()->json([
             'success' => true,
             'message' => 'Booking confirmed successfully!',
@@ -423,6 +458,23 @@ class BookingController extends Controller
                 'status' => 'cancelled'
             ])
         ]);
+
+        // Dispatch real-time event for dashboard updates
+        event(new \App\Events\BookingUpdated($booking->user_id, 'pet_owner', [
+            'booking_id' => $booking->id,
+            'status' => $booking->status,
+            'date' => $booking->date,
+            'sitter_id' => $booking->sitter_id,
+            'user_id' => $booking->user_id
+        ]));
+
+        event(new \App\Events\BookingUpdated($booking->sitter_id, 'pet_sitter', [
+            'booking_id' => $booking->id,
+            'status' => $booking->status,
+            'date' => $booking->date,
+            'sitter_id' => $booking->sitter_id,
+            'user_id' => $booking->user_id
+        ]));
 
         return response()->json([
             'success' => true,
@@ -591,6 +643,23 @@ class BookingController extends Controller
             // Broadcast the event
             broadcast(new SessionStarted($booking, $sitter, $owner));
 
+            // Dispatch real-time event for dashboard updates
+            event(new \App\Events\BookingUpdated($booking->user_id, 'pet_owner', [
+                'booking_id' => $booking->id,
+                'status' => $booking->status,
+                'date' => $booking->date,
+                'sitter_id' => $booking->sitter_id,
+                'user_id' => $booking->user_id
+            ]));
+
+            event(new \App\Events\BookingUpdated($booking->sitter_id, 'pet_sitter', [
+                'booking_id' => $booking->id,
+                'status' => $booking->status,
+                'date' => $booking->date,
+                'sitter_id' => $booking->sitter_id,
+                'user_id' => $booking->user_id
+            ]));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Session started successfully!',
@@ -663,10 +732,10 @@ class BookingController extends Controller
                     $owner->notifications()->create([
                         'type' => 'booking_completed',
                         'title' => 'Booking Completed',
-                        'message' => "Your booking with {$sitter->first_name} {$sitter->last_name} has been automatically completed. You can go to the Book Service page, open the Past tab, and rate and review your sitter.",
+                        'message' => "Your booking with {$sitter->name} has been automatically completed. You can go to the Book Service page, open the Past tab, and rate and review your sitter.",
                         'data' => json_encode([
                             'booking_id' => $booking->id,
-                            'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                            'sitter_name' => $sitter->name,
                             'sitter_id' => $sitter->id,
                             'pet_name' => $booking->pet_name,
                             'date' => $booking->date->format('Y-m-d'),
@@ -803,6 +872,23 @@ class BookingController extends Controller
                 'completed_jobs' => $sitter->bookings()->where('status', 'completed')->count(),
             ];
             broadcast(new \App\Events\DashboardUpdated($sitter, $dashboardData));
+
+            // Dispatch real-time event for dashboard updates
+            event(new \App\Events\BookingUpdated($booking->user_id, 'pet_owner', [
+                'booking_id' => $booking->id,
+                'status' => $booking->status,
+                'date' => $booking->date,
+                'sitter_id' => $booking->sitter_id,
+                'user_id' => $booking->user_id
+            ]));
+
+            event(new \App\Events\BookingUpdated($booking->sitter_id, 'pet_sitter', [
+                'booking_id' => $booking->id,
+                'status' => $booking->status,
+                'date' => $booking->date,
+                'sitter_id' => $booking->sitter_id,
+                'user_id' => $booking->user_id
+            ]));
 
             return response()->json([
                 'success' => true,

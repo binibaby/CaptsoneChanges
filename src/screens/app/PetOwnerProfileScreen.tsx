@@ -463,7 +463,7 @@ const PetOwnerProfileScreen = () => {
       >
         <ScrollView 
           style={styles.content}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -663,6 +663,15 @@ const PetOwnerProfileScreen = () => {
             <Text style={styles.actionText}>Find Pet Sitters</Text>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
+        </View>
+        
+        {/* PetSit Footer - Only visible when scrolled to bottom */}
+        <View style={styles.footer}>
+          <Image 
+            source={require('../../assets/images/logo.png')} 
+            style={styles.footerLogo} 
+          />
+          <Text style={styles.footerEmail}>petsitconnectph@gmail.com</Text>
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -913,6 +922,26 @@ const styles = StyleSheet.create({
   },
   color3B82F6: {
     color: '#3B82F6',
+  },
+  footer: {
+    backgroundColor: '#F8F9FA',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    marginTop: 10,
+  },
+  footerLogo: {
+    width: 40,
+    height: 40,
+    marginBottom: 5,
+  },
+  footerEmail: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });
 
