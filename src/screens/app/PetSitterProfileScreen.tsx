@@ -3,18 +3,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import CertificateAlbum from '../../components/CertificateAlbum';
 // import PullToRefreshWrapper from '../../components/PullToRefreshWrapper';
@@ -35,7 +35,6 @@ const PetSitterProfileScreen = () => {
     lastName: '',
     email: '',
     phone: '',
-    bio: '',
     hourlyRate: '',
     location: '',
     specialties: [] as string[],
@@ -57,7 +56,6 @@ const PetSitterProfileScreen = () => {
     phone: string;
     hourlyRate: string;
     experience: string;
-    aboutMe: string;
     reason: string;
   }>({
     firstName: '',
@@ -65,7 +63,6 @@ const PetSitterProfileScreen = () => {
     phone: '',
     hourlyRate: '',
     experience: '',
-    aboutMe: '',
     reason: '',
   });
   
@@ -374,7 +371,6 @@ const PetSitterProfileScreen = () => {
         lastName: lastName,
         email: user.email || '',
         phone: user.phone || '',
-        bio: user.aboutMe || '',
         hourlyRate: user.hourlyRate || '',
         location: userAddress || '', // Use only real-time location
         specialties: user.specialties || [],
@@ -411,7 +407,6 @@ const PetSitterProfileScreen = () => {
           lastName: lastName,
           email: user.email || '',
           phone: user.phone || '',
-          bio: user.aboutMe || '',
           hourlyRate: user.hourlyRate || '',
           location: user.address || '',
           specialties: user.specialties || [],
@@ -445,7 +440,6 @@ const PetSitterProfileScreen = () => {
         lastName: profile.lastName,
         email: profile.email,
         phone: profile.phone,
-        aboutMe: profile.bio,
         hourlyRate: profile.hourlyRate,
         address: profile.location,
         specialties: profile.specialties,
@@ -474,7 +468,6 @@ const PetSitterProfileScreen = () => {
         phone: user.phone || '',
         hourlyRate: user.hourlyRate ? user.hourlyRate.toString() : '',
         experience: user.experience || '',
-        aboutMe: user.aboutMe || '',
         reason: '', // Leave reason empty for user to fill
       });
     }
@@ -499,7 +492,6 @@ const PetSitterProfileScreen = () => {
           email: user.email || '',
           phone: user.phone || '',
           location: user.address || '',
-          bio: user.aboutMe || '',
           hourlyRate: user.hourlyRate || '',
           experience: user.experience || '',
           specialties: user.specialties || [],
@@ -785,7 +777,6 @@ const PetSitterProfileScreen = () => {
       phone: '',
       hourlyRate: '',
       experience: '',
-      aboutMe: '',
       reason: '',
     });
   };
@@ -934,7 +925,6 @@ const PetSitterProfileScreen = () => {
         phone: requestData.phone.trim(),
         hourlyRate: requestData.hourlyRate.trim(),
         experience: requestData.experience.trim(),
-        aboutMe: requestData.aboutMe.trim(),
         reason: requestData.reason.trim(),
       }, currentUser.token, currentUser.role || 'pet_sitter');
       
@@ -953,7 +943,6 @@ const PetSitterProfileScreen = () => {
           phone: '',
           hourlyRate: '',
           experience: '',
-          aboutMe: '',
           reason: '',
         });
         // Refresh cooldown status
@@ -1387,17 +1376,6 @@ const PetSitterProfileScreen = () => {
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>About Me (Current: {user?.aboutMe ? 'Set' : 'Not set'})</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={requestData.aboutMe}
-                onChangeText={(text) => setRequestData({...requestData, aboutMe: text})}
-                placeholder="Tell us about yourself..."
-                multiline
-                numberOfLines={3}
-              />
-            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Reason for Changes *</Text>
@@ -1519,19 +1497,6 @@ const PetSitterProfileScreen = () => {
           />
         </View>
 
-        {/* Bio */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About Me</Text>
-          <TextInput
-            style={[styles.bioInput, !isEditing && styles.disabledInput]}
-            value={profile.bio}
-            onChangeText={(text) => setProfile({...profile, bio: text})}
-            editable={isEditing}
-            multiline
-            numberOfLines={4}
-            placeholder="Tell pet owners about yourself..."
-          />
-        </View>
 
 
         {/* Specialties */}
@@ -1773,17 +1738,6 @@ const styles = StyleSheet.create({
   disabledInput: {
     backgroundColor: '#F8F9FA',
     color: '#666',
-  },
-  bioInput: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    minHeight: 100,
-    textAlignVertical: 'top',
   },
   specialtiesContainer: {
     flexDirection: 'row',

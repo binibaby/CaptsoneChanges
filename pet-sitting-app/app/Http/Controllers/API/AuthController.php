@@ -302,13 +302,19 @@ class AuthController extends Controller
         // Check if user can be activated
         $this->checkAndUpdateUserStatus($user);
 
+        $user = $user->fresh();
+        $isFullyVerified = $user->verification_status === 'verified';
+        
         return response()->json([
             'success' => true,
-            'message' => 'Phone number verified successfully!',
+            'message' => $isFullyVerified ? 'Congratulations! You are now fully verified and can use all features!' : 'Phone number verified successfully!',
+            'is_fully_verified' => $isFullyVerified,
             'user' => [
                 'id' => $user->id,
                 'phone_verified' => true,
-                'status' => $user->fresh()->status,
+                'status' => $user->status,
+                'verification_status' => $user->verification_status,
+                'role' => $user->role,
             ]
         ]);
     }
@@ -371,6 +377,7 @@ class AuthController extends Controller
                 
                 $user->update([
                     'status' => 'active',
+                    'verification_status' => 'verified',
                     'pet_breeds' => $currentPetBreeds,
                     'selected_pet_types' => $currentSelectedPetTypes,
                 ]);
@@ -380,6 +387,21 @@ class AuthController extends Controller
                     'pet_breeds' => $currentPetBreeds,
                     'selected_pet_types' => $currentSelectedPetTypes,
                 ]);
+                
+                // Broadcast admin dashboard update for pet owner verification
+                try {
+                    broadcast(new \App\Events\AdminUserVerificationUpdated(
+                        $user,
+                        'verified',
+                        'Pet owner phone verification completed'
+                    ));
+                    \Log::info("📡 REAL-TIME EVENT - AdminUserVerificationUpdated dispatched for pet owner: {$user->id}");
+                } catch (\Exception $e) {
+                    \Log::error('Failed to broadcast admin update for pet owner verification', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
         } elseif ($user->role === 'pet_sitter') {
             // Pet sitters need phone + ID verification (email is auto-verified)
@@ -645,6 +667,12 @@ class AuthController extends Controller
                 'message' => 'Phone number does not match your registered phone number.',
             ], 400);
         }
+        
+        // If no authenticated user, find the most recent user with this phone (for registration flow)
+        if (!$user) {
+            $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
+            \Log::info("🔍 SEND CODE - Found user by phone: " . ($user ? "Found (ID: {$user->id}, Created: {$user->created_at})" : "NULL"));
+        }
         $timestamp = now()->format('Y-m-d H:i:s');
         
         // Enhanced logging for phone verification
@@ -757,14 +785,34 @@ class AuthController extends Controller
         $phone = $this->formatPhoneNumber($request->phone);
         $code = $request->code;
         
-        // Verify the phone number matches the user's registered phone
+        // Check if user is authenticated (for logged-in users) or find user by phone (for registration)
         $user = $request->user();
-        if ($user && $user->phone !== $phone) {
-            \Log::warning("📱 PHONE MISMATCH - User phone: {$user->phone}, Requested phone: {$phone}");
+        \Log::info("🔍 USER AUTHENTICATION - User from request: " . ($user ? "Found (ID: {$user->id})" : "NULL"));
+        \Log::info("🔍 USER AUTHENTICATION - User phone: " . ($user ? $user->phone : "N/A"));
+        \Log::info("🔍 USER AUTHENTICATION - Requested phone: {$phone}");
+        
+        // If no authenticated user, try to find user by phone (for registration flow)
+        if (!$user) {
+            // Find the most recent user with this phone number (for registration flow)
+            $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
+            \Log::info("🔍 USER LOOKUP - Found user by phone: " . ($user ? "Found (ID: {$user->id}, Created: {$user->created_at})" : "NULL"));
+        } else {
+            // For authenticated users, verify phone matches
+            if ($user->phone !== $phone) {
+                \Log::warning("📱 PHONE MISMATCH - User phone: {$user->phone}, Requested phone: {$phone}");
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Phone number does not match your registered phone number.',
+                ], 400);
+            }
+        }
+        
+        if (!$user) {
+            \Log::error("❌ USER NOT FOUND - No user found for phone: {$phone}");
             return response()->json([
                 'success' => false,
-                'message' => 'Phone number does not match your registered phone number.',
-            ], 400);
+                'message' => 'No user found with this phone number.',
+            ], 404);
         }
         $timestamp = now()->format('Y-m-d H:i:s');
         
@@ -828,10 +876,24 @@ class AuthController extends Controller
         
         // Update user verification status
         if ($user) {
+            $hasIdVerification = $user->verifications()->where('status', 'approved')->exists();
+            
+            // For pet sitters: need both phone and ID verification to be fully verified
+            // For pet owners: only need phone verification
+            $shouldBeVerified = false;
+            if ($user->role === 'pet_sitter') {
+                $shouldBeVerified = $hasIdVerification; // Phone verification is being completed now
+            } elseif ($user->role === 'pet_owner') {
+                $shouldBeVerified = true; // Pet owners only need phone verification
+            } else {
+                $shouldBeVerified = true; // Other roles follow same logic
+            }
+            
             $user->update([
                 'phone_verified_at' => now(),
-                'verification_status' => 'verified',
-                'status' => 'active' // Change from 'pending' to 'active' when phone is verified
+                'verification_status' => $shouldBeVerified ? 'verified' : 'pending_verification',
+                'status' => 'active', // Change from 'pending' to 'active' when phone is verified
+                'can_accept_bookings' => $shouldBeVerified
             ]);
             
             \Log::info("✅ USER UPDATE - Phone verification status updated to verified");
@@ -841,18 +903,54 @@ class AuthController extends Controller
             // Dispatch real-time event for admin panel updates
             event(new \App\Events\UserVerificationUpdated($user, 'phone', 'verified'));
             \Log::info("📡 REAL-TIME EVENT - UserVerificationUpdated dispatched for user: {$user->id}");
+            
+            // Check if user can be activated
+            $this->checkAndUpdateUserStatus($user);
+            
+            // Broadcast admin dashboard update
+            try {
+                broadcast(new \App\Events\AdminUserVerificationUpdated(
+                    $user,
+                    $shouldBeVerified ? 'verified' : 'pending_verification',
+                    'User verification status updated after phone verification'
+                ));
+                \Log::info("📡 ADMIN DASHBOARD UPDATE - AdminUserVerificationUpdated broadcasted for user: {$user->id}");
+            } catch (\Exception $broadcastError) {
+                \Log::warning("⚠️ ADMIN DASHBOARD UPDATE - Failed to broadcast admin dashboard update", [
+                    'user_id' => $user->id,
+                    'error' => $broadcastError->getMessage()
+                ]);
+            }
+            
+            // Refresh user data after updates
+            $user = $user->fresh();
+            $isFullyVerified = $user->verification_status === 'verified';
         } else {
-            \Log::warning("⚠️ USER UPDATE - No authenticated user found to update verification status");
+            \Log::error("❌ USER UPDATE - No authenticated user found to update verification status");
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated. Please log in again.',
+            ], 401);
         }
         
         \Log::info("🎉 PHONE VERIFICATION COMPLETED SUCCESSFULLY");
-
-        return response()->json([
+        
+        $responseData = [
             'success' => true,
-            'message' => 'Phone number verified successfully!',
-            'verification_status' => 'verified',
-            'user_status' => 'active'
-        ]);
+            'message' => $isFullyVerified ? 'Congratulations! You are now fully verified and can use all features!' : 'Phone number verified successfully!',
+            'is_fully_verified' => $isFullyVerified,
+            'user' => [
+                'id' => $user->id,
+                'phone_verified' => true,
+                'status' => $user->status,
+                'verification_status' => $user->verification_status,
+                'role' => $user->role,
+            ]
+        ];
+        
+        \Log::info("📤 API RESPONSE - Sending response data:", $responseData);
+        
+        return response()->json($responseData);
     }
 
     private function formatPhoneForSMS($phone)
@@ -877,7 +975,11 @@ class AuthController extends Controller
         $simulationMode = env('SMS_SIMULATION_MODE', false); // Default to false for production
         $semaphoreEnabled = env('SEMAPHORE_ENABLED', true); // Default to true since API is approved
         
-        // Enable simulation if explicitly set or if Semaphore is not enabled
+        // Convert string values to boolean properly
+        $simulationMode = filter_var($simulationMode, FILTER_VALIDATE_BOOLEAN);
+        $semaphoreEnabled = filter_var($semaphoreEnabled, FILTER_VALIDATE_BOOLEAN);
+        
+        // Enable simulation if explicitly set to true or if Semaphore is not enabled
         return $simulationMode || !$semaphoreEnabled;
     }
 

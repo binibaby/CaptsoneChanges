@@ -28,13 +28,6 @@ class DashboardController extends Controller
         return view('admin.dashboard', compact('stats', 'recentActivities', 'chartsData'));
     }
 
-    public function reportsIndex()
-    {
-        // Get dashboard statistics for reports overview
-        $stats = $this->getDashboardStats();
-        
-        return view('admin.reports.index', compact('stats'));
-    }
 
     public function announcements()
     {
@@ -76,6 +69,10 @@ class DashboardController extends Controller
 
     private function getChartsData()
     {
+        // Get the earliest user registration date to determine app start
+        $earliestUser = User::orderBy('created_at', 'asc')->first();
+        $appStartDate = $earliestUser ? $earliestUser->created_at : Carbon::now();
+        
         $last7Days = collect();
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::now()->subDays($i);
@@ -89,22 +86,33 @@ class DashboardController extends Controller
             ]);
         }
 
+        // Only show months from when the app actually started
         $monthlyData = collect();
-        for ($i = 5; $i >= 0; $i--) {
-            $date = Carbon::now()->subMonths($i);
-            $monthlyData->push([
-                'month' => $date->format('M Y'),
-                'users' => User::whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
-                    ->count(),
-                'bookings' => Booking::whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
-                    ->count(),
-                'revenue' => Payment::where('status', 'completed')
-                    ->whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
-                    ->sum('amount'),
-            ]);
+        $currentMonth = Carbon::now();
+        $startMonth = $appStartDate->copy()->startOfMonth();
+        
+        // Calculate how many months to show (from app start to now)
+        $monthsToShow = $startMonth->diffInMonths($currentMonth) + 1;
+        
+        for ($i = 0; $i < $monthsToShow; $i++) {
+            $date = $startMonth->copy()->addMonths($i);
+            
+            // Only include months up to current month
+            if ($date->lte($currentMonth)) {
+                $monthlyData->push([
+                    'month' => $date->format('M Y'),
+                    'users' => User::whereYear('created_at', $date->year)
+                        ->whereMonth('created_at', $date->month)
+                        ->count(),
+                    'bookings' => Booking::whereYear('created_at', $date->year)
+                        ->whereMonth('created_at', $date->month)
+                        ->count(),
+                    'revenue' => Payment::where('status', 'completed')
+                        ->whereYear('created_at', $date->year)
+                        ->whereMonth('created_at', $date->month)
+                        ->sum('amount'),
+                ]);
+            }
         }
 
         return [

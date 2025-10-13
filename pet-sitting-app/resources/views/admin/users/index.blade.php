@@ -151,7 +151,7 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
                         @forelse($users as $user)
-                        <tr class="hover:bg-gray-50 transition-colors duration-200">
+                        <tr class="hover:bg-gray-50 transition-colors duration-200" data-user-id="{{ $user->id }}">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-10 w-10">
@@ -222,7 +222,7 @@
                                     @endif
                                     @if($user->hourly_rate)
                                     <div class="text-xs text-purple-600 font-semibold mt-1 flex items-center">
-                                        <span class="mr-1">💰</span> ${{ $user->hourly_rate }}/hour
+                                        <span class="mr-1">💰</span> ₱{{ $user->hourly_rate }}/hour
                                     </div>
                                     @endif
                                 @endif
@@ -241,7 +241,7 @@
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-6 py-4 whitespace-nowrap verification-status">
                                 @if($user->verification_badge)
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
                                     {{ $user->verification_badge['color'] === 'success' ? 'bg-green-100 text-green-800' : 
@@ -528,6 +528,107 @@ document.addEventListener('visibilitychange', function() {
     } else {
         startAutoRefresh();
     }
+});
+
+// Real-time broadcast updates using Laravel Reverb
+let reverbConnection = null;
+
+function initializeReverb() {
+    // Check if Reverb is available
+    if (typeof window.Echo === 'undefined') {
+        console.log('Laravel Echo not available, skipping real-time updates');
+        return;
+    }
+
+    try {
+        // Initialize Echo connection
+        window.Echo = new Echo({
+            broadcaster: 'reverb',
+            key: '{{ env('REVERB_APP_KEY') }}',
+            wsHost: '{{ env('REVERB_HOST') }}',
+            wsPort: {{ env('REVERB_PORT', 443) }},
+            wssPort: {{ env('REVERB_PORT', 443) }},
+            forceTLS: {{ env('REVERB_SCHEME', 'https') === 'https' ? 'true' : 'false' }},
+            enabledTransports: ['ws', 'wss'],
+        });
+
+        // Listen for admin dashboard updates
+        window.Echo.channel('admin-dashboard')
+            .listen('admin.user.verification.updated', (e) => {
+                console.log('Real-time verification update received:', e);
+                updateUserVerificationStatus(e.user);
+            });
+
+        console.log('Real-time updates initialized successfully');
+    } catch (error) {
+        console.log('Failed to initialize real-time updates:', error);
+    }
+}
+
+// Update user verification status in real-time
+function updateUserVerificationStatus(userData) {
+    // Find the user row in the table
+    const userRow = document.querySelector(`tr[data-user-id="${userData.id}"]`);
+    if (!userRow) {
+        console.log('User row not found for ID:', userData.id);
+        return;
+    }
+
+    // Find the verification status cell
+    const verificationCell = userRow.querySelector('.verification-status');
+    if (!verificationCell) {
+        console.log('Verification status cell not found for user:', userData.id);
+        return;
+    }
+
+    // Determine the verification badge based on user data
+    let badgeClass, badgeText;
+    
+    if (userData.role === 'pet_owner') {
+        // Pet owners only need phone verification
+        if (userData.phone_verified_at) {
+            badgeClass = 'bg-green-100 text-green-800';
+            badgeText = 'Verified';
+        } else {
+            badgeClass = 'bg-yellow-100 text-yellow-800';
+            badgeText = 'Not Verified';
+        }
+    } else if (userData.role === 'pet_sitter') {
+        // Pet sitters need both phone and ID verification
+        if (userData.phone_verified_at && userData.id_verified) {
+            badgeClass = 'bg-green-100 text-green-800';
+            badgeText = 'Verified';
+        } else {
+            badgeClass = 'bg-yellow-100 text-yellow-800';
+            badgeText = 'Not Verified';
+        }
+    } else {
+        // Other roles
+        if (userData.phone_verified_at) {
+            badgeClass = 'bg-green-100 text-green-800';
+            badgeText = 'Verified';
+        } else {
+            badgeClass = 'bg-yellow-100 text-yellow-800';
+            badgeText = 'Not Verified';
+        }
+    }
+
+    // Update the verification badge
+    verificationCell.innerHTML = `
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}">
+            ${badgeText}
+        </span>
+    `;
+
+    // Show notification
+    showUpdateNotification(`User ${userData.name} verification status updated to ${badgeText}`);
+}
+
+// Initialize real-time updates when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startAutoRefresh();
+    addRefreshButton();
+    initializeReverb();
 });
 </script>
 @endsection 

@@ -46,6 +46,7 @@ const ProfileScreen = () => {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [cooldownInfo, setCooldownInfo] = useState<any>(null);
+  
   const [newSpecialty, setNewSpecialty] = useState('');
   const [requestData, setRequestData] = useState<{
     firstName: string;
@@ -53,7 +54,6 @@ const ProfileScreen = () => {
     phone: string;
     hourlyRate: string;
     experience: string;
-    aboutMe: string;
     reason: string;
   }>({
     firstName: '',
@@ -61,7 +61,6 @@ const ProfileScreen = () => {
     phone: '',
     hourlyRate: '',
     experience: '',
-    aboutMe: '',
     reason: '',
   });
   const [profileData, setProfileData] = useState<{
@@ -74,7 +73,6 @@ const ProfileScreen = () => {
     address: string;
     experience?: string;
     hourlyRate?: string;
-    aboutMe: string;
     specialties?: string[];
     petBreeds: string[];
   }>({
@@ -85,7 +83,6 @@ const ProfileScreen = () => {
     age: '',
     gender: '',
     address: '',
-    aboutMe: '',
     petBreeds: [],
   });
 
@@ -240,7 +237,6 @@ const ProfileScreen = () => {
         phone: user.phone || '',
         hourlyRate: user.hourlyRate || '',
         experience: user.experience || '',
-        aboutMe: user.aboutMe || '',
         reason: '',
       });
     }
@@ -288,7 +284,6 @@ const ProfileScreen = () => {
         age: user.age ? user.age.toString() : '',
         gender: user.gender || '',
         address: userAddress || '', // Use only real-time location
-        aboutMe: user.aboutMe || '',
         petBreeds: user.selectedBreeds || [],
         // Only include sitter-specific fields for pet sitters
         ...(user.role === 'pet_sitter' && {
@@ -314,7 +309,6 @@ const ProfileScreen = () => {
         address: '',
         experience: '',
         hourlyRate: '',
-        aboutMe: '',
         specialties: [],
         petBreeds: [],
       });
@@ -400,7 +394,6 @@ const ProfileScreen = () => {
           gender: user.gender || '',
           hourlyRate: user.hourlyRate || '',
           experience: user.experience || '',
-          aboutMe: user.aboutMe || '',
           specialties: user.specialties || [],
           petBreeds: (user as any).pet_breeds || [],
         });
@@ -621,6 +614,7 @@ const ProfileScreen = () => {
     }
   };
 
+
   const handleSubmitProfileRequest = async () => {
     try {
       setIsSubmittingRequest(true);
@@ -645,7 +639,6 @@ const ProfileScreen = () => {
         phone: requestData.phone.trim(),
         hourlyRate: requestData.hourlyRate.trim(),
         experience: requestData.experience.trim(),
-        aboutMe: requestData.aboutMe.trim(),
         reason: requestData.reason.trim(),
       }, user?.token || '', user?.role || 'pet_owner');
       
@@ -664,7 +657,6 @@ const ProfileScreen = () => {
           phone: '',
           hourlyRate: '',
           experience: '',
-          aboutMe: '',
           reason: '',
         });
         // Refresh cooldown status
@@ -938,8 +930,8 @@ const ProfileScreen = () => {
             )}
           </View>
 
-          {/* Cooldown Notice */}
-          {cooldownInfo && cooldownInfo.in_cooldown && (
+          {/* Cooldown Notice - Hidden */}
+          {false && cooldownInfo && cooldownInfo.in_cooldown && (
             <View style={styles.cooldownNotice}>
               <Ionicons name="time-outline" size={20} color="#F59E0B" />
               <View style={styles.cooldownTextContainer}>
@@ -980,10 +972,6 @@ const ProfileScreen = () => {
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Experience</Text>
                     <Text style={styles.infoValue}>{profileData.experience ? `${profileData.experience} years` : 'Not set'}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>About Me</Text>
-                    <Text style={styles.infoValue}>{profileData.aboutMe || 'Not set'}</Text>
                   </View>
                 </>
               )}
@@ -1046,18 +1034,6 @@ const ProfileScreen = () => {
                     />
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>About Me</Text>
-                    <TextInput
-                      style={[styles.textArea, styles.textAreaEditing]}
-                      value={requestData.aboutMe}
-                      onChangeText={(text) => setRequestData({...requestData, aboutMe: text})}
-                      placeholder="Tell us about yourself..."
-                      multiline
-                      numberOfLines={4}
-                      textAlignVertical="top"
-                    />
-                  </View>
                 </>
               )}
 
@@ -1562,6 +1538,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  infoRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
 });
 

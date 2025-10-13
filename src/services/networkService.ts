@@ -297,14 +297,13 @@ export const makeApiCall = async (
   }
 };
 
-// API Methods
+// API Methods - Updated to remove aboutMe field
 export const submitProfileUpdateRequest = async (data: {
   firstName: string;
   lastName: string;
   phone: string;
   hourlyRate: string;
   experience: string;
-  aboutMe: string;
   reason: string;
 }, token: string, userRole?: string) => {
   try {

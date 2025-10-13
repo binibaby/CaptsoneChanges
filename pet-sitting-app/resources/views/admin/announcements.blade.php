@@ -3,7 +3,7 @@
 @section('content')
 <div class="space-y-8">
     <!-- Page Header -->
-    <div class="relative overflow-hidden bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 rounded-2xl shadow-2xl">
+    <div class="relative overflow-hidden rounded-2xl shadow-2xl" style="background: linear-gradient(135deg, #ec4899, #f43f5e, #ef4444, #f97316);">
         <div class="absolute inset-0 bg-black opacity-10"></div>
         <div class="relative px-8 py-8">
             <div class="flex items-center justify-between">
@@ -58,27 +58,27 @@
     </div>
 
     <!-- Announcements Content -->
-    <div class="bg-gradient-to-br from-pink-50 to-rose-100 rounded-2xl shadow-lg border border-pink-200 hover-lift p-8">
+    <div class="rounded-2xl shadow-xl border-4 border-pink-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-8" style="background: linear-gradient(135deg, #fce7f3, #fbcfe8, #f9a8d4);">
         <div class="text-center">
-            <div class="w-16 h-16 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl border-4 border-pink-600" style="background: linear-gradient(135deg, #ec4899, #f43f5e, #ef4444);">
                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
                 </svg>
             </div>
-            <h3 class="text-xl font-semibold text-pink-800 mb-2">Announcements Management</h3>
-            <p class="text-pink-600 mb-6">Create and manage platform announcements to keep users informed about important updates, features, and news.</p>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-white rounded-xl p-4 shadow-sm border border-pink-200">
-                    <div class="text-2xl font-bold text-pink-600">0</div>
-                    <div class="text-sm text-pink-700">Active Announcements</div>
+            <h3 class="text-2xl font-bold text-white mb-2 drop-shadow-lg">Announcements Management</h3>
+            <p class="text-white mb-6 drop-shadow-lg">Create and manage platform announcements to keep users informed about important updates, features, and news.</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="rounded-2xl shadow-xl border-4 border-pink-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #ec4899, #f43f5e, #ef4444);">
+                    <div class="text-3xl font-bold text-white drop-shadow-lg">0</div>
+                    <div class="text-sm text-white font-medium drop-shadow-lg">Active Announcements</div>
                 </div>
-                <div class="bg-white rounded-xl p-4 shadow-sm border border-pink-200">
-                    <div class="text-2xl font-bold text-pink-600">0</div>
-                    <div class="text-sm text-pink-700">Scheduled</div>
+                <div class="rounded-2xl shadow-xl border-4 border-orange-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #f97316, #f59e0b, #eab308);">
+                    <div class="text-3xl font-bold text-white drop-shadow-lg">0</div>
+                    <div class="text-sm text-white font-medium drop-shadow-lg">Scheduled</div>
                 </div>
-                <div class="bg-white rounded-xl p-4 shadow-sm border border-pink-200">
-                    <div class="text-2xl font-bold text-pink-600">0</div>
-                    <div class="text-sm text-pink-700">Total Sent</div>
+                <div class="rounded-2xl shadow-xl border-4 border-green-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #10b981, #059669, #0d9488);">
+                    <div class="text-3xl font-bold text-white drop-shadow-lg">0</div>
+                    <div class="text-sm text-white font-medium drop-shadow-lg">Total Sent</div>
                 </div>
             </div>
         </div>

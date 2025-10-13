@@ -3,7 +3,7 @@
 @section('content')
 <div class="space-y-8">
     <!-- Page Header -->
-    <div class="relative overflow-hidden bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 rounded-2xl shadow-2xl">
+    <div class="relative overflow-hidden rounded-2xl shadow-2xl" style="background: linear-gradient(135deg, #0d9488, #06b6d4, #3b82f6, #8b5cf6);">
         <div class="absolute inset-0 bg-black opacity-10"></div>
         <div class="relative px-8 py-8">
             <div class="flex items-center justify-between">
@@ -59,66 +59,66 @@
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="bg-gradient-to-br from-yellow-50 to-orange-100 rounded-2xl shadow-lg border border-yellow-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-yellow-500 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #fbbf24, #f59e0b, #ef4444);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4 flex-1">
-                    <div class="text-sm font-medium text-yellow-700">Pending Reviews</div>
-                    <div class="text-2xl font-bold text-yellow-800">{{ \App\Models\Verification::where('verification_status', 'pending')->count() }}</div>
+                    <div class="text-sm font-medium text-white drop-shadow-lg">Pending Reviews</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::where('verification_status', 'pending')->count() }}</div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl shadow-lg border border-green-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-green-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #10b981, #059669, #0d9488);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4 flex-1">
-                    <div class="text-sm font-medium text-green-700">Approved</div>
-                    <div class="text-2xl font-bold text-green-800">{{ \App\Models\Verification::where('verification_status', 'approved')->count() }}</div>
+                    <div class="text-sm font-medium text-white drop-shadow-lg">Approved</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::where('verification_status', 'approved')->count() }}</div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-br from-red-50 to-rose-100 rounded-2xl shadow-lg border border-red-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-red-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #ef4444, #f43f5e, #ec4899);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-red-400 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4 flex-1">
-                    <div class="text-sm font-medium text-red-700">Rejected</div>
-                    <div class="text-2xl font-bold text-red-800">{{ \App\Models\Verification::where('verification_status', 'rejected')->count() }}</div>
+                    <div class="text-sm font-medium text-white drop-shadow-lg">Rejected</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::where('verification_status', 'rejected')->count() }}</div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-br from-blue-50 to-cyan-100 rounded-2xl shadow-lg border border-blue-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-blue-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #3b82f6, #06b6d4, #6366f1);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4 flex-1">
-                    <div class="text-sm font-medium text-blue-700">Total Submissions</div>
-                    <div class="text-2xl font-bold text-blue-800">{{ \App\Models\Verification::count() }}</div>
+                    <div class="text-sm font-medium text-white drop-shadow-lg">Total Submissions</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::count() }}</div>
                 </div>
             </div>
         </div>

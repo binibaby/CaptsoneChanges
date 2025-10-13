@@ -234,7 +234,7 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
 
   const renderAddButton = () => (
     <TouchableOpacity style={styles.addButton} onPress={pickImage}>
-      <Ionicons name="add" size={40} color="#F59E0B" />
+      <Ionicons name="add" size={16} color="#F59E0B" />
       <Text style={styles.addButtonText}>Add Certificate</Text>
     </TouchableOpacity>
   );
@@ -384,11 +384,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   addButton: {
-    flex: 1,
+    width: 80,
+    height: 80,
     margin: 8,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 8,
+    padding: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -401,10 +402,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   addButtonText: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '600',
     color: '#F59E0B',
-    marginTop: 8,
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
 

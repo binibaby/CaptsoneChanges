@@ -3,18 +3,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -25,6 +25,7 @@ const PetOwnerProfileScreen = () => {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [cooldownInfo, setCooldownInfo] = useState<any>(null);
+  
   const [profileImage, setProfileImage] = useState<string | null>(user?.profileImage || null);
   const [imageError, setImageError] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -35,7 +36,6 @@ const PetOwnerProfileScreen = () => {
     email: '',
     phone: '',
     address: '',
-    bio: '',
   });
   const [requestData, setRequestData] = useState<{
     firstName: string;
@@ -64,7 +64,6 @@ const PetOwnerProfileScreen = () => {
         email: user.email || '',
         phone: user.phone || '',
         address: user.address || '',
-        bio: user.aboutMe || '',
       });
     }
   }, [user]);
@@ -123,7 +122,6 @@ const PetOwnerProfileScreen = () => {
         phone: requestData.phone.trim(),
         hourlyRate: '',
         experience: '',
-        aboutMe: '',
         reason: requestData.reason.trim(),
       }, user?.token || '', user?.role || 'pet_owner');
       
@@ -172,6 +170,7 @@ const PetOwnerProfileScreen = () => {
     setIsEditing(false);
   };
 
+
   const checkCooldownStatus = async () => {
     try {
       const { makeApiCall } = await import('../../services/networkService');
@@ -212,7 +211,6 @@ const PetOwnerProfileScreen = () => {
           email: user.email || '',
           phone: user.phone || '',
           address: user.address || '',
-          bio: user.aboutMe || '',
         });
       }
     } catch (error) {
@@ -526,8 +524,8 @@ const PetOwnerProfileScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
           
-          {/* Cooldown Notice */}
-          {cooldownInfo && cooldownInfo.in_cooldown && (
+          {/* Cooldown Notice - Hidden */}
+          {false && cooldownInfo && cooldownInfo.in_cooldown && (
             <View style={styles.cooldownNotice}>
               <Ionicons name="time-outline" size={20} color="#F59E0B" />
               <View style={styles.cooldownTextContainer}>
@@ -620,22 +618,6 @@ const PetOwnerProfileScreen = () => {
               multiline
             />
           </View>
-        </View>
-        {/* Bio */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About Me</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.bioInput}
-              value={profile.bio}
-              onChangeText={(text) => setProfile({...profile, bio: text})}
-              placeholder="Tell us about yourself..."
-              multiline
-              numberOfLines={4}
-            />
-          ) : (
-            <Text style={[styles.bioInput, styles.disabledInput]}>{profile.bio}</Text>
-          )}
         </View>
         {/* My Pets Navigation */}
         <View style={styles.section}>
@@ -881,17 +863,6 @@ const styles = StyleSheet.create({
   disabledInput: {
     backgroundColor: '#F8F9FA',
     color: '#666',
-  },
-  bioInput: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    minHeight: 100,
-    textAlignVertical: 'top',
   },
   actionItem: {
     flexDirection: 'row',

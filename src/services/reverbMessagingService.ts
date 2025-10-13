@@ -885,9 +885,9 @@ class ReverbMessagingService extends EventEmitter {
         const errorText = await response.text();
         console.error('❌ GET CONVERSATIONS API Error Response:', errorText);
         
-        // If it's a 401, the token might be invalid
-        if (response.status === 401) {
-          console.log('🔄 401 Unauthorized - clearing cached token');
+        // If it's a 401 or 403, the token might be invalid or user lacks permission
+        if (response.status === 401 || response.status === 403) {
+          console.log(`🔄 ${response.status} Unauthorized/Forbidden - clearing cached token`);
           this.authToken = null; // Clear cached token
           throw new Error('Authentication failed: Invalid or expired token. Please log in again.');
         }
@@ -950,9 +950,9 @@ class ReverbMessagingService extends EventEmitter {
         const errorText = await response.text();
         console.error('❌ GET MESSAGES API Error:', response.status, errorText);
         
-        // If it's a 401, the token might be invalid
-        if (response.status === 401) {
-          console.log('🔄 401 Unauthorized - clearing cached token');
+        // If it's a 401 or 403, the token might be invalid or user lacks permission
+        if (response.status === 401 || response.status === 403) {
+          console.log(`🔄 ${response.status} Unauthorized/Forbidden - clearing cached token`);
           this.authToken = null; // Clear cached token
           throw new Error('Authentication failed: Invalid or expired token');
         }
@@ -1022,9 +1022,9 @@ class ReverbMessagingService extends EventEmitter {
         const errorText = await response.text();
         console.error(`❌ Send Message API Error ${response.status}:`, errorText);
         
-        // Check if it's a 401 authentication error
-        if (response.status === 401) {
-          console.log('🔄 401 Unauthorized - clearing cached token');
+        // Check if it's a 401 or 403 authentication error
+        if (response.status === 401 || response.status === 403) {
+          console.log(`🔄 ${response.status} Unauthorized/Forbidden - clearing cached token`);
           this.authToken = null; // Clear cached token
           throw new Error('Authentication failed: Invalid or expired token');
         }

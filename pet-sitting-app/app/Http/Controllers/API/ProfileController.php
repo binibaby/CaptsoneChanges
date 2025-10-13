@@ -271,6 +271,59 @@ class ProfileController extends Controller
     }
 
     /**
+     * Update only the user's bio
+     */
+    public function updateBio(Request $request)
+    {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        $user = Auth::user();
+        
+        $validator = Validator::make($request->all(), [
+            'bio' => 'required|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $user->bio = $request->bio;
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Bio updated successfully',
+                'user' => [
+                    'id' => $user->id,
+                    'bio' => $user->bio,
+                    'updated_at' => $user->updated_at,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update bio',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Upload profile image
      */
     public function uploadImage(Request $request)

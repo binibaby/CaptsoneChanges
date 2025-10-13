@@ -63,7 +63,15 @@ class VerificationController extends Controller
 
         // Filter by status
         if ($status !== 'all') {
-            $query->where('verification_status', $status);
+            if ($status === 'pending') {
+                // For pending, only show verifications that are actually pending
+                $query->where('verification_status', 'pending')
+                      ->where('status', 'pending');
+            } else {
+                // For approved/rejected, show only those that have been processed
+                $query->where('verification_status', $status)
+                      ->where('status', $status);
+            }
         }
 
         // Search functionality
@@ -98,6 +106,8 @@ class VerificationController extends Controller
     public function getStatusUpdates()
     {
         $recentVerifications = Verification::where('updated_at', '>=', now()->subMinutes(5))
+            ->where('verification_status', 'pending')
+            ->where('status', 'pending')
             ->with('user')
             ->get(['id', 'status', 'updated_at', 'user_id']);
 
@@ -265,6 +275,13 @@ class VerificationController extends Controller
                 ], 400);
             }
 
+            // Remove any other pending verifications for this user to prevent duplicates
+            Verification::where('user_id', $verification->user_id)
+                ->where('id', '!=', $verification->id)
+                ->where('verification_status', 'pending')
+                ->where('status', 'pending')
+                ->delete();
+
             // Update verification
             $verification->update([
                 'status' => 'approved',
@@ -309,14 +326,34 @@ class VerificationController extends Controller
             ]);
 
             // Update user status to active
-            $verification->user->update([
+            $user = $verification->user;
+            $hasPhoneVerification = !is_null($user->phone_verified_at);
+            
+            // For pet sitters: need both phone and ID verification to be fully verified
+            // For pet owners: only need phone verification
+            $shouldBeVerified = false;
+            if ($user->role === 'pet_sitter') {
+                // If sitter doesn't have phone verification, give it to them since ID is approved
+                if (!$hasPhoneVerification) {
+                    $user->update(['phone_verified_at' => now()]);
+                    $hasPhoneVerification = true;
+                    Log::info("📱 AUTO-PHONE-VERIFICATION - Granted phone verification to sitter {$user->name} after ID approval");
+                }
+                $shouldBeVerified = $hasPhoneVerification; // ID verification is being approved now
+            } elseif ($user->role === 'pet_owner') {
+                $shouldBeVerified = $hasPhoneVerification; // Pet owners only need phone verification
+            } else {
+                $shouldBeVerified = $hasPhoneVerification; // Other roles follow same logic
+            }
+            
+            $user->update([
                 'status' => 'active',
                 'approved_at' => now(),
                 'approved_by' => $this->getAuthId(),
                 'id_verified' => true,
                 'id_verified_at' => now(),
-                'verification_status' => 'verified',
-                'can_accept_bookings' => true
+                'verification_status' => $shouldBeVerified ? 'verified' : 'pending_verification',
+                'can_accept_bookings' => $shouldBeVerified
             ]);
 
             // Create audit log
@@ -345,6 +382,21 @@ class VerificationController extends Controller
                     'error' => $broadcastError->getMessage()
                 ]);
                 // Continue with the approval process even if broadcasting fails
+            }
+
+            // Broadcast admin dashboard update
+            try {
+                broadcast(new \App\Events\AdminUserVerificationUpdated(
+                    $user,
+                    $shouldBeVerified ? 'verified' : 'pending_verification',
+                    'User verification status updated after ID approval'
+                ));
+                Log::info('Admin dashboard update broadcasted successfully', ['user_id' => $user->id]);
+            } catch (\Exception $broadcastError) {
+                Log::warning('Failed to broadcast admin dashboard update', [
+                    'user_id' => $user->id,
+                    'error' => $broadcastError->getMessage()
+                ]);
             }
 
             // Notify user of approval
@@ -462,6 +514,13 @@ class VerificationController extends Controller
                     'message' => 'This verification has already been processed.'
                 ], 400);
             }
+
+            // Remove any other pending verifications for this user to prevent duplicates
+            Verification::where('user_id', $verification->user_id)
+                ->where('id', '!=', $verification->id)
+                ->where('verification_status', 'pending')
+                ->where('status', 'pending')
+                ->delete();
 
             // Update verification
             $verification->update([
@@ -596,17 +655,25 @@ class VerificationController extends Controller
     {
         $stats = [
             'total' => Verification::count(),
-            'pending' => Verification::where('verification_status', 'pending')->count(),
-            'approved' => Verification::where('verification_status', 'approved')->count(),
-            'rejected' => Verification::where('verification_status', 'rejected')->count(),
+            'pending' => Verification::where('verification_status', 'pending')
+                ->where('status', 'pending')
+                ->count(),
+            'approved' => Verification::where('verification_status', 'approved')
+                ->where('status', 'approved')
+                ->count(),
+            'rejected' => Verification::where('verification_status', 'rejected')
+                ->where('status', 'rejected')
+                ->count(),
         ];
 
-        // Get urgent and critical counts
+        // Get urgent and critical counts - only for truly pending verifications
         $stats['urgent'] = Verification::where('verification_status', 'pending')
+            ->where('status', 'pending')
             ->where('created_at', '<', Carbon::now()->subHour())
             ->count();
 
         $stats['critical'] = Verification::where('verification_status', 'pending')
+            ->where('status', 'pending')
             ->where('created_at', '<', Carbon::now()->subDay())
             ->count();
 
@@ -683,6 +750,83 @@ class VerificationController extends Controller
         return response()->json([
             'success' => true,
             'audit_logs' => $logs
+        ]);
+    }
+
+    /**
+     * Clean up duplicate verifications for users
+     */
+    public function cleanupDuplicateVerifications()
+    {
+        $duplicatesRemoved = 0;
+        
+        // Find users with multiple verifications
+        $usersWithDuplicates = \DB::table('verifications')
+            ->select('user_id')
+            ->groupBy('user_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+            
+        foreach ($usersWithDuplicates as $user) {
+            // Get all verifications for this user
+            $verifications = Verification::where('user_id', $user->user_id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+                
+            // Keep the latest approved/rejected verification, remove others
+            $keepVerification = null;
+            $toDelete = [];
+            
+            foreach ($verifications as $verification) {
+                if ($verification->verification_status === 'approved' || $verification->verification_status === 'rejected') {
+                    if (!$keepVerification) {
+                        $keepVerification = $verification;
+                    } else {
+                        $toDelete[] = $verification;
+                    }
+                } else {
+                    // Remove pending verifications if user already has approved/rejected
+                    if ($keepVerification) {
+                        $toDelete[] = $verification;
+                    } else {
+                        // Keep the latest pending if no approved/rejected exists
+                        if (!$keepVerification) {
+                            $keepVerification = $verification;
+                        } else {
+                            $toDelete[] = $verification;
+                        }
+                    }
+                }
+            }
+            
+            // Delete duplicate verifications
+            foreach ($toDelete as $verification) {
+                $verification->delete();
+                $duplicatesRemoved++;
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => "Cleaned up {$duplicatesRemoved} duplicate verification records.",
+            'duplicates_removed' => $duplicatesRemoved
+        ]);
+    }
+
+    /**
+     * Clean up old processed verifications (optional maintenance method)
+     */
+    public function cleanupOldVerifications()
+    {
+        // Remove verifications that were processed more than 30 days ago
+        $deletedCount = Verification::whereIn('status', ['approved', 'rejected'])
+            ->where('updated_at', '<', Carbon::now()->subDays(30))
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Cleaned up {$deletedCount} old verification records.",
+            'deleted_count' => $deletedCount
         ]);
     }
 }

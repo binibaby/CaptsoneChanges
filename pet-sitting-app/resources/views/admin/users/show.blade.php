@@ -112,7 +112,7 @@
                         </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Hourly Rate</dt>
-                            <dd class="text-sm text-gray-900">{{ $user->hourly_rate ? '$' . $user->hourly_rate . '/hr' : 'Not specified' }}</dd>
+                            <dd class="text-sm text-gray-900">{{ $user->hourly_rate ? '₱' . $user->hourly_rate . '/hr' : 'Not specified' }}</dd>
                         </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Specialties</dt>
@@ -162,7 +162,7 @@
                                 @if($user->hourly_rate)
                                 <div>
                                     <dt class="text-sm font-medium text-blue-700">Hourly Rate</dt>
-                                    <dd class="text-sm text-blue-900 font-semibold">${{ $user->hourly_rate }}/hour</dd>
+                                    <dd class="text-sm text-blue-900 font-semibold">₱{{ $user->hourly_rate }}/hour</dd>
                                 </div>
                                 @endif
                                 @if($user->experience)

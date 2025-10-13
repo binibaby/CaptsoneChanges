@@ -7,7 +7,7 @@
         <div class="relative px-8 py-12">
             <div class="flex items-center justify-between">
                 <div class="text-gray-900">
-                    <h1 class="text-4xl font-bold mb-2">Welcome back, {{ Auth::user()->name ?? 'Admin' }}! 👋</h1>
+                    <h1 class="text-4xl font-bold mb-2">Welcome back, {{ Auth::user()->name ?? 'Admin' }}!</h1>
                     <p class="text-gray-600 text-lg">Here's what's happening with your PetSitConnect platform today.</p>
                     <div class="flex items-center mt-4 space-x-4">
                         <div class="flex items-center text-gray-600">
@@ -15,12 +15,6 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                             <span class="text-sm">{{ now()->format('l, F j, Y') }}</span>
-                        </div>
-                        <div class="flex items-center text-gray-600">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            <span class="text-sm">Last updated: {{ now()->format('g:i A') }}</span>
                         </div>
                     </div>
                 </div>
@@ -355,12 +349,6 @@
                     <p class="text-sm text-gray-600">Key performance indicators</p>
                 </div>
             </div>
-            <a href="{{ route('admin.reports.index') }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center">
-                View Reports
-                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-            </a>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -407,13 +395,19 @@
 document.addEventListener('DOMContentLoaded', function() {
     // User Growth Chart
     const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
+    
+    // Get actual data from backend
+    const monthlyStats = @json($chartsData['monthly_stats']);
+    const userLabels = monthlyStats.map(stat => stat.month);
+    const userData = monthlyStats.map(stat => stat.users);
+    
     const userGrowthChart = new Chart(userGrowthCtx, {
         type: 'line',
         data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            labels: userLabels,
             datasets: [{
                 label: 'New Users',
-                data: [12, 19, 3, 5, 2, 3, 8, 15, 22, 18, 25, 30],
+                data: userData,
                 borderColor: 'rgb(59, 130, 246)',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 borderWidth: 3,
@@ -463,27 +457,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Revenue Chart
     const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    
+    // Get actual revenue data from backend
+    const revenueData = monthlyStats.map(stat => stat.revenue);
+    const revenueBackgroundColors = revenueData.map(() => 'rgba(34, 197, 94, 0.8)');
+    
     const revenueChart = new Chart(revenueCtx, {
         type: 'bar',
         data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            labels: userLabels,
             datasets: [{
                 label: 'Revenue (₱)',
-                data: [25000, 32000, 18000, 45000, 28000, 35000, 42000, 38000, 55000, 48000, 62000, 75000],
-                backgroundColor: [
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(34, 197, 94, 0.8)'
-                ],
+                data: revenueData,
+                backgroundColor: revenueBackgroundColors,
                 borderColor: 'rgb(34, 197, 94)',
                 borderWidth: 2,
                 borderRadius: 6,
@@ -539,11 +525,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Update chart data based on selection
             if (this.textContent === 'Month') {
-                userGrowthChart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                userGrowthChart.data.datasets[0].data = [12, 19, 3, 5, 2, 3, 8, 15, 22, 18, 25, 30];
+                userGrowthChart.data.labels = userLabels;
+                userGrowthChart.data.datasets[0].data = userData;
             } else {
-                userGrowthChart.data.labels = ['2020', '2021', '2022', '2023', '2024'];
-                userGrowthChart.data.datasets[0].data = [120, 180, 250, 320, 450];
+                // For yearly view, we could aggregate the data, but for now just show monthly
+                userGrowthChart.data.labels = userLabels;
+                userGrowthChart.data.datasets[0].data = userData;
             }
             userGrowthChart.update();
         });
@@ -561,11 +548,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Update chart data based on selection
             if (this.textContent === 'Month') {
-                revenueChart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                revenueChart.data.datasets[0].data = [25000, 32000, 18000, 45000, 28000, 35000, 42000, 38000, 55000, 48000, 62000, 75000];
+                revenueChart.data.labels = userLabels;
+                revenueChart.data.datasets[0].data = revenueData;
             } else {
-                revenueChart.data.labels = ['2020', '2021', '2022', '2023', '2024'];
-                revenueChart.data.datasets[0].data = [180000, 250000, 320000, 450000, 680000];
+                // For yearly view, we could aggregate the data, but for now just show monthly
+                revenueChart.data.labels = userLabels;
+                revenueChart.data.datasets[0].data = revenueData;
             }
             revenueChart.update();
         });

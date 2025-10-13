@@ -35,7 +35,7 @@ class SemaphoreService
             // Format phone number for Semaphore (ensure it starts with +)
             $formattedPhone = $this->formatPhoneNumber($phoneNumber);
             
-            // Prepare the request data
+            // Prepare the request data for OTP endpoint
             $data = [
                 'apikey' => $this->apiKey,
                 'number' => $formattedPhone,
@@ -47,8 +47,8 @@ class SemaphoreService
 
             Log::info("📱 SEMAPHORE SMS - Request data: " . json_encode($data));
 
-            // Send the request to Semaphore API
-            $response = Http::timeout(30)->post($this->baseUrl . '/otp', $data);
+            // Send the request to Semaphore API messages endpoint
+            $response = Http::timeout(30)->post($this->baseUrl . '/messages', $data);
 
             Log::info("📱 SEMAPHORE SMS - Response status: " . $response->status());
             Log::info("📱 SEMAPHORE SMS - Response body: " . $response->body());
@@ -222,29 +222,22 @@ class SemaphoreService
      */
     private function formatPhoneNumber($phoneNumber)
     {
-        // Remove any non-digit characters except +
-        $phone = preg_replace('/[^0-9+]/', '', $phoneNumber);
+        // Remove any non-digit characters
+        $phone = preg_replace('/[^0-9]/', '', $phoneNumber);
         
-        // For Philippine numbers, ensure proper format
-        if (str_starts_with($phone, '+63')) {
-            // Already properly formatted
+        // For Philippine numbers, ensure proper format without + prefix
+        if (str_starts_with($phone, '63')) {
+            // Already properly formatted for Semaphore (63XXXXXXXXX)
             return $phone;
-        } elseif (str_starts_with($phone, '63')) {
-            // Add + prefix
-            return '+' . $phone;
         } elseif (str_starts_with($phone, '0')) {
-            // Remove leading 0 and add +63
+            // Remove leading 0 and add 63
             $phone = substr($phone, 1);
-            return '+63' . $phone;
-        } elseif (str_starts_with($phone, '+0')) {
-            // Handle +0 prefix (like +09639283365)
-            $phone = substr($phone, 2); // Remove +0
-            return '+63' . $phone;
+            return '63' . $phone;
         }
         
-        // Ensure it starts with + if not already
-        if (!str_starts_with($phone, '+')) {
-            $phone = '+' . $phone;
+        // If it doesn't start with 63, assume it's a Philippine number and add 63
+        if (!str_starts_with($phone, '63')) {
+            $phone = '63' . $phone;
         }
         
         return $phone;
@@ -259,22 +252,48 @@ class SemaphoreService
     {
         Log::info("🧪 SEMAPHORE SMS - Testing connection");
         
-        $accountInfo = $this->getAccountInfo();
-        
-        if ($accountInfo['success']) {
-            Log::info("✅ SEMAPHORE SMS - Connection test successful");
-            return [
-                'success' => true,
-                'message' => 'Semaphore connection test successful',
-                'account_info' => $accountInfo['data'],
-                'provider' => 'semaphore'
+        try {
+            // Test with a simple API call to messages endpoint
+            $testPhone = '639123456789'; // Test phone number
+            $testMessage = 'Test connection';
+            
+            $data = [
+                'apikey' => $this->apiKey,
+                'number' => $testPhone,
+                'message' => $testMessage
             ];
-        } else {
-            Log::error("❌ SEMAPHORE SMS - Connection test failed");
+            
+            Log::info("🧪 SEMAPHORE SMS - Testing with messages endpoint");
+            $response = Http::timeout(30)->post($this->baseUrl . '/messages', $data);
+            
+            Log::info("🧪 SEMAPHORE SMS - Test response status: " . $response->status());
+            Log::info("🧪 SEMAPHORE SMS - Test response body: " . $response->body());
+            
+            if ($response->successful()) {
+                $responseData = $response->json();
+                Log::info("✅ SEMAPHORE SMS - Connection test successful");
+                return [
+                    'success' => true,
+                    'message' => 'Semaphore connection test successful',
+                    'test_response' => $responseData,
+                    'provider' => 'semaphore'
+                ];
+            } else {
+                Log::error("❌ SEMAPHORE SMS - Connection test failed");
+                return [
+                    'success' => false,
+                    'message' => 'Semaphore connection test failed',
+                    'error' => $response->body(),
+                    'status' => $response->status(),
+                    'provider' => 'semaphore'
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error("❌ SEMAPHORE SMS - Connection test exception: " . $e->getMessage());
             return [
                 'success' => false,
                 'message' => 'Semaphore connection test failed',
-                'error' => $accountInfo['error'] ?? 'Unknown error',
+                'error' => $e->getMessage(),
                 'provider' => 'semaphore'
             ];
         }

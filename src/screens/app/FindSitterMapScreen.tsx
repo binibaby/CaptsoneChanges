@@ -745,14 +745,6 @@ const FindSitterMapScreen = () => {
             Cats
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterTab, selectedFilter === 'verified' && styles.activeFilterTab]}
-          onPress={() => handleFilterPress('verified')}
-        >
-          <Text style={[styles.filterTabText, selectedFilter === 'verified' && styles.activeFilterTabText]}>
-            Verified
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Sitters List */}

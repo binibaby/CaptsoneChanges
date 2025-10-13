@@ -12,6 +12,7 @@ import {
     View,
 } from 'react-native';
 import { getAuthHeaders } from '../../constants/config';
+import { useAuth } from '../../contexts/AuthContext';
 import { networkService } from '../../services/networkService';
 
 interface PhoneVerificationScreenProps {
@@ -21,6 +22,7 @@ interface PhoneVerificationScreenProps {
 
 const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userData: propUserData, onPhoneVerified }) => {
   const router = useRouter();
+  const { user } = useAuth();
   
   // Get userData from props (since we're using Expo Router)
   const userData = propUserData;
@@ -35,8 +37,6 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
   const [codeSent, setCodeSent] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [simulationMode, setSimulationMode] = useState(false);
-  const [simulationCode, setSimulationCode] = useState<string | null>(null);
 
   const sendVerificationCode = async () => {
     if (!phoneNumber) {
@@ -98,7 +98,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(user?.token),
         mode: 'cors',
         credentials: 'omit',
         signal: controller.signal,
@@ -122,21 +122,10 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       if (response.ok) {
         setCodeSent(true);
         
-        // Check if simulation mode is active
-        if (data.simulation_mode && data.verification_code) {
-          setSimulationMode(true);
-          setSimulationCode(data.verification_code);
-          console.log('🎭 SIMULATION MODE: Code is', data.verification_code);
-        }
-        
         // Show success message
-        const alertMessage = data.simulation_mode 
-          ? `🎭 SIMULATION MODE: Verification code is ${data.verification_code}\n\nCheck the logs for the code.`
-          : 'Please check your SMS messages for the verification code.';
-        
         Alert.alert(
-          data.simulation_mode ? 'Simulation Mode' : 'Verification Code Sent', 
-          alertMessage,
+          'Verification Code Sent', 
+          'Please check your SMS messages for the verification code.',
           [
             {
               text: 'OK',
@@ -212,7 +201,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(user?.token),
         mode: 'cors',
         credentials: 'omit',
         signal: controller.signal,
@@ -235,17 +224,46 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       if (response.ok) {
         console.log('LOG PhoneVerificationScreen - Code verified successfully');
         console.log('LOG PhoneVerificationScreen - User data:', userData);
+        console.log('LOG PhoneVerificationScreen - Response data:', data);
         
-        // Use callback if available, otherwise use navigation
-        if (onPhoneVerified) {
-          console.log('Using callback for navigation with user data');
-          onPhoneVerified(true, userData);
+        // Check if user is fully verified (especially for pet owners)
+        const isFullyVerified = data.is_fully_verified;
+        const userRole = data.user?.role;
+        
+        console.log('LOG PhoneVerificationScreen - isFullyVerified:', isFullyVerified);
+        console.log('LOG PhoneVerificationScreen - userRole:', userRole);
+        
+        if (isFullyVerified && userRole === 'pet_owner') {
+          console.log('LOG PhoneVerificationScreen - Showing success popup for pet owner');
+          // Show success popup for pet owners
+          Alert.alert(
+            '🎉 Verification Complete!',
+            data.message || 'Congratulations! You are now fully verified and can use all features!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  console.log('LOG PhoneVerificationScreen - Redirecting to owner dashboard');
+                  // Redirect to owner dashboard
+                  router.replace('/pet-owner-dashboard');
+                }
+              }
+            ]
+          );
         } else {
-          console.log('No callback available, staying on current screen');
-          // If no callback is provided, we stay on the current screen
-          // The parent component should handle navigation
+          console.log('LOG PhoneVerificationScreen - Not a fully verified pet owner, using callback or staying on screen');
+          // Use callback if available, otherwise use navigation
+          if (onPhoneVerified) {
+            console.log('Using callback for navigation with user data');
+            onPhoneVerified(true, userData);
+          } else {
+            console.log('No callback available, staying on current screen');
+            // If no callback is provided, we stay on the current screen
+            // The parent component should handle navigation
+          }
         }
       } else {
+        console.log('LOG PhoneVerificationScreen - API response not OK:', response.status, data);
         Alert.alert('Error', data.message || 'Invalid verification code');
       }
     } catch (error: any) {
@@ -330,13 +348,6 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
           <Text style={styles.subtitle}>
             We'll send a verification code to your phone number
           </Text>
-          {simulationMode && (
-            <View style={styles.simulationBanner}>
-              <Text style={styles.simulationText}>
-                🎭 Simulation Mode Active - Check logs for verification code
-              </Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.form}>
@@ -397,7 +408,6 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
                     <Text style={styles.tipsText}>• Wait a few minutes before retrying</Text>
                     <Text style={styles.tipsText}>• Verify server is running and accessible</Text>
                     <Text style={styles.tipsText}>• Ensure both devices are on same network</Text>
-                    <Text style={styles.tipsText}>• Note: Using simulation mode for development</Text>
                   </View>
                 </View>
               )}
@@ -578,20 +588,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 5,
     textAlign: 'left',
-  },
-  simulationBanner: {
-    backgroundColor: '#FFF3CD',
-    borderColor: '#FFEAA7',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-  },
-  simulationText: {
-    color: '#856404',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
   },
 });
 

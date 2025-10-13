@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\VerificationController;
 use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\NameUpdateController;
 use App\Http\Controllers\Admin\PasswordResetController;
+use App\Http\Controllers\Admin\BookingController;
+use App\Http\Controllers\Admin\PaymentController;
 
 // Handle admin redirect for unauthenticated users
 Route::get('/admin', function () {
@@ -54,6 +56,24 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::post('/api/{user}/status', [UserController::class, 'updateStatus'])->name('api.update-status');
     });
 
+    // Booking Management
+    Route::prefix('bookings')->name('bookings.')->group(function () {
+        Route::get('/', [BookingController::class, 'index'])->name('index');
+        Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
+        Route::post('/{booking}/confirm', [BookingController::class, 'confirm'])->name('confirm');
+        Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
+    });
+
+    // Payment Management
+    Route::prefix('payments')->name('payments.')->group(function () {
+        Route::get('/', [PaymentController::class, 'index'])->name('index');
+        Route::get('/{payment}', [PaymentController::class, 'show'])->name('show');
+        Route::post('/process', [PaymentController::class, 'processPayment'])->name('process');
+        Route::post('/{payment}/refund', [PaymentController::class, 'processRefund'])->name('refund');
+        Route::get('/analytics', [PaymentController::class, 'analytics'])->name('analytics');
+        Route::get('/export', [PaymentController::class, 'export'])->name('export');
+    });
+
     // Password Reset Management
     Route::prefix('password-reset')->name('password-reset.')->group(function () {
         Route::get('/', [PasswordResetController::class, 'index'])->name('index');
@@ -66,6 +86,7 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::get('/users', [NameUpdateController::class, 'index'])->name('users');
         Route::post('/update-user-name', [NameUpdateController::class, 'updateUserName'])->name('update-user-name');
         Route::get('/requests', [NameUpdateController::class, 'getNameUpdateRequests'])->name('requests');
+        Route::get('/user/{userId}/requests', [NameUpdateController::class, 'getUserNameUpdateRequests'])->name('user-requests');
         Route::post('/requests/{id}/approve', [NameUpdateController::class, 'approveRequest'])->name('approve-request');
         Route::post('/requests/{id}/reject', [NameUpdateController::class, 'rejectRequest'])->name('reject-request');
     });
@@ -104,6 +125,8 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::get('/status-updates', [VerificationController::class, 'getStatusUpdates'])->name('status-updates');
         Route::post('/bulk-action', [VerificationController::class, 'bulkAction'])->name('bulk');
         Route::get('/{id}/audit-logs', [VerificationController::class, 'getAuditLogs'])->name('audit_logs');
+        Route::post('/cleanup', [VerificationController::class, 'cleanupOldVerifications'])->name('cleanup');
+        Route::post('/cleanup-duplicates', [VerificationController::class, 'cleanupDuplicateVerifications'])->name('cleanup-duplicates');
     });
 
     // Support Management
@@ -153,23 +176,6 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         })->name('notification');
     });
 
-    // Reports
-    Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/', [DashboardController::class, 'reportsIndex'])->name('index');
-        
-        Route::get('/users', function () {
-            return view('admin.reports.users');
-        })->name('users');
-        
-        
-        Route::get('/support', function () {
-            return view('admin.reports.support');
-        })->name('support');
-        
-        Route::get('/revenue', function () {
-            return view('admin.reports.revenue');
-        })->name('revenue');
-    });
 
     // API Routes for AJAX requests
     Route::prefix('api')->name('api.')->group(function () {
@@ -196,6 +202,7 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
         Route::get('/users', [NameUpdateController::class, 'getUsers'])->name('users');
         Route::post('/update-user-name', [NameUpdateController::class, 'updateUserName'])->name('update-user-name');
         Route::get('/name-update-requests', [NameUpdateController::class, 'getNameUpdateRequests'])->name('name-update-requests');
+        Route::get('/name-update-requests/user/{userId}', [NameUpdateController::class, 'getUserNameUpdateRequests'])->name('name-update-requests.user');
         Route::post('/name-update-requests/{id}/approve', [NameUpdateController::class, 'approveRequest'])->name('name-update-requests.approve');
         Route::post('/name-update-requests/{id}/reject', [NameUpdateController::class, 'rejectRequest'])->name('name-update-requests.reject');
         

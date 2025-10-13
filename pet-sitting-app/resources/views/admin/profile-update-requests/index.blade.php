@@ -3,7 +3,7 @@
 @section('content')
 <div class="space-y-8">
     <!-- Page Header -->
-    <div class="relative overflow-hidden bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl shadow-2xl">
+    <div class="relative overflow-hidden rounded-2xl shadow-2xl" style="background: linear-gradient(135deg, #8b5cf6, #a855f7, #ec4899, #f97316);">
         <div class="absolute inset-0 bg-black opacity-10"></div>
         <div class="relative px-8 py-8">
     <div class="flex items-center justify-between">
@@ -24,14 +24,6 @@
                             <span class="text-sm">Real-time Updates</span>
                         </div>
                     </div>
-                    <div id="autoRefreshIndicator" class="text-xs text-indigo-200 mt-2 hidden">
-                <span class="inline-flex items-center">
-                    <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    Auto-refreshing every 5 seconds
-                </span>
-            </div>
         </div>
                 <div class="hidden md:block">
                     <div class="w-24 h-24 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
@@ -67,66 +59,66 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div class="bg-gradient-to-br from-indigo-50 to-purple-100 rounded-2xl shadow-lg border border-indigo-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-purple-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #8b5cf6, #6366f1, #3b82f6);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-indigo-700">Total Requests</p>
-                    <p id="totalRequests" class="text-2xl font-bold text-indigo-800">-</p>
+                    <p class="text-sm font-medium text-white drop-shadow-lg">Total Requests</p>
+                    <p id="totalRequests" class="text-3xl font-bold text-white drop-shadow-lg">-</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-br from-amber-50 to-yellow-100 rounded-2xl shadow-lg border border-amber-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-orange-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #f97316, #f59e0b, #eab308);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-amber-700">Pending</p>
-                    <p id="pendingRequests" class="text-2xl font-bold text-amber-800">-</p>
+                    <p class="text-sm font-medium text-white drop-shadow-lg">Pending</p>
+                    <p id="pendingRequests" class="text-3xl font-bold text-white drop-shadow-lg">-</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl shadow-lg border border-emerald-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-green-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #10b981, #059669, #0d9488);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-emerald-700">Approved</p>
-                    <p id="approvedRequests" class="text-2xl font-bold text-emerald-800">-</p>
+                    <p class="text-sm font-medium text-white drop-shadow-lg">Approved</p>
+                    <p id="approvedRequests" class="text-3xl font-bold text-white drop-shadow-lg">-</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-br from-rose-50 to-red-100 rounded-2xl shadow-lg border border-rose-200 hover-lift p-6">
+        <div class="rounded-2xl shadow-xl border-4 border-red-600 hover:shadow-2xl hover:scale-105 transition-all duration-300 p-6" style="background: linear-gradient(135deg, #ef4444, #f43f5e, #ec4899);">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gradient-to-br from-rose-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-14 h-14 bg-white bg-opacity-30 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg class="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-rose-700">Rejected</p>
-                    <p id="rejectedRequests" class="text-2xl font-bold text-rose-800">-</p>
+                    <p class="text-sm font-medium text-white drop-shadow-lg">Rejected</p>
+                    <p id="rejectedRequests" class="text-3xl font-bold text-white drop-shadow-lg">-</p>
                 </div>
             </div>
         </div>

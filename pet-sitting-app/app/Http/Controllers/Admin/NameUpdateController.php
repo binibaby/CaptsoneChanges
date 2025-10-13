@@ -27,7 +27,8 @@ class NameUpdateController extends Controller
     {
         try {
             // Only get users who have submitted name update requests
-            $query = User::select('id', 'name', 'first_name', 'last_name', 'email', 'phone', 'role', 'created_at', 'profile_image')
+            $query = User::select('id', 'name', 'first_name', 'last_name', 'email', 'phone', 'role', 'created_at', 'profile_image', 
+                                 'experience', 'hourly_rate', 'bio', 'specialties', 'pet_breeds', 'selected_pet_types', 'address', 'status')
                 ->whereHas('nameUpdateRequests'); // Only users with name update requests
 
             // Apply search filter
@@ -164,6 +165,183 @@ class NameUpdateController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch name update requests: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get name update requests for a specific user
+     */
+    public function getUserNameUpdateRequests($userId)
+    {
+        try {
+            $nameRequests = NameUpdateRequest::where('user_id', $userId)
+                ->with(['reviewer:id,name'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $profileRequests = \App\Models\ProfileChangeRequest::where('user_id', $userId)
+                ->with(['reviewer:id,name'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // Combine and sort all requests by creation date
+            $allRequests = collect()
+                ->merge($nameRequests->map(function($request) {
+                    return [
+                        'id' => $request->id,
+                        'type' => 'name_update',
+                        'field_name' => 'Name',
+                        'old_value' => $request->old_name,
+                        'new_value' => $request->new_name,
+                        'reason' => $request->reason,
+                        'admin_notes' => $request->admin_notes,
+                        'status' => $request->status,
+                        'created_at' => $request->created_at,
+                        'reviewer' => $request->reviewer
+                    ];
+                }))
+                ->merge($profileRequests->flatMap(function($request) {
+                    $results = [];
+                    
+                    // Handle multiple fields update
+                    if ($request->field_name === 'multiple') {
+                        // Create separate entries for each changed field
+                        if ($request->first_name && $request->first_name !== $request->old_first_name) {
+                            $results[] = [
+                                'id' => $request->id . '_first_name',
+                                'type' => 'profile_update',
+                                'field_name' => 'First Name',
+                                'old_value' => $request->old_first_name ?: 'Not set',
+                                'new_value' => $request->first_name,
+                                'reason' => $request->reason,
+                                'admin_notes' => $request->admin_notes,
+                                'status' => $request->status,
+                                'created_at' => $request->created_at,
+                                'reviewer' => $request->reviewer
+                            ];
+                        }
+                        
+                        if ($request->last_name && $request->last_name !== $request->old_last_name) {
+                            $results[] = [
+                                'id' => $request->id . '_last_name',
+                                'type' => 'profile_update',
+                                'field_name' => 'Last Name',
+                                'old_value' => $request->old_last_name ?: 'Not set',
+                                'new_value' => $request->last_name,
+                                'reason' => $request->reason,
+                                'admin_notes' => $request->admin_notes,
+                                'status' => $request->status,
+                                'created_at' => $request->created_at,
+                                'reviewer' => $request->reviewer
+                            ];
+                        }
+                        
+                        if ($request->hourly_rate && $request->hourly_rate != $request->old_hourly_rate) {
+                            $results[] = [
+                                'id' => $request->id . '_hourly_rate',
+                                'type' => 'profile_update',
+                                'field_name' => 'Hourly Rate',
+                                'old_value' => $request->old_hourly_rate ? '₱' . $request->old_hourly_rate . '/hour' : 'Not set',
+                                'new_value' => '₱' . $request->hourly_rate . '/hour',
+                                'reason' => $request->reason,
+                                'admin_notes' => $request->admin_notes,
+                                'status' => $request->status,
+                                'created_at' => $request->created_at,
+                                'reviewer' => $request->reviewer
+                            ];
+                        }
+                        
+                        if ($request->phone && $request->phone !== $request->old_phone) {
+                            $results[] = [
+                                'id' => $request->id . '_phone',
+                                'type' => 'profile_update',
+                                'field_name' => 'Phone Number',
+                                'old_value' => $request->old_phone ?: 'Not set',
+                                'new_value' => $request->phone,
+                                'reason' => $request->reason,
+                                'admin_notes' => $request->admin_notes,
+                                'status' => $request->status,
+                                'created_at' => $request->created_at,
+                                'reviewer' => $request->reviewer
+                            ];
+                        }
+                        
+                        // Handle specialties/services changes
+                        if ($request->specialties && $request->specialties !== $request->old_specialties) {
+                            $oldSpecialties = $request->old_specialties ? (is_array($request->old_specialties) ? implode(', ', $request->old_specialties) : $request->old_specialties) : 'No services specified';
+                            $newSpecialties = is_array($request->specialties) ? implode(', ', $request->specialties) : $request->specialties;
+                            
+                            $results[] = [
+                                'id' => $request->id . '_specialties',
+                                'type' => 'profile_update',
+                                'field_name' => 'Services',
+                                'old_value' => $oldSpecialties,
+                                'new_value' => $newSpecialties,
+                                'reason' => $request->reason,
+                                'admin_notes' => $request->admin_notes,
+                                'status' => $request->status,
+                                'created_at' => $request->created_at,
+                                'reviewer' => $request->reviewer
+                            ];
+                        }
+                    } else {
+                        // Handle single field updates
+                        $fieldName = $request->getFieldDisplayName();
+                        $oldValue = $request->old_value;
+                        $newValue = $request->new_value;
+                        
+                        // Handle specific field mappings
+                        if ($request->field_name === 'first_name') {
+                            $oldValue = $request->old_first_name ?: 'Not set';
+                            $newValue = $request->first_name;
+                        } elseif ($request->field_name === 'last_name') {
+                            $oldValue = $request->old_last_name ?: 'Not set';
+                            $newValue = $request->last_name;
+                        } elseif ($request->field_name === 'phone') {
+                            $oldValue = $request->old_phone ?: 'Not set';
+                            $newValue = $request->phone;
+                        } elseif ($request->field_name === 'hourly_rate') {
+                            $oldValue = $request->old_hourly_rate ? '₱' . $request->old_hourly_rate . '/hour' : 'Not set';
+                            $newValue = $request->hourly_rate ? '₱' . $request->hourly_rate . '/hour' : 'Not set';
+                        } elseif ($request->field_name === 'experience') {
+                            $oldValue = $request->old_value ?: 'Not specified';
+                            $newValue = $request->new_value ?: 'Not specified';
+                        } elseif ($request->field_name === 'bio') {
+                            $oldValue = $request->old_value ?: 'No bio provided';
+                            $newValue = $request->new_value ?: 'No bio provided';
+                        } elseif ($request->field_name === 'specialties') {
+                            $oldValue = $request->old_value ? (is_array($request->old_value) ? implode(', ', $request->old_value) : $request->old_value) : 'No services specified';
+                            $newValue = $request->new_value ? (is_array($request->new_value) ? implode(', ', $request->new_value) : $request->new_value) : 'No services specified';
+                        }
+                        
+                        $results[] = [
+                            'id' => $request->id,
+                            'type' => 'profile_update',
+                            'field_name' => $fieldName,
+                            'old_value' => $oldValue,
+                            'new_value' => $newValue,
+                            'reason' => $request->reason,
+                            'admin_notes' => $request->admin_notes,
+                            'status' => $request->status,
+                            'created_at' => $request->created_at,
+                            'reviewer' => $request->reviewer
+                        ];
+                    }
+                    
+                    return $results;
+                }))
+                ->sortByDesc('created_at')
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'requests' => $allRequests
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch user change history: ' . $e->getMessage()
             ], 500);
         }
     }
