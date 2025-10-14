@@ -887,8 +887,21 @@ class ReverbMessagingService extends EventEmitter {
         
         // If it's a 401 or 403, the token might be invalid or user lacks permission
         if (response.status === 401 || response.status === 403) {
-          console.log(`🔄 ${response.status} Unauthorized/Forbidden - clearing cached token`);
+          console.log(`🔄 ${response.status} Unauthorized/Forbidden - attempting token refresh`);
           this.authToken = null; // Clear cached token
+          
+          // Try to refresh the token automatically
+          try {
+            console.log('🔄 Attempting automatic token refresh...');
+            const { default: authService } = await import('./authService');
+            await authService.refreshUserToken();
+            console.log('✅ Token refreshed successfully, retrying API call...');
+            // Retry the API call with the new token
+            return this.getConversations();
+          } catch (refreshError) {
+            console.error('❌ Token refresh failed:', refreshError);
+          }
+          
           throw new Error('Authentication failed: Invalid or expired token. Please log in again.');
         }
         
@@ -1218,6 +1231,13 @@ class ReverbMessagingService extends EventEmitter {
 
   public onError(callback: (error: any) => void) {
     this.on('error', callback);
+  }
+
+  // Clear authentication cache
+  public clearAuthCache() {
+    console.log('🧹 Clearing Reverb messaging service auth cache...');
+    this.authToken = null;
+    console.log('✅ Auth cache cleared');
   }
 }
 
