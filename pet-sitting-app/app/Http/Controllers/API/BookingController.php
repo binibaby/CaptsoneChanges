@@ -78,7 +78,7 @@ class BookingController extends Controller
                 return [
                     'id' => $booking->id,
                     'date' => $booking->date,
-                    'time' => $booking->time,
+                    'time' => $booking->start_time ? $booking->date . ' ' . $booking->start_time : $booking->time,
                     'status' => $booking->status,
                     'hourly_rate' => $booking->hourly_rate,
                     'total_amount' => $booking->total_amount,
