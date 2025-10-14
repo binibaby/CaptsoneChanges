@@ -33,16 +33,16 @@ const PetOwnerDashboardScreen = () => {
       return uri;
     }
     if (uri.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.192:8000${uri}`;
+      const fullUrl = `http://172.20.10.2:8000${uri}`;
       console.log('🔗 PetOwnerDashboardScreen: Generated URL for /storage/ path:', fullUrl);
       return fullUrl;
     }
     if (uri.includes('profile_images/')) {
-      const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+      const fullUrl = `http://172.20.10.2:8000/storage/${uri}`;
       console.log('🔗 PetOwnerDashboardScreen: Generated URL for profile_images/ path:', fullUrl);
       return fullUrl;
     }
-    const fullUrl = `http://192.168.100.192:8000/storage/${uri}`;
+    const fullUrl = `http://172.20.10.2:8000/storage/${uri}`;
     console.log('🔗 PetOwnerDashboardScreen: Generated URL for fallback path:', fullUrl);
     return fullUrl;
   };

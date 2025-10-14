@@ -32,7 +32,7 @@ class EchoService implements EchoServiceInterface {
       const baseUrl = networkService.getBaseUrl();
       
       // Extract host from base URL
-      let host = '192.168.100.197'; // Default fallback
+      let host = '172.20.10.2'; // Default fallback (mobile data)
       try {
         const url = new URL(baseUrl);
         host = url.hostname;

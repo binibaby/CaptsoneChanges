@@ -2,7 +2,7 @@
 const getNetworkIP = () => {
   if (__DEV__) {
     // Use current WiFi IP for development
-    return '192.168.100.197';
+    return '172.20.10.2';
   }
   return 'https://your-production-domain.com';
 };
@@ -11,15 +11,19 @@ const getNetworkIP = () => {
 export const NETWORK_FALLBACK = {
   // Primary IPs to try in order - WiFi first for current connection
   PRIMARY_IPS: [
-    '192.168.100.197',  // Current WiFi IP (primary)
-    '127.0.0.1',        // Localhost fallback
-    '172.20.10.2',      // Mobile data IP (fallback)
+    '172.20.10.2',      // Mobile data IP (primary)
     '172.20.10.1',      // Mobile hotspot gateway
+    '192.168.100.197',  // WiFi IP (fallback)
+    '127.0.0.1',        // Localhost fallback
   ],
   
   // Fallback IPs for different network scenarios
   FALLBACK_IPS: [
-    '192.168.100.197',  // Current WiFi IP (primary)
+    '172.20.10.2',      // Mobile data IP (primary)
+    '172.20.10.1',      // Mobile hotspot gateway
+    '172.20.10.3',      // Additional mobile data IP
+    '172.20.10.4',      // Additional mobile data IP
+    '192.168.100.197',  // WiFi IP (fallback)
     '127.0.0.1',        // Localhost fallback
     '192.168.100.192',  // Previous WiFi IP
     '192.168.100.184',  // Previous WiFi IP
@@ -27,10 +31,6 @@ export const NETWORK_FALLBACK = {
     '192.168.1.100',    // Common home WiFi
     '192.168.0.100',    // Common home WiFi
     '192.168.100.1',    // WiFi gateway (if server is on gateway)
-    '172.20.10.2',      // Mobile data IP (fallback)
-    '172.20.10.1',      // Mobile hotspot gateway
-    '172.20.10.3',      // Additional mobile data IP
-    '172.20.10.4',      // Additional mobile data IP
     '192.168.43.1',     // Android hotspot
     '192.168.137.1',    // Windows mobile hotspot
     '10.0.0.100',       // Corporate networks
