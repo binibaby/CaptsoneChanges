@@ -380,11 +380,25 @@ class ProfileController extends Controller
         
         $validator = Validator::make($request->all(), [
             'certificates' => 'required|array',
-            'certificates.*.name' => 'required|string|max:255',
-            'certificates.*.image' => 'required|string',
-            'certificates.*.date' => 'required|string',
-            'certificates.*.issuer' => 'required|string|max:255',
         ]);
+
+        // Only validate individual certificate fields if certificates array is not empty
+        if (!empty($request->certificates)) {
+            $certificateValidator = Validator::make($request->all(), [
+                'certificates.*.name' => 'required|string|max:255',
+                'certificates.*.image' => 'required|string',
+                'certificates.*.date' => 'required|string',
+                'certificates.*.issuer' => 'required|string|max:255',
+            ]);
+            
+            if ($certificateValidator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $certificateValidator->errors()
+                ], 422);
+            }
+        }
 
         if ($validator->fails()) {
             return response()->json([

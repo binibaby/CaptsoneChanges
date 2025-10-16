@@ -3,16 +3,17 @@ import Echo from 'laravel-echo';
 import { EchoServiceInterface } from './echoServiceInterface';
 
 class EchoService implements EchoServiceInterface {
-  private echo: Echo | null = null;
+  private echo: Echo<any> | null = null;
   private authToken: string | null = null;
 
   constructor() {
     // Ensure Pusher is globally available for Laravel Echo
     (global as any).Pusher = Pusher;
     
-    // Configure Pusher for React Native (if the property exists)
-    if (Pusher && typeof Pusher.logToConsole !== 'undefined') {
-      Pusher.logToConsole = __DEV__;
+    // Configure Pusher for React Native
+    // Note: logToConsole property may not exist on all Pusher versions
+    if (Pusher && typeof (Pusher as any).logToConsole !== 'undefined') {
+      (Pusher as any).logToConsole = __DEV__;
     }
     
     // Initialize Echo with proper configuration
@@ -32,7 +33,7 @@ class EchoService implements EchoServiceInterface {
       const baseUrl = networkService.getBaseUrl();
       
       // Extract host from base URL
-      let host = '172.20.10.2'; // Default fallback (mobile data)
+      let host = '172.20.10.2'; // Default fallback (Mobile data)
       try {
         const url = new URL(baseUrl);
         host = url.hostname;
@@ -224,7 +225,7 @@ class EchoService implements EchoServiceInterface {
   }
 
   // Get the Echo instance
-  getEcho(): Echo | null {
+  getEcho(): Echo<any> | null {
     return this.echo;
   }
 

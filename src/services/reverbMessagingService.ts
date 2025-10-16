@@ -283,11 +283,11 @@ class ReverbMessagingService extends EventEmitter {
         return;
       }
       
-      // For now, use a public channel instead of private to avoid authentication issues
+      // Subscribe to private channel for user-specific messages
       const subscribeMessage = {
         event: 'pusher:subscribe',
         data: {
-          channel: `user.${user.id}` // Use public channel instead of private
+          channel: `private-user.${user.id}` // Use private channel for proper filtering
         }
       };
 
@@ -318,15 +318,48 @@ class ReverbMessagingService extends EventEmitter {
     }
   }
 
-  private handleNewMessage(message: ReverbMessage) {
+  private async handleNewMessage(message: ReverbMessage) {
     console.log('💬 New message received:', message);
     
-    // Just emit the message - no local storage
-    console.log('💬 New message received via WebSocket:', message);
+    try {
+      // Get current user to verify this message is intended for them
+      const { default: authService } = await import('./authService');
+      const currentUser = await authService.getCurrentUser();
+      
+      if (!currentUser || !currentUser.id) {
+        console.log('⚠️ No current user found, ignoring message');
+        return;
+      }
+      
+      // Check if this message is intended for the current user
+      const isForCurrentUser = message.receiver_id.toString() === currentUser.id.toString() || 
+                               message.sender_id.toString() === currentUser.id.toString();
+      
+      if (!isForCurrentUser) {
+        console.log('⚠️ Message not intended for current user, ignoring:', {
+          messageReceiverId: message.receiver_id,
+          messageSenderId: message.sender_id,
+          currentUserId: currentUser.id,
+          isForCurrentUser
+        });
+        return;
+      }
+      
+      console.log('✅ Message is for current user, processing:', {
+        messageId: message.id,
+        conversationId: message.conversation_id,
+        senderId: message.sender_id,
+        receiverId: message.receiver_id,
+        currentUserId: currentUser.id
+      });
 
     // Emit event for UI updates
     this.emit('message', message);
     this.emit('conversationUpdated', message.conversation_id);
+    } catch (error) {
+      console.error('❌ Error processing message:', error);
+      // If there's an error checking user, don't process the message to be safe
+    }
   }
 
   private scheduleReconnect() {
@@ -840,43 +873,13 @@ class ReverbMessagingService extends EventEmitter {
   // API Methods
   public async getConversations(): Promise<ReverbConversation[]> {
     try {
-      const { networkService } = require('./networkService');
-      const token = await this.ensureAuthToken();
-
-      // Get and validate base URL
-      let baseUrl = networkService.getBaseUrl();
-      if (!baseUrl || baseUrl.trim() === '') {
-        console.log('🔄 Base URL not available, detecting working IP...');
-        baseUrl = await networkService.detectWorkingIP();
-      }
-      
-      if (!baseUrl || baseUrl.trim() === '') {
-        throw new Error('Unable to determine base URL for API calls');
-      }
+      const { makeApiCall } = require('./networkService');
 
       console.log('🔍 GET CONVERSATIONS DEBUG:');
-      console.log('  - API URL:', `${baseUrl}/api/messages/conversations`);
-      console.log('  - Token present:', !!token);
-      console.log('  - Token preview:', token ? token.substring(0, 20) + '...' : 'null');
-      console.log('  - Full token length:', token ? token.length : 0);
+      console.log('  - Using makeApiCall helper for automatic token management');
 
-      // Validate token before making the request
-      if (!token) {
-        console.error('❌ No token available for API call');
-        throw new Error('No authentication token available. Please log in again.');
-      }
-
-      // Ensure token is properly formatted
-      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-      console.log('🔑 Using auth token:', authToken.substring(0, 30) + '...');
-
-      const response = await fetch(`${baseUrl}/api/messages/conversations`, {
+      const response = await makeApiCall('/api/messages/conversations', {
         method: 'GET',
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
       });
 
       console.log('📡 GET CONVERSATIONS Response status:', response.status);
@@ -884,27 +887,6 @@ class ReverbMessagingService extends EventEmitter {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ GET CONVERSATIONS API Error Response:', errorText);
-        
-        // If it's a 401 or 403, the token might be invalid or user lacks permission
-        if (response.status === 401 || response.status === 403) {
-          console.log(`🔄 ${response.status} Unauthorized/Forbidden - attempting token refresh`);
-          this.authToken = null; // Clear cached token
-          
-          // Try to refresh the token automatically
-          try {
-            console.log('🔄 Attempting automatic token refresh...');
-            const { default: authService } = await import('./authService');
-            await authService.refreshUserToken();
-            console.log('✅ Token refreshed successfully, retrying API call...');
-            // Retry the API call with the new token
-            return this.getConversations();
-          } catch (refreshError) {
-            console.error('❌ Token refresh failed:', refreshError);
-          }
-          
-          throw new Error('Authentication failed: Invalid or expired token. Please log in again.');
-        }
-        
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
@@ -928,48 +910,19 @@ class ReverbMessagingService extends EventEmitter {
 
   public async getMessages(conversationId: string): Promise<ReverbMessage[]> {
     try {
-      const { networkService } = require('./networkService');
-      const token = await this.ensureAuthToken();
-
-      // Get and validate base URL
-      let baseUrl = networkService.getBaseUrl();
-      if (!baseUrl || baseUrl.trim() === '') {
-        baseUrl = await networkService.detectWorkingIP();
-      }
+      const { makeApiCall } = require('./networkService');
       
-      if (!baseUrl || baseUrl.trim() === '') {
-        throw new Error('Unable to determine base URL for API calls');
-      }
+      console.log('🔍 GET MESSAGES DEBUG:');
+      console.log('  - Using makeApiCall helper for automatic token management');
+      console.log('  - Conversation ID:', conversationId);
 
-      // Validate token before making the request
-      if (!token) {
-        console.error('❌ No token available for API call');
-        throw new Error('No authentication token available');
-      }
-
-      // Ensure token is properly formatted
-      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-
-      const response = await fetch(`${baseUrl}/api/messages/conversations/${conversationId}`, {
+      const response = await makeApiCall(`/api/messages/conversations/${conversationId}`, {
         method: 'GET',
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ GET MESSAGES API Error:', response.status, errorText);
-        
-        // If it's a 401 or 403, the token might be invalid or user lacks permission
-        if (response.status === 401 || response.status === 403) {
-          console.log(`🔄 ${response.status} Unauthorized/Forbidden - clearing cached token`);
-          this.authToken = null; // Clear cached token
-          throw new Error('Authentication failed: Invalid or expired token');
-        }
-        
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -992,36 +945,16 @@ class ReverbMessagingService extends EventEmitter {
 
   public async sendMessage(receiverId: string, message: string, type: string = 'text'): Promise<ReverbMessage> {
     try {
-      const { networkService } = require('./networkService');
-      const token = await this.ensureAuthToken();
-
-      // Get and validate base URL
-      let baseUrl = networkService.getBaseUrl();
-      if (!baseUrl || baseUrl.trim() === '') {
-        baseUrl = await networkService.detectWorkingIP();
-      }
-      
-      if (!baseUrl || baseUrl.trim() === '') {
-        throw new Error('Unable to determine base URL for API calls');
-      }
+      const { makeApiCall } = require('./networkService');
 
       console.log('🔍 SEND MESSAGE DEBUG:');
       console.log('  - receiverId:', receiverId);
       console.log('  - message:', message);
       console.log('  - type:', type);
-      console.log('  - token present:', !!token);
-      console.log('  - API URL:', `${baseUrl}/api/messages/send`);
+      console.log('  - Using makeApiCall helper for automatic token management');
 
-      // Ensure token is properly formatted
-      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-
-      const response = await fetch(`${baseUrl}/api/messages/send`, {
+      const response = await makeApiCall('/api/messages/send', {
         method: 'POST',
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
         body: JSON.stringify({
           receiver_id: receiverId,
           message: message,
@@ -1034,14 +967,6 @@ class ReverbMessagingService extends EventEmitter {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`❌ Send Message API Error ${response.status}:`, errorText);
-        
-        // Check if it's a 401 or 403 authentication error
-        if (response.status === 401 || response.status === 403) {
-          console.log(`🔄 ${response.status} Unauthorized/Forbidden - clearing cached token`);
-          this.authToken = null; // Clear cached token
-          throw new Error('Authentication failed: Invalid or expired token');
-        }
-        
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
@@ -1063,29 +988,15 @@ class ReverbMessagingService extends EventEmitter {
 
   public async startConversation(userId: string, userName?: string, userImage?: string): Promise<{ conversation_id: string; other_user: any }> {
     try {
-      const { networkService } = require('./networkService');
-      const token = await this.ensureAuthToken();
-
-      // Get and validate base URL
-      let baseUrl = networkService.getBaseUrl();
-      if (!baseUrl || baseUrl.trim() === '') {
-        baseUrl = await networkService.detectWorkingIP();
-      }
+      const { makeApiCall } = require('./networkService');
       
-      if (!baseUrl || baseUrl.trim() === '') {
-        throw new Error('Unable to determine base URL for API calls');
-      }
+      console.log('🔍 START CONVERSATION DEBUG:');
+      console.log('  - userId:', userId);
+      console.log('  - userName:', userName);
+      console.log('  - Using makeApiCall helper for automatic token management');
 
-      // Ensure token is properly formatted
-      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-
-      const response = await fetch(`${baseUrl}/api/messages/start-conversation`, {
+      const response = await makeApiCall('/api/messages/start-conversation', {
         method: 'POST',
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
         body: JSON.stringify({
           user_id: userId,
           user_name: userName,
@@ -1132,29 +1043,14 @@ class ReverbMessagingService extends EventEmitter {
 
   public async markAsRead(conversationId: string): Promise<void> {
     try {
-      const { networkService } = require('./networkService');
-      const token = await this.ensureAuthToken();
-
-      // Get and validate base URL
-      let baseUrl = networkService.getBaseUrl();
-      if (!baseUrl || baseUrl.trim() === '') {
-        baseUrl = await networkService.detectWorkingIP();
-      }
+      const { makeApiCall } = require('./networkService');
       
-      if (!baseUrl || baseUrl.trim() === '') {
-        throw new Error('Unable to determine base URL for API calls');
-      }
+      console.log('🔍 MARK AS READ DEBUG:');
+      console.log('  - conversationId:', conversationId);
+      console.log('  - Using makeApiCall helper for automatic token management');
 
-      // Ensure token is properly formatted
-      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-
-      const response = await fetch(`${baseUrl}/api/messages/conversations/${conversationId}/read`, {
+      const response = await makeApiCall(`/api/messages/conversations/${conversationId}/read`, {
         method: 'POST',
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
       });
 
       if (!response.ok) {
@@ -1170,29 +1066,13 @@ class ReverbMessagingService extends EventEmitter {
 
   public async getUnreadCount(): Promise<number> {
     try {
-      const { networkService } = require('./networkService');
-      const token = await this.ensureAuthToken();
-
-      // Get and validate base URL
-      let baseUrl = networkService.getBaseUrl();
-      if (!baseUrl || baseUrl.trim() === '') {
-        baseUrl = await networkService.detectWorkingIP();
-      }
+      const { makeApiCall } = require('./networkService');
       
-      if (!baseUrl || baseUrl.trim() === '') {
-        throw new Error('Unable to determine base URL for API calls');
-      }
+      console.log('🔍 GET UNREAD COUNT DEBUG:');
+      console.log('  - Using makeApiCall helper for automatic token management');
 
-      // Ensure token is properly formatted
-      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-
-      const response = await fetch(`${baseUrl}/api/messages/unread-count`, {
+      const response = await makeApiCall('/api/messages/unread-count', {
         method: 'GET',
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
       });
 
       if (!response.ok) {

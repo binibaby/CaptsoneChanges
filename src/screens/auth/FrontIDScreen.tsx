@@ -2,13 +2,13 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { getAuthHeaders } from '../../constants/config';
 import { makeApiCall } from '../../services/networkService';
@@ -201,12 +201,6 @@ const FrontIDScreen: React.FC<FrontIDScreenProps> = ({ userData: propUserData, p
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.skipButton} 
-          onPress={handleSkip}
-        >
-          <Text style={styles.skipButtonText}>Skip for Now</Text>
-        </TouchableOpacity>
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>

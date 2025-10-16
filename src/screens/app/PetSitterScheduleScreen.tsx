@@ -2,12 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import authService from '../../services/authService';
 import { Booking, bookingService } from '../../services/bookingService';
@@ -158,6 +158,12 @@ const PetSitterScheduleScreen = () => {
         rate: `₱${booking.hourlyRate || 0}/hr`,
       }));
       
+      console.log('📋 Final schedule items with statuses:', scheduleItems.map(item => ({
+        id: item.id,
+        status: item.status,
+        petOwnerName: item.petOwnerName
+      })));
+      
       setSchedule(scheduleItems);
       
       // Generate available dates from bookings
@@ -285,7 +291,7 @@ const PetSitterScheduleScreen = () => {
       }
       
       // Get start time
-      const startTime = booking.startTime || booking.time;
+      const startTime = booking.startTime;
       if (!startTime) {
         console.log(`📅 Booking ${booking.id} cannot start: no start time`);
         return false;
@@ -323,7 +329,7 @@ const PetSitterScheduleScreen = () => {
       const bookingDate = new Date(booking.date);
       
       // Get start time
-      const startTime = booking.startTime || booking.time;
+      const startTime = booking.startTime;
       if (!startTime) return false;
       
       // Parse start time
@@ -372,7 +378,7 @@ const PetSitterScheduleScreen = () => {
       const bookingDate = new Date(booking.date);
       
       // Get end time
-      const endTime = booking.endTime || booking.time;
+      const endTime = booking.endTime;
       if (!endTime) return false;
       
       // Parse end time
@@ -412,6 +418,7 @@ const PetSitterScheduleScreen = () => {
         throw new Error('No authentication token available');
       }
       
+      console.log('🔄 Calling start API for booking:', item.id);
       const response = await makeApiCall(`/api/bookings/${item.id}/start`, {
         method: 'POST',
         headers: {
@@ -420,8 +427,11 @@ const PetSitterScheduleScreen = () => {
         },
       });
 
+      console.log('📡 Start API response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Start API error:', errorData);
         throw new Error(errorData.message || 'Failed to start session');
       }
 
@@ -446,7 +456,11 @@ const PetSitterScheduleScreen = () => {
       });
       
       // Refresh the schedule to show updated status
-      loadSchedule();
+      console.log('🔄 Refreshing schedule after starting session...');
+      // Add a small delay to ensure backend has processed the status change
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await loadSchedule();
+      console.log('✅ Schedule refreshed after starting session');
       
       // Refresh booking service data to notify other screens
       const { bookingService } = await import('../../services/bookingService');
@@ -459,7 +473,8 @@ const PetSitterScheduleScreen = () => {
     } catch (error) {
       console.error('❌ Error starting session:', error);
       // Show error message to user
-      alert(`Failed to start session: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to start session: ${errorMessage}`);
     }
   };
 
@@ -467,12 +482,7 @@ const PetSitterScheduleScreen = () => {
   const handleCompleteSession = async (item: ScheduleItem) => {
     console.log('🏁 Completing session for booking:', item.id);
     
-    // Check if session is still ongoing
-    if (isSessionOngoing(item)) {
-      const endTime = formatTimeForDisplay(item.endTime || item.time || '');
-      alert(`⏰ Session is still ongoing!\n\nThe session is scheduled to end at ${endTime}. Please wait until the session time is completed before marking it as finished.`);
-      return;
-    }
+    // Allow completing session anytime - no time restrictions
     
     try {
       // Call the new complete session API endpoint
@@ -484,6 +494,7 @@ const PetSitterScheduleScreen = () => {
         throw new Error('No authentication token available');
       }
       
+      console.log('🔄 Calling complete API for booking:', item.id);
       const response = await makeApiCall(`/api/bookings/${item.id}/complete`, {
         method: 'POST',
         headers: {
@@ -492,8 +503,11 @@ const PetSitterScheduleScreen = () => {
         },
       });
 
+      console.log('📡 Complete API response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Complete API error:', errorData);
         throw new Error(errorData.message || 'Failed to complete session');
       }
 
@@ -515,7 +529,8 @@ const PetSitterScheduleScreen = () => {
     } catch (error) {
       console.error('❌ Error completing session:', error);
       // Show error message to user
-      alert(`Failed to complete session: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to complete session: ${errorMessage}`);
     }
   };
 
@@ -622,7 +637,7 @@ const PetSitterScheduleScreen = () => {
                     <Text style={styles.timeText}>
                       {item.startTime && item.endTime ? 
                         `${formatTimeForDisplay(item.startTime)} - ${formatTimeForDisplay(item.endTime)}` : 
-                        formatTimeForDisplay(item.startTime || item.time || '')
+                        formatTimeForDisplay(item.startTime || '')
                       }
                     </Text>
                   </View>
@@ -663,14 +678,6 @@ const PetSitterScheduleScreen = () => {
                     </TouchableOpacity>
                   </View>
                   
-                  {/* Status Message */}
-                  {item.status === 'active' && (
-                    <View style={styles.ongoingContainer}>
-                      <Text style={styles.ongoingText}>
-                        ⏰ Session in progress - ends at {formatTimeForDisplay(item.endTime || item.time || '')}
-                      </Text>
-                    </View>
-                  )}
                   
                   {/* Status message removed - buttons provide the functionality now */}
                   

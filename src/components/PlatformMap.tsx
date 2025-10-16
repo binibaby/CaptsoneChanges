@@ -10,7 +10,7 @@ const WebMapComponent = ({ initialRegion, showsUserLocation, children, style, ..
   useEffect(() => {
     // Load Google Maps script
     const loadGoogleMaps = () => {
-      if (window.google && window.google.maps) {
+      if ((window as any).google && (window as any).google.maps) {
         setMapLoaded(true);
         return;
       }

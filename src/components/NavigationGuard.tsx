@@ -8,7 +8,7 @@ interface NavigationGuardProps {
 
 export default function NavigationGuard({ children }: NavigationGuardProps) {
   const router = useRouter();
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     const checkLogoutStatus = async () => {

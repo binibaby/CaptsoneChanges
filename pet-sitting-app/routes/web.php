@@ -11,6 +11,7 @@ Route::get('/', function () {
 
 // Simple admin login route
 Route::get('/admin/login', function () {
+    return "Hello";
     return view('admin.login');
 })->name('admin.login');
 

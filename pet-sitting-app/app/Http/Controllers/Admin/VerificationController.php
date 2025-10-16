@@ -48,6 +48,63 @@ class VerificationController extends Controller
     }
 
     /**
+     * Display ID access management page for unverified sitters
+     */
+    public function idAccess()
+    {
+        return view('admin.verifications.id-access');
+    }
+
+    /**
+     * Get unverified sitters for ID access management
+     */
+    public function getUnverifiedSitters(Request $request)
+    {
+        $page = $request->get('page', 1);
+        $limit = $request->get('limit', 20);
+        $search = $request->get('search');
+
+        $query = User::where('role', 'pet_sitter')
+            ->where(function($q) {
+                $q->where('id_verified', false)
+                  ->orWhereNull('id_verified')
+                  ->orWhere('verification_status', 'pending_verification')
+                  ->orWhere('verification_status', 'rejected');
+            })
+            ->with(['verifications' => function($q) {
+                $q->latest()->take(1);
+            }])
+            ->select('*')
+            ->addSelect(DB::raw('(julianday("now") - julianday(created_at)) * 24 * 60 as minutes_ago'));
+
+        // Search functionality
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        $sitters = $query->orderBy('created_at', 'desc')
+            ->paginate($limit);
+
+        // Add time formatting and status info
+        $sitters->getCollection()->transform(function ($sitter) {
+            $sitter->time_ago = $this->formatTimeAgo($sitter->minutes_ago);
+            $sitter->verification_status_text = $this->getVerificationStatusText($sitter);
+            $sitter->can_be_verified = $this->canBeManuallyVerified($sitter);
+            return $sitter;
+        });
+
+        return response()->json([
+            'success' => true,
+            'sitters' => $sitters,
+            'stats' => $this->getUnverifiedSitterStats()
+        ]);
+    }
+
+    /**
      * Get all verifications with real-time data
      */
     public function getVerifications(Request $request)
@@ -64,7 +121,7 @@ class VerificationController extends Controller
         // Filter by status
         if ($status !== 'all') {
             if ($status === 'pending') {
-                // For pending, only show verifications that are actually pending
+                // For pending, show only verifications that are actually pending
                 $query->where('verification_status', 'pending')
                       ->where('status', 'pending');
             } else {
@@ -93,11 +150,93 @@ class VerificationController extends Controller
             return $verification;
         });
 
+        // Debug: Log the query and results
+        \Log::info('Verification Query Debug:', [
+            'status_filter' => $status,
+            'total_found' => $verifications->total(),
+            'current_page' => $verifications->currentPage(),
+            'per_page' => $verifications->perPage(),
+            'verification_ids' => $verifications->pluck('id')->toArray()
+        ]);
+
         return response()->json([
             'success' => true,
             'verifications' => $verifications,
-            'stats' => $this->getVerificationStats()
+            'stats' => $this->getVerificationStats(),
+            'debug' => [
+                'status_filter' => $status,
+                'total_found' => $verifications->total(),
+                'current_page' => $verifications->currentPage(),
+                'per_page' => $verifications->perPage()
+            ]
         ]);
+    }
+
+    /**
+     * Debug method to see all verifications
+     */
+    public function debugVerifications()
+    {
+        $allVerifications = Verification::with('user')
+            ->select('id', 'user_id', 'verification_status', 'status', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $pendingCount = Verification::where('verification_status', 'pending')->count();
+        $statusPendingCount = Verification::where('status', 'pending')->count();
+        $bothPendingCount = Verification::where('verification_status', 'pending')
+            ->where('status', 'pending')
+            ->count();
+
+        return response()->json([
+            'success' => true,
+            'all_verifications' => $allVerifications,
+            'counts' => [
+                'total' => $allVerifications->count(),
+                'verification_status_pending' => $pendingCount,
+                'status_pending' => $statusPendingCount,
+                'both_pending' => $bothPendingCount
+            ]
+        ]);
+    }
+
+    /**
+     * Clean up inconsistent verification statuses
+     */
+    public function cleanupInconsistentStatuses()
+    {
+        try {
+            // Find verifications that have been processed but still show as pending
+            $inconsistentVerifications = Verification::where(function($q) {
+                $q->where('verification_status', 'pending')
+                  ->where('status', '!=', 'pending');
+            })->orWhere(function($q) {
+                $q->where('status', 'pending')
+                  ->where('verification_status', '!=', 'pending');
+            })->get();
+
+            $cleanedCount = 0;
+            foreach ($inconsistentVerifications as $verification) {
+                // Sync the statuses - use the more recent/processed status
+                if ($verification->verification_status !== 'pending') {
+                    $verification->update(['status' => $verification->verification_status]);
+                } else {
+                    $verification->update(['verification_status' => $verification->status]);
+                }
+                $cleanedCount++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Cleaned up {$cleanedCount} inconsistent verification statuses",
+                'cleaned_count' => $cleanedCount
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error cleaning up statuses: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -828,5 +967,238 @@ class VerificationController extends Controller
             'message' => "Cleaned up {$deletedCount} old verification records.",
             'deleted_count' => $deletedCount
         ]);
+    }
+
+    /**
+     * Manually verify a sitter (admin override)
+     */
+    public function manualVerify(Request $request, $id)
+    {
+        $request->validate([
+            'reason' => 'required|string|min:10|max:500',
+            'confidence_level' => 'required|in:high,medium,low'
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $sitter = User::where('role', 'pet_sitter')->find($id);
+            
+            if (!$sitter) {
+                Log::warning('Manual verification attempted for non-existent sitter', [
+                    'sitter_id' => $id,
+                    'admin_id' => $this->getAuthId()
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sitter not found.'
+                ], 404);
+            }
+
+            if ($sitter->id_verified) {
+                Log::info('Manual verification attempted for already verified sitter', [
+                    'sitter_id' => $id,
+                    'admin_id' => $this->getAuthId(),
+                    'current_status' => $sitter->status,
+                    'id_verified' => $sitter->id_verified
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This sitter is already verified.'
+                ], 400);
+            }
+
+            Log::info('Starting manual verification process', [
+                'sitter_id' => $sitter->id,
+                'sitter_name' => $sitter->name,
+                'admin_id' => $this->getAuthId(),
+                'reason' => $request->reason,
+                'confidence_level' => $request->confidence_level
+            ]);
+
+            // Create a manual verification record
+            $verification = Verification::create([
+                'user_id' => $sitter->id,
+                'status' => 'approved',
+                'verification_status' => 'approved',
+                'admin_decision' => 'approved',
+                'verified_at' => now(),
+                'verified_by' => $this->getAuthId(),
+                'admin_reviewed_at' => now(),
+                'admin_reviewed_by' => $this->getAuthId(),
+                'documents_clear' => true,
+                'face_match_verified' => true,
+                'address_match_verified' => true,
+                'is_legit_sitter' => true,
+                'confidence_level' => $request->confidence_level,
+                'verification_method' => 'manual_admin',
+                'admin_review_notes' => $request->reason,
+                'badges_earned' => json_encode([
+                    [
+                        'id' => 'legit_sitter',
+                        'name' => 'Legit Sitter',
+                        'description' => 'Verified pet sitter with approved ID verification',
+                        'icon' => 'shield-checkmark',
+                        'color' => '#10B981',
+                        'earned_at' => now()->toISOString(),
+                    ],
+                    [
+                        'id' => 'verified_identity',
+                        'name' => 'Verified ID',
+                        'description' => 'Government-issued ID verified',
+                        'icon' => 'card',
+                        'color' => '#3B82F6',
+                        'earned_at' => now()->toISOString(),
+                    ],
+                    [
+                        'id' => 'admin_verified',
+                        'name' => 'Admin Verified',
+                        'description' => 'Manually verified by admin',
+                        'icon' => 'star',
+                        'color' => '#F59E0B',
+                        'earned_at' => now()->toISOString(),
+                    ]
+                ])
+            ]);
+
+            // Update sitter status
+            $sitter->update([
+                'status' => 'active',
+                'approved_at' => now(),
+                'approved_by' => $this->getAuthId(),
+                'id_verified' => true,
+                'id_verified_at' => now(),
+                'verification_status' => 'verified',
+                'can_accept_bookings' => true
+            ]);
+
+            Log::info('Sitter status updated successfully', [
+                'sitter_id' => $sitter->id,
+                'status' => 'active',
+                'id_verified' => true,
+                'verification_status' => 'verified'
+            ]);
+
+            // Create audit log
+            VerificationAuditLog::create([
+                'verification_id' => $verification->id,
+                'admin_id' => $this->getAuthId(),
+                'action' => 'approved',
+                'reason' => $request->reason,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'confidence_level' => $request->confidence_level
+            ]);
+
+            // Notify sitter
+            $sitter->notifications()->create([
+                'type' => 'id_verification_approved',
+                'title' => 'ID Verification Approved',
+                'message' => '🎉 Congratulations! Your ID verification has been approved by admin! You can now start accepting jobs and bookings.',
+                'data' => json_encode([
+                    'verification_id' => $verification->id,
+                    'verified_at' => now()->toISOString(),
+                    'admin_name' => $this->getAuthUser()->name,
+                    'badges_earned' => json_decode($verification->badges_earned, true),
+                    'confidence_level' => $request->confidence_level,
+                    'manual_verification' => true
+                ])
+            ]);
+
+            // Log security event
+            Log::info('Manual ID Verification Approved', [
+                'verification_id' => $verification->id,
+                'sitter_id' => $sitter->id,
+                'admin_id' => $this->getAuthId(),
+                'reason' => $request->reason,
+                'confidence_level' => $request->confidence_level,
+                'ip_address' => $request->ip()
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sitter manually verified successfully.',
+                'verification' => [
+                    'id' => $verification->id,
+                    'sitter_name' => $sitter->name,
+                    'verified_at' => $verification->verified_at->format('Y-m-d H:i:s'),
+                    'verified_by' => $this->getAuthUser()->name
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Manual Verification Failed', [
+                'sitter_id' => $id,
+                'admin_id' => $this->getAuthId(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to verify sitter: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get verification status text for display
+     */
+    private function getVerificationStatusText($sitter)
+    {
+        if ($sitter->id_verified) {
+            return 'Verified';
+        }
+        
+        if ($sitter->verification_status === 'rejected') {
+            return 'Rejected';
+        }
+        
+        if ($sitter->verification_status === 'pending_verification') {
+            return 'Pending Verification';
+        }
+        
+        return 'Not Verified';
+    }
+
+    /**
+     * Check if sitter can be manually verified
+     */
+    private function canBeManuallyVerified($sitter)
+    {
+        return !$sitter->id_verified && 
+               $sitter->verification_status !== 'verified' &&
+               $sitter->role === 'pet_sitter';
+    }
+
+    /**
+     * Get unverified sitter statistics
+     */
+    private function getUnverifiedSitterStats()
+    {
+        return [
+            'total_unverified' => User::where('role', 'pet_sitter')
+                ->where(function($q) {
+                    $q->where('id_verified', false)
+                      ->orWhereNull('id_verified')
+                      ->orWhere('verification_status', 'pending_verification')
+                      ->orWhere('verification_status', 'rejected');
+                })
+                ->count(),
+            'pending_verification' => User::where('role', 'pet_sitter')
+                ->where('verification_status', 'pending_verification')
+                ->count(),
+            'rejected' => User::where('role', 'pet_sitter')
+                ->where('verification_status', 'rejected')
+                ->count(),
+            'never_verified' => User::where('role', 'pet_sitter')
+                ->where('id_verified', false)
+                ->orWhereNull('id_verified')
+                ->count()
+        ];
     }
 }

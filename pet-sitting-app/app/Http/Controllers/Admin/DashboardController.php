@@ -45,7 +45,7 @@ class DashboardController extends Controller
             'total_pet_sitters' => User::where('role', 'pet_sitter')->count(),
             'total_bookings' => Booking::count(),
             'active_bookings' => Booking::where('status', 'confirmed')->count(),
-            'pending_verifications' => Verification::where('verification_status', 'pending')->count(),
+            'pending_verifications' => Verification::where('verification_status', 'pending')->where('status', 'pending')->count(),
             'total_revenue' => Payment::where('status', 'completed')->sum('amount'),
             'monthly_revenue' => Payment::where('status', 'completed')
                 ->whereBetween('created_at', [$lastMonth, $now])

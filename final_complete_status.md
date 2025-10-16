@@ -14,7 +14,7 @@
 - ✅ **Messaging errors** - Created working SimpleMessagingService
 
 ### 🚀 **Servers Running Perfectly:**
-- ✅ **Laravel API Server** - Running on `http://192.168.100.192:8000`
+- ✅ **Laravel API Server** - Running on `http://172.20.10.2:8000`
 - ✅ **Laravel Reverb Server** - Running on port 8080
 - ✅ **Health Endpoint** - Working: `/api/health`
 - ✅ **Test Endpoint** - Working: `/api/test`

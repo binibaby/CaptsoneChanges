@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Review {
@@ -45,6 +45,27 @@ const SitterReviewsModal: React.FC<SitterReviewsModalProps> = ({
     }
   }, [visible, sitterId]);
 
+  // Listen for review submission events
+  useEffect(() => {
+    const { DeviceEventEmitter } = require('react-native');
+    
+    const handleReviewSubmitted = (event: any) => {
+      if (event.sitterId === sitterId) {
+        console.log('🔔 Review submitted for this sitter, refreshing reviews...');
+        // Small delay to ensure backend has processed the review
+        setTimeout(() => {
+          loadReviews();
+        }, 1000);
+      }
+    };
+
+    const subscription = DeviceEventEmitter.addListener('reviewSubmitted', handleReviewSubmitted);
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, [sitterId]);
+
   const loadReviews = async () => {
     setLoading(true);
     try {
@@ -52,6 +73,12 @@ const SitterReviewsModal: React.FC<SitterReviewsModalProps> = ({
       const authService = (await import('../services/authService')).default;
       const currentUser = await authService.getCurrentUser();
       const token = currentUser?.token;
+
+      console.log('🔍 SitterReviewsModal - Loading reviews for sitter:', {
+        sitterId: sitterId,
+        sitterName: sitterName,
+        token: token ? 'present' : 'missing'
+      });
 
       const response = await makeApiCall(`/api/sitters/${sitterId}/reviews`, {
         method: 'GET',
@@ -61,21 +88,34 @@ const SitterReviewsModal: React.FC<SitterReviewsModalProps> = ({
         },
       });
 
+      console.log('🔍 SitterReviewsModal - API response:', {
+        status: response.status,
+        ok: response.ok
+      });
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ SitterReviewsModal - API error:', errorData);
         throw new Error(errorData.message || 'Failed to load reviews');
       }
 
       const result = await response.json();
-      console.log('✅ Reviews loaded successfully:', result);
+      console.log('✅ SitterReviewsModal - Reviews loaded successfully:', {
+        sitterId: sitterId,
+        averageRating: result.sitter?.average_rating,
+        totalReviews: result.sitter?.total_reviews,
+        reviewsCount: result.reviews?.length || 0,
+        fullResponse: result
+      });
 
       setReviews(result.reviews || []);
       setAverageRating(result.sitter?.average_rating || 0);
       setTotalReviews(result.sitter?.total_reviews || 0);
 
     } catch (error) {
-      console.error('❌ Error loading reviews:', error);
-      Alert.alert('Error', `Failed to load reviews: ${error.message}`);
+      console.error('❌ SitterReviewsModal - Error loading reviews:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to load reviews: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

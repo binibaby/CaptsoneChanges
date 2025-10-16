@@ -1,17 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface ReviewModalProps {
@@ -89,6 +89,14 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
       setRating(0);
       setReview('');
       
+      // Emit event to notify other components about review submission
+      const { DeviceEventEmitter } = require('react-native');
+      DeviceEventEmitter.emit('reviewSubmitted', {
+        sitterId: result.sitter?.id,
+        rating: result.review?.rating,
+        reviewId: result.review?.id
+      });
+      
       // Close modal and notify parent
       onClose();
       onReviewSubmitted();
@@ -97,7 +105,8 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
 
     } catch (error) {
       console.error('❌ Error submitting review:', error);
-      Alert.alert('Error', `Failed to submit review: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to submit review: ${errorMessage}`);
     } finally {
       setSubmitting(false);
     }

@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { RealtimeSitter } from '../services/realtimeLocationService';
 
@@ -52,6 +52,12 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
       const currentUser = await authService.getCurrentUser();
       const token = currentUser?.token;
 
+      console.log('🔍 SitterProfilePopup - Loading rating for sitter:', {
+        sitterId: sitter.id,
+        sitterName: sitter.name,
+        token: token ? 'present' : 'missing'
+      });
+
       const response = await makeApiCall(`/api/sitters/${sitter.id}/reviews`, {
         method: 'GET',
         headers: {
@@ -60,21 +66,42 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
         },
       });
 
+      console.log('🔍 SitterProfilePopup - API response:', {
+        status: response.status,
+        ok: response.ok
+      });
+
       if (response.ok) {
         const result = await response.json();
-        console.log('⭐ Sitter rating data fetched:', {
+        console.log('⭐ SitterProfilePopup - Rating data received:', {
           sitterId: sitter.id,
+          sitterName: sitter.name,
           averageRating: result.sitter?.average_rating,
           totalReviews: result.sitter?.total_reviews,
-          reviews: result.reviews?.length || 0
+          reviews: result.reviews?.length || 0,
+          fullResponse: result
         });
         setSitterRating(result.sitter?.average_rating || 0);
         setHasReviews((result.sitter?.total_reviews || 0) > 0);
+      } else {
+        const errorData = await response.json();
+        console.error('❌ SitterProfilePopup - API error:', errorData);
       }
     } catch (error) {
-      console.error('Error loading sitter rating:', error);
+      console.error('❌ SitterProfilePopup - Error loading sitter rating:', error);
     }
   };
+
+  // Load rating data when popup becomes visible - FORCE REFRESH
+  useEffect(() => {
+    if (visible && sitter?.id) {
+      console.log('🔄 SitterProfilePopup visible, loading fresh rating data...');
+      // Force refresh with a small delay to ensure API call works
+      setTimeout(() => {
+        loadSitterRating();
+      }, 100);
+    }
+  }, [visible, sitter?.id]);
 
   // Subscribe to real-time review notifications
   useEffect(() => {
@@ -91,6 +118,28 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
     });
 
     return unsubscribe;
+  }, [sitter?.id]);
+
+  // Listen for review submission events using DeviceEventEmitter
+  useEffect(() => {
+    const { DeviceEventEmitter } = require('react-native');
+    
+    const handleReviewSubmitted = (event: any) => {
+      if (event.sitterId === sitter?.id) {
+        console.log('🔔 Review submitted for this sitter, refreshing rating...');
+        // Small delay to ensure backend has processed the review
+        setTimeout(() => {
+          loadSitterRating();
+        }, 1000);
+      }
+    };
+
+    // Listen for custom review submitted events
+    const subscription = DeviceEventEmitter.addListener('reviewSubmitted', handleReviewSubmitted);
+    
+    return () => {
+      subscription?.remove();
+    };
   }, [sitter?.id]);
   
   // Reset image error state when sitter changes
@@ -413,8 +462,11 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                 <TouchableOpacity 
                   style={styles.credentialButton}
                   onPress={() => {
+                    console.log('🔔 Book Now button clicked in SitterProfilePopup!');
+                    
                     // Check if sitter is verified before allowing booking
                     if (!sitter.isVerified) {
+                      console.log('⚠️ Sitter not verified, showing verification alert');
                       Alert.alert(
                         '⚠️ Sitter Not Verified',
                         'This pet sitter has not completed ID verification yet. They cannot accept bookings until verified.',
@@ -422,16 +474,31 @@ const SitterProfilePopup: React.FC<SitterProfilePopupProps> = ({
                       );
                       return;
                     }
-                    onClose();
-                    router.push({
-                      pathname: '/booking',
-                      params: {
-                        sitterId: sitter.id,
-                        sitterName: sitter.name,
-                        sitterRate: (sitter.hourlyRate || 25).toString(),
-                        sitterImage: sitter.imageSource || sitter.images?.[0] || sitter.profileImage
-                      }
-                    });
+                    
+                    console.log('✅ Sitter is verified, showing message reminder popup');
+                    // Show message reminder popup before booking
+                    Alert.alert(
+                      'Message Sitter First',
+                      'Please make sure to message the sitter before booking. This helps reassure both parties and gives you a chance to discuss any questions or concerns you may have in advance.',
+                      [
+                        {
+                          text: 'OK',
+                          onPress: () => {
+                            console.log('✅ User clicked OK, navigating to booking screen');
+                            onClose();
+                            router.push({
+                              pathname: '/booking',
+                              params: {
+                                sitterId: sitter.id,
+                                sitterName: sitter.name,
+                                sitterRate: (sitter.hourlyRate || 25).toString(),
+                                sitterImage: sitter.imageSource || sitter.images?.[0] || sitter.profileImage
+                              }
+                            });
+                          }
+                        }
+                      ]
+                    );
                   }}
                   activeOpacity={0.7}
                 >

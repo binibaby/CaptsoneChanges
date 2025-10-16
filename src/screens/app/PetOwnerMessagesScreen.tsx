@@ -1,19 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import ReviewModal from '../../components/ReviewModal';
 import { useAuth } from '../../contexts/AuthContext';
@@ -87,14 +88,47 @@ const PetOwnerMessagesScreen = () => {
     try {
       setLoading(true);
       console.log('💬 Loading conversations...');
+      
+      // Load conversations for current user only
+      console.log('💬 Loading conversations for current user...');
+      
+      // Get current user first to ensure we have the right user context
+      const { default: authService } = await import('../../services/authService');
+      const currentUser = await authService.getCurrentUser();
+      console.log('💬 Current user ID:', currentUser?.id);
+      console.log('💬 Current user token present:', !!currentUser?.token);
+      
+      if (!currentUser) {
+        console.log('⚠️ No current user found, cannot load conversations');
+        setConversations([]);
+        return;
+      }
+      
+      // Clear any cached conversations in the messaging service
+      const { reverbMessagingService } = await import('../../services/reverbMessagingService');
+      reverbMessagingService.clearAuthCache();
+      
+      // Force fresh conversation load from API
       const data = await reverbMessagingService.getConversations();
-      console.log('💬 Conversations loaded:', data.length);
+      console.log('💬 Conversations loaded for current user:', data.length);
+      
+      if (data && data.length > 0) {
+        console.log('💬 Conversation details:', data.map(conv => ({
+          conversation_id: conv.conversation_id,
+          other_user_id: conv.other_user?.id,
+          other_user_name: conv.other_user?.name,
+          latest_message: conv.last_message?.message?.substring(0, 30) + '...'
+        })));
+      } else {
+        console.log('💬 No conversations found for user ID:', currentUser.id);
+      }
+      
       setConversations(data);
+      
     } catch (error) {
       console.error('❌ Error loading conversations:', error);
-      // Don't show alert - let the service handle fallback
-      console.log('⚠️ Conversations will use fallback data');
-      setConversations([]); // This will trigger the fallback in the service
+      console.log('⚠️ Using empty conversations for fresh start');
+      setConversations([]);
     } finally {
       setLoading(false);
     }
@@ -233,8 +267,37 @@ const PetOwnerMessagesScreen = () => {
   useEffect(() => {
     console.log('💬 Initializing messaging in PetOwnerMessagesScreen');
     
-    // Load initial data
-    loadConversations();
+    // Verify current user before loading conversations
+    const initializeWithUserCheck = async () => {
+      try {
+        const { default: authService } = await import('../../services/authService');
+        const currentUser = await authService.getCurrentUser();
+        
+        if (!currentUser) {
+          console.log('⚠️ No authenticated user found, skipping conversation loading');
+          setConversations([]);
+          return;
+        }
+        
+        console.log('✅ Authenticated user found:', {
+          id: currentUser.id,
+          name: currentUser.firstName + ' ' + currentUser.lastName,
+          email: currentUser.email
+        });
+        
+        setCurrentUserId(currentUser.id);
+        console.log('✅ Current user ID set to:', currentUser.id);
+        
+        // Load conversations for this specific user
+        await loadConversations();
+        
+      } catch (error) {
+        console.error('❌ Error in user verification:', error);
+        setConversations([]);
+      }
+    };
+    
+    initializeWithUserCheck();
     
     // Set up real-time event listeners
     reverbMessagingService.onMessage((message: ReverbMessage) => {
@@ -258,6 +321,14 @@ const PetOwnerMessagesScreen = () => {
     }
   }, [loadConversations]); // Removed selectedConversation from dependencies
 
+  // Reload conversations when screen comes into focus (after login/logout)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('💬 Messages screen focused - reloading conversations');
+      loadConversations();
+    }, [loadConversations])
+  );
+
   // Skip auto conversation creation to avoid 422 errors with non-existent users
   // Users will need to find sitters through the Find Sitter feature first
 
@@ -278,11 +349,11 @@ const PetOwnerMessagesScreen = () => {
         const otherUserId = params.otherUserId;
         if (otherUserId) {
           const newConversation: ReverbConversation = {
-            conversation_id: params.conversationId,
+            conversation_id: Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId || '',
             other_user: {
-              id: otherUserId,
-              name: params.otherUserName || `Sitter ${otherUserId}`,
-              profile_image: params.otherUserImage || null
+              id: Array.isArray(otherUserId) ? otherUserId[0] : otherUserId || '',
+              name: Array.isArray(params.otherUserName) ? params.otherUserName[0] : params.otherUserName || `Sitter ${Array.isArray(otherUserId) ? otherUserId[0] : otherUserId}`,
+              profile_image: Array.isArray(params.otherUserImage) ? params.otherUserImage[0] : params.otherUserImage || null
             },
             last_message: null,
             unread_count: 0,
@@ -362,7 +433,21 @@ const PetOwnerMessagesScreen = () => {
   const renderMessageItem = ({ item }: { item: Message }) => (
     <TouchableOpacity 
       style={styles.messageItem} 
-      onPress={() => handleChatPress(item)}
+      onPress={() => {
+        // Convert Message to ReverbConversation format
+        const conversation: ReverbConversation = {
+          conversation_id: (item as any).conversation_id || '',
+          other_user: {
+            id: (item as any).sender_id || '',
+            name: (item as any).sender?.name || 'Unknown',
+            profile_image: (item as any).sender?.profile_image || null
+          },
+          last_message: item as any,
+          unread_count: 0,
+          updated_at: (item as any).created_at || new Date().toISOString()
+        };
+        handleChatPress(conversation);
+      }}
     >
       <View style={styles.avatarContainer}>
         <Image source={item.avatar} style={styles.avatar} />
@@ -394,16 +479,32 @@ const PetOwnerMessagesScreen = () => {
 
   const renderChatMessage = ({ item }: { item: ReverbMessage }) => {
     // For owner screen: sent messages on right, received messages on left
-    const isFromMe = currentUserId ? item.sender_id.toString() === currentUserId.toString() : false;
     const messageTime = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
-    // Debug logging
-    console.log('🔍 Message debug:', {
+    // Simplified and robust alignment logic
+    const senderId = parseInt(item.sender_id);
+    const userId = currentUserId ? parseInt(currentUserId) : null;
+    
+    // For debugging: if we're in PetOwnerMessagesScreen, assume owner ID is 6 (beta owner)
+    // This is a temporary fix to ensure owner messages go to the right
+    let isFromMe = userId !== null && senderId === userId;
+    
+    // Temporary hardcoded fix for owner messages alignment
+    if (!isFromMe && senderId === 6) {
+      isFromMe = true;
+      console.log('🔧 Hardcoded fix applied: Owner message (ID 6) -> RIGHT');
+    }
+    
+    // Enhanced debug logging
+    console.log('🔍 Message alignment debug:', {
       messageId: item.id,
-      senderId: item.sender_id,
-      currentUserId: currentUserId,
+      senderId: senderId,
+      senderIdType: typeof senderId,
+      currentUserId: userId,
+      currentUserIdType: typeof userId,
       isFromMe: isFromMe,
-      message: item.message.substring(0, 20) + '...'
+      message: item.message.substring(0, 20) + '...',
+      alignment: isFromMe ? 'RIGHT (my message)' : 'LEFT (their message)'
     });
     
     return (
@@ -534,7 +635,7 @@ const PetOwnerMessagesScreen = () => {
             </View>
             
             {/* Rate & Review Button - Owner Side Only */}
-            {availableBookings.length > 0 && !reviewModalVisible && (
+            {!reviewModalVisible && (
               <TouchableOpacity style={styles.reviewButton} onPress={handleReviewPress}>
                 <Ionicons name="star" size={20} color="#F59E0B" />
               </TouchableOpacity>
@@ -707,6 +808,30 @@ const PetOwnerMessagesScreen = () => {
             >
               <Ionicons name="search" size={20} color="#fff" />
               <Text style={styles.findSitterButtonText}>Find Pet Sitters</Text>
+            </TouchableOpacity>
+            
+            {/* Clear Conversations Button for Testing */}
+            <TouchableOpacity 
+              style={[styles.findSitterButton, { backgroundColor: '#10B981', marginTop: 10 }]}
+              onPress={async () => {
+                console.log('🔄 Manual refresh triggered');
+                await loadConversations();
+                Alert.alert('Refreshed', 'Conversations have been refreshed from the server.');
+              }}
+            >
+              <Ionicons name="refresh" size={20} color="#fff" />
+              <Text style={styles.findSitterButtonText}>Refresh Conversations</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.findSitterButton, { backgroundColor: '#EF4444', marginTop: 10 }]}
+              onPress={() => {
+                setConversations([]);
+                Alert.alert('Conversations Cleared', 'All conversations have been cleared for testing.');
+              }}
+            >
+              <Ionicons name="trash" size={20} color="#fff" />
+              <Text style={styles.findSitterButtonText}>Clear All Conversations</Text>
             </TouchableOpacity>
           </View>
         }

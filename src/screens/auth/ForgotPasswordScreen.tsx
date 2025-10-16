@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { passwordResetService } from '../../services/passwordResetService';
 
@@ -36,7 +36,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
 
   // Countdown timer effect
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: number;
     if (countdown > 0) {
       timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     }
@@ -315,7 +315,11 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
               {otpInputs.map((value, index) => (
                 <TextInput
                   key={index}
-                  ref={(ref) => (otpInputRefs.current[index] = ref!)}
+                  ref={(ref) => {
+                    if (ref) {
+                      otpInputRefs.current[index] = ref;
+                    }
+                  }}
                   style={[styles.otpInput, value && styles.otpInputFilled]}
                   value={value}
                   onChangeText={(text) => handleOtpChange(text, index)}

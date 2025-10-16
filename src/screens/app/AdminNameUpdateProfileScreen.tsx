@@ -2,17 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -95,7 +95,7 @@ const AdminNameUpdateProfileScreen = () => {
       const response = await makeApiCall('/api/admin/users', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${currentUser.token}`,
+          'Authorization': `Bearer ${currentUser?.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -124,7 +124,7 @@ const AdminNameUpdateProfileScreen = () => {
       const response = await makeApiCall('/api/admin/name-update-requests', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${currentUser.token}`,
+          'Authorization': `Bearer ${currentUser?.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -213,7 +213,7 @@ const AdminNameUpdateProfileScreen = () => {
       const response = await makeApiCall('/api/admin/update-user-name', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${currentUser.token}`,
+          'Authorization': `Bearer ${currentUser?.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -257,7 +257,7 @@ const AdminNameUpdateProfileScreen = () => {
       const response = await makeApiCall(`/api/admin/name-update-requests/${requestId}/${action}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${currentUser.token}`,
+          'Authorization': `Bearer ${currentUser?.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

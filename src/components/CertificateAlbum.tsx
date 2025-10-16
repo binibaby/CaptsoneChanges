@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -21,12 +21,18 @@ interface Certificate {
   issuer: string;
 }
 
+interface AddButtonItem {
+  id: string;
+  isAddButton: boolean;
+}
+
+type CertificateItem = Certificate | AddButtonItem;
+
 interface CertificateAlbumProps {
   visible: boolean;
   onClose: () => void;
   certificates: Certificate[];
   onAddCertificate: (certificate: Omit<Certificate, 'id'>) => void;
-  onDeleteCertificate: (id: string) => void;
 }
 
 const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
@@ -34,14 +40,13 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
   onClose,
   certificates,
   onAddCertificate,
-  onDeleteCertificate,
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const { user } = useAuth();
 
   // Helper function to get proper image source using network service
   const getImageSource = (imagePath: string) => {
-    if (!imagePath) return null;
+    if (!imagePath) return { uri: 'https://via.placeholder.com/150' };
     
     // If it's a URL (starts with http), use it directly
     if (imagePath.startsWith('http')) {
@@ -136,7 +141,7 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
         },
         {
           text: 'Add',
-          onPress: async (name) => {
+          onPress: async (name?: string) => {
             if (name && name.trim()) {
               try {
                 // Upload image to server first
@@ -204,33 +209,26 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
     }
   };
 
-  const renderCertificate = ({ item }: { item: Certificate }) => (
-    <View style={styles.certificateItem}>
-      <Image source={getImageSource(item.image)} style={styles.certificateImage} />
-      <View style={styles.certificateInfo}>
-        <Text style={styles.certificateName} numberOfLines={2}>
-          {item.name}
-        </Text>
-        <Text style={styles.certificateIssuer}>{item.issuer}</Text>
-        <Text style={styles.certificateDate}>{item.date}</Text>
+  const renderCertificate = ({ item }: { item: CertificateItem }) => {
+    // Type guard to check if it's a Certificate
+    if ('isAddButton' in item && item.isAddButton) {
+      return renderAddButton();
+    }
+    
+    const certificate = item as Certificate;
+    return (
+      <View style={styles.certificateItem}>
+        <Image source={getImageSource(certificate.image)} style={styles.certificateImage} />
+        <View style={styles.certificateInfo}>
+          <Text style={styles.certificateName} numberOfLines={2}>
+            {certificate.name}
+          </Text>
+          <Text style={styles.certificateIssuer}>{certificate.issuer}</Text>
+          <Text style={styles.certificateDate}>{certificate.date}</Text>
+        </View>
       </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => {
-          Alert.alert(
-            'Delete Certificate',
-            'Are you sure you want to delete this certificate?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: () => onDeleteCertificate(item.id) },
-            ]
-          );
-        }}
-      >
-        <Ionicons name="trash-outline" size={20} color="#ef4444" />
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const renderAddButton = () => (
     <TouchableOpacity style={styles.addButton} onPress={pickImage}>
@@ -264,10 +262,8 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
             </View>
           ) : (
             <FlatList
-              data={[...certificates, { id: 'add', isAddButton: true }]}
-              renderItem={({ item }) => 
-                item.isAddButton ? renderAddButton() : renderCertificate({ item })
-              }
+              data={[...certificates, { id: 'add', isAddButton: true }] as CertificateItem[]}
+              renderItem={({ item }) => renderCertificate({ item })}
               keyExtractor={(item) => item.id}
               numColumns={2}
               contentContainerStyle={styles.grid}
@@ -369,19 +365,6 @@ const styles = StyleSheet.create({
   certificateDate: {
     fontSize: 12,
     color: '#999',
-  },
-  deleteButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
   },
   addButton: {
     width: 80,

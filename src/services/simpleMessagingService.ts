@@ -193,6 +193,24 @@ class SimpleMessagingService {
     this.conversations.forEach(conv => {
       total += conv.unread_count;
     });
+    console.log('📱 Total unread messages:', total);
+    return total;
+  }
+
+  // Get unread count for specific user
+  public async getUnreadCountForUser(userId: string): Promise<number> {
+    console.log('📱 Getting unread count for user:', userId);
+    let total = 0;
+    
+    // Count unread messages where the user is the receiver
+    this.messages.forEach((messageList, conversationId) => {
+      const unreadMessages = messageList.filter(msg => 
+        msg.receiver_id === userId && !msg.is_read
+      );
+      total += unreadMessages.length;
+    });
+    
+    console.log('📱 Unread messages for user', userId, ':', total);
     return total;
   }
 

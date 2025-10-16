@@ -133,9 +133,35 @@ const MyPetsScreen = () => {
         }
     };
 
+    // Clear pets for new user accounts
+    const clearPetsForNewUser = async () => {
+        try {
+            const lastUserId = await AsyncStorage.getItem('last_user_id');
+            const currentUserId = user?.id;
+            
+            if (currentUserId && lastUserId !== currentUserId) {
+                console.log('🔄 New user detected, clearing pets from storage');
+                await AsyncStorage.removeItem('user_pets');
+                await AsyncStorage.setItem('last_user_id', currentUserId);
+                setPets([]);
+                setPetsLoaded(true);
+                return true; // Indicates pets were cleared
+            }
+        } catch (error) {
+            console.error('❌ Error clearing pets for new user:', error);
+        }
+        return false;
+    };
+
     // Load pets from local storage
     const loadPetsFromStorage = async (): Promise<Pet[]> => {
         try {
+            // Check if this is a new user and clear pets if needed
+            const wasCleared = await clearPetsForNewUser();
+            if (wasCleared) {
+                return []; // Return empty array for new users
+            }
+            
             const storedPets = await AsyncStorage.getItem('user_pets');
             if (storedPets) {
                 const pets = JSON.parse(storedPets);
@@ -169,16 +195,33 @@ const MyPetsScreen = () => {
                 token: user.token ? 'Present' : 'Missing',
                 tokenLength: user.token?.length || 0
             });
-            // Load pets from storage first, then from backend
-            loadPetsFromStorage().then((storedPets) => {
-                if (storedPets.length > 0) {
-                    setPets(storedPets);
+            // Check if this is a new user first
+            const checkNewUser = async () => {
+                const lastUserId = await AsyncStorage.getItem('last_user_id');
+                const currentUserId = user.id;
+                
+                if (lastUserId !== currentUserId) {
+                    console.log('🔄 New user detected, clearing all pets');
+                    await AsyncStorage.removeItem('user_pets');
+                    await AsyncStorage.setItem('last_user_id', currentUserId);
+                    setPets([]);
                     setPetsLoaded(true);
-                    console.log('💾 Loaded pets from storage first');
+                    return; // Don't load any pets for new users
                 }
-                // Always refresh from backend to get latest data
-                loadPetsFromBackend();
-            });
+                
+                // Load pets from storage first, then from backend for existing users
+                loadPetsFromStorage().then((storedPets) => {
+                    if (storedPets.length > 0) {
+                        setPets(storedPets);
+                        setPetsLoaded(true);
+                        console.log('💾 Loaded pets from storage first');
+                    }
+                    // Always refresh from backend to get latest data
+                    loadPetsFromBackend();
+                });
+            };
+            
+            checkNewUser();
         } else {
             console.log('MyPetsScreen: No user found');
             setPets([]);
@@ -244,6 +287,17 @@ const MyPetsScreen = () => {
                 return;
             }
 
+            // Check if this is a new user and skip backend load if pets were cleared
+            const lastUserId = await AsyncStorage.getItem('last_user_id');
+            const currentUserId = user?.id;
+            
+            if (currentUserId && lastUserId !== currentUserId) {
+                console.log('🔄 New user detected, skipping backend pets load');
+                setPets([]);
+                setPetsLoaded(true);
+                return;
+            }
+
             console.log('🔄 Loading pets from backend for user:', user.id);
             console.log('🔄 Using token:', user.token ? 'Present' : 'Missing');
             
@@ -266,7 +320,7 @@ const MyPetsScreen = () => {
                     const petsData = result.pets || [];
                     
                     // Verify each pet has required fields
-                    const validPets = petsData.filter(pet => pet.id && pet.name && pet.age && pet.breed);
+                    const validPets = petsData.filter((pet: any) => pet.id && pet.name && pet.age && pet.breed);
                     console.log('✅ Valid pets from backend:', validPets.length, 'out of', petsData.length);
                     
                     // Only update state if we got pets from backend, otherwise keep local state
@@ -730,27 +784,27 @@ const MyPetsScreen = () => {
                                 })() ? (
                                     <Image 
                                         source={{ 
-                                            uri: getImageUrl(pet.image),
+                                            uri: getImageUrl(pet.image || ''),
                                             cache: 'force-cache'
                                         }} 
                                         style={styles.petImage}
                                         onLoadStart={() => {
                                             console.log('🚀 ATTEMPTING to load image for pet:', pet.name);
-                                            console.log('🚀 Image URL:', getImageUrl(pet.image));
+                                            console.log('🚀 Image URL:', getImageUrl(pet.image || ''));
                                         }}
                                         onLoadEnd={() => {
                                             console.log('🏁 Image load ended for pet:', pet.name);
                                         }}
                                         onError={(error) => {
                                             console.log('❌ Pet image failed to load:', error.nativeEvent.error);
-                                            console.log('❌ Failed image URI:', getImageUrl(pet.image));
+                                            console.log('❌ Failed image URI:', getImageUrl(pet.image || ''));
                                             console.log('❌ Original image path:', pet.image);
                                             console.log('❌ Pet ID:', pet.id);
                                             console.log('🔄 Image failed but continuing to try...');
                                         }}
                                         onLoad={() => {
                                             console.log('🎉 SUCCESS: Pet image loaded successfully:', pet.name);
-                                            console.log('🎉 SUCCESS: Image URL used:', getImageUrl(pet.image));
+                                            console.log('🎉 SUCCESS: Image URL used:', getImageUrl(pet.image || ''));
                                             console.log('🎉 SUCCESS: Showing actual uploaded image!');
                                             setValidImages(prev => new Set(prev).add(pet.id));
                                         }}
@@ -924,14 +978,14 @@ const MyPetsScreen = () => {
                                             style={styles.petDetailsImage}
                                             onError={(error) => {
                                                 console.log('❌ Pet details image failed to load:', error.nativeEvent.error);
-                                                console.log('❌ Failed image URI:', getImageUrl(selectedPet.image));
+                                                console.log('❌ Failed image URI:', getImageUrl(selectedPet.image || ''));
                                                 console.log('❌ Pet details image path:', selectedPet.image);
                                                 console.log('🔄 Switching to default image for pet details');
                                                 setImageLoadErrors(prev => new Set(prev).add(selectedPet.id));
                                             }}
                                             onLoad={() => {
                                                 console.log('✅ Pet details image loaded successfully');
-                                                console.log('✅ Pet details image URL:', getImageUrl(selectedPet.image));
+                                                console.log('✅ Pet details image URL:', getImageUrl(selectedPet.image || ''));
                                                 setValidImages(prev => new Set(prev).add(selectedPet.id));
                                             }}
                                             resizeMode="cover"

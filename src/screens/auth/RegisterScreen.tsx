@@ -1,15 +1,15 @@
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface RegisterScreenProps {
@@ -144,7 +144,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onRegisterSuccess, onLo
             <Text style={styles.socialButtonText}>Continue with Google</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.socialButton, styles.appleButton]}>
-            <AntDesign name="apple1" size={20} color="#4A4A4A" />
+            <AntDesign name="apple" size={20} color="#4A4A4A" />
             <Text style={styles.socialButtonText}>Continue with Apple</Text>
           </TouchableOpacity>
 

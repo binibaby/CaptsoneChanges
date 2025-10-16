@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { makeApiCall } from '../../services/networkService';
@@ -27,7 +27,7 @@ interface BookingSummaryScreenProps {
   petName?: string;
   petType?: string;
   serviceType?: string;
-  duration?: number;
+  duration?: string;
   description?: string;
 }
 
@@ -50,7 +50,7 @@ const BookingSummaryScreen: React.FC = () => {
     serviceType,
     duration,
     description,
-  } = useLocalSearchParams<BookingSummaryScreenProps>();
+  } = useLocalSearchParams();
 
   // Debug logging to see what time values we're receiving
   console.log('🔍 BookingSummaryScreen received params:', {
@@ -62,7 +62,7 @@ const BookingSummaryScreen: React.FC = () => {
   });
 
   // Calculate total amount with proper validation
-  const hourlyRate = parseFloat(sitterRate || '25') || 25; // Fallback to 25 if NaN
+  const hourlyRate = parseFloat(Array.isArray(sitterRate) ? sitterRate[0] : sitterRate || '25') || 25; // Fallback to 25 if NaN
   
   // Calculate duration from start and end times if not provided
   const calculateDurationFromTimes = (startTime: string, endTime: string): number => {
@@ -98,7 +98,10 @@ const BookingSummaryScreen: React.FC = () => {
 
   // Use provided duration or calculate from start/end times
   const hours = duration ? parseFloat(duration.toString()) : 
-    (startTime && endTime ? calculateDurationFromTimes(startTime, endTime) : 2);
+    (startTime && endTime ? calculateDurationFromTimes(
+      Array.isArray(startTime) ? startTime[0] : startTime, 
+      Array.isArray(endTime) ? endTime[0] : endTime
+    ) : 2);
   const totalAmount = hourlyRate * hours;
   const appFee = totalAmount * 0.1; // 10% app fee
   const sitterAmount = totalAmount * 0.9; // 90% to sitter
@@ -147,28 +150,32 @@ const BookingSummaryScreen: React.FC = () => {
       
       if (time12HourRegex.test(cleanTime)) {
         const match = cleanTime.match(time12HourRegex);
-        hour = parseInt(match[1], 10);
-        minute = parseInt(match[2], 10);
-        ampm = match[3].toUpperCase();
+        if (match) {
+          hour = parseInt(match[1], 10);
+          minute = parseInt(match[2], 10);
+          ampm = match[3].toUpperCase();
+        }
         
         // Convert to 24-hour format for validation
-        if (ampm === 'PM' && hour !== 12) {
+        if (hour !== undefined && ampm === 'PM' && hour !== 12) {
           hour += 12;
-        } else if (ampm === 'AM' && hour === 12) {
+        } else if (hour !== undefined && ampm === 'AM' && hour === 12) {
           hour = 0;
         }
       } else if (time24HourRegex.test(cleanTime)) {
         const match = cleanTime.match(time24HourRegex);
-        hour = parseInt(match[1], 10);
-        minute = parseInt(match[2], 10);
-        ampm = hour >= 12 ? 'PM' : 'AM';
+        if (match) {
+          hour = parseInt(match[1], 10);
+          minute = parseInt(match[2], 10);
+          ampm = hour >= 12 ? 'PM' : 'AM';
+        }
       } else {
         console.error('Invalid time format:', timeString);
         return 'Invalid Time';
       }
       
       // Validate hour and minute
-      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      if (hour === undefined || minute === undefined || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
         console.error('Invalid time values:', { hour, minute });
         return 'Invalid Time';
       }
@@ -330,7 +337,7 @@ const BookingSummaryScreen: React.FC = () => {
           <View style={styles.sitterInfo}>
             <Image
               source={{
-                uri: sitterImage || 'https://via.placeholder.com/60x60?text=Sitter',
+                uri: Array.isArray(sitterImage) ? sitterImage[0] : sitterImage || 'https://via.placeholder.com/60x60?text=Sitter',
               }}
               style={styles.sitterImage}
             />
@@ -352,7 +359,7 @@ const BookingSummaryScreen: React.FC = () => {
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Date</Text>
               <Text style={styles.detailValue}>
-                {selectedDate ? formatDate(selectedDate) : 'Not specified'}
+                {selectedDate ? formatDate(Array.isArray(selectedDate) ? selectedDate[0] : selectedDate) : 'Not specified'}
               </Text>
             </View>
           </View>
@@ -365,7 +372,7 @@ const BookingSummaryScreen: React.FC = () => {
               <Text style={styles.detailLabel}>Time</Text>
               <Text style={styles.detailValue}>
                 {startTime && endTime 
-                  ? `${formatTime(startTime)} - ${formatTime(endTime)}`
+                  ? `${formatTime(Array.isArray(startTime) ? startTime[0] : startTime)} - ${formatTime(Array.isArray(endTime) ? endTime[0] : endTime)}`
                   : 'Not specified'
                 }
               </Text>
@@ -495,7 +502,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: '#FFF',
     borderBottomWidth: 1,

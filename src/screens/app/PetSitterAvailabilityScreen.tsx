@@ -4,15 +4,15 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import Modal from 'react-native-modal';
@@ -67,6 +67,7 @@ const PetSitterAvailabilityScreen = () => {
   
   // Availability status state
   const [isAvailabilityEnabled, setIsAvailabilityEnabled] = useState<boolean>(true);
+  
 
   // Check availability status
   const checkAvailabilityStatus = async () => {
@@ -156,19 +157,33 @@ const PetSitterAvailabilityScreen = () => {
         }
       }
 
-      // Validate that each availability has the required fields
-      for (const availability of availabilities) {
-        if (!availability.date || !availability.timeRanges || availability.timeRanges.length === 0) {
-          console.error('❌ Invalid availability data:', availability);
-          return;
+      // Filter out availability entries with empty time ranges (not available on those days)
+      const validAvailabilities = availabilities.filter(availability => {
+        if (!availability.date) {
+          console.error('❌ Invalid availability data - missing date:', availability);
+          return false;
         }
         
+        // Skip entries with empty time ranges (sitter not available on those days)
+        if (!availability.timeRanges || availability.timeRanges.length === 0) {
+          console.log('📅 Skipping day with no availability:', availability.date);
+          return false;
+        }
+        
+        // Validate time ranges
         for (const timeRange of availability.timeRanges) {
           if (!timeRange.startTime || !timeRange.endTime) {
             console.error('❌ Invalid time range:', timeRange);
-            return;
+            return false;
           }
         }
+        
+        return true;
+      });
+      
+      if (validAvailabilities.length === 0) {
+        console.log('📅 No valid availability data to save');
+        return;
       }
 
       // Get token for the user
@@ -181,7 +196,7 @@ const PetSitterAvailabilityScreen = () => {
 
       console.log('✅ Using token for user:', user.id);
 
-      const requestBody = { availabilities };
+      const requestBody = { availabilities: validAvailabilities };
       console.log('🔄 Request body being sent:', JSON.stringify(requestBody, null, 2));
 
       const response = await makeApiCall(
@@ -495,6 +510,8 @@ const PetSitterAvailabilityScreen = () => {
     }
   };
 
+  // Load full status data from backend
+
   // Clean up expired availability data
   const cleanupExpiredAvailabilityData = async (userId: string) => {
     try {
@@ -571,7 +588,9 @@ const PetSitterAvailabilityScreen = () => {
 
     // Call immediately and set up interval for periodic refresh
     handleFocus();
-    const interval = setInterval(handleFocus, 5000); // Refresh every 5 seconds
+    const interval = setInterval(() => {
+      handleFocus();
+    }, 5000); // Refresh every 5 seconds
     
     return () => {
       clearInterval(interval);
@@ -728,6 +747,8 @@ const PetSitterAvailabilityScreen = () => {
     setShowEditModal(false);
     setEditingDate(null);
   };
+
+
 
   const handleDeleteAvailability = async (date: string) => {
     try {

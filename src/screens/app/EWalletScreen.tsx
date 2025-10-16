@@ -2,19 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { makeApiCall } from '../../services/networkService';
@@ -158,6 +158,7 @@ const EWalletScreen: React.FC = () => {
         }),
       });
       const data = await response.json();
+      console.log('Cash out response:', data);
 
       if (data.success) {
         Alert.alert(
@@ -175,10 +176,16 @@ const EWalletScreen: React.FC = () => {
           ]
         );
       } else {
+        console.error('Cash out failed:', data.error);
         Alert.alert('Error', data.error || 'Failed to process cash out request');
       }
     } catch (error) {
       console.error('Cash out error:', error);
+      console.error('Error details:', {
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+        response: (error as any).response
+      });
       Alert.alert('Error', 'Failed to process cash out request. Please try again.');
     } finally {
       setCashOutLoading(false);
@@ -496,7 +503,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: '#FFF',
     borderBottomWidth: 1,
@@ -676,7 +683,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: '#FFF',
     borderBottomWidth: 1,

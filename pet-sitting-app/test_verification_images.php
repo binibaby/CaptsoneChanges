@@ -68,6 +68,6 @@ if ($verificationWithoutImages) {
 
 echo "\n=== Test Complete ===\n";
 echo "To test the admin panel:\n";
-echo "1. Visit: http://0.0.0.0:8000/admin/verifications/104 (should show images and location)\n";
-echo "2. Visit: http://0.0.0.0:8000/admin/verifications/78 (should show 'No Documents' message)\n";
+echo "1. Visit: http://172.20.10.2:8000/admin/verifications/104 (should show images and location)\n";
+echo "2. Visit: http://172.20.10.2:8000/admin/verifications/78 (should show 'No Documents' message)\n";
 ?>

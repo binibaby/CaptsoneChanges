@@ -138,9 +138,15 @@
                 
                 <div class="mb-4">
                     <label for="new-password" class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-                    <input type="password" id="new-password" name="new_password" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                           placeholder="Enter new password" minlength="8" required>
+                    <div class="relative">
+                        <input type="password" id="new-password" name="new_password" 
+                               class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="Enter new password" minlength="8" required>
+                        <button type="button" onclick="togglePasswordVisibility('new-password', 'new-password-toggle')" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                            <i id="new-password-toggle" class="fas fa-eye text-gray-400 hover:text-gray-600 cursor-pointer"></i>
+                        </button>
+                    </div>
                     <p class="text-xs text-gray-500 mt-1">
                         Password must contain at least 8 characters with uppercase, lowercase, number, and special character (@$!%*?&)
                     </p>
@@ -148,9 +154,15 @@
 
                 <div class="mb-6">
                     <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-                    <input type="password" id="confirm-password" name="confirm_password" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                           placeholder="Confirm new password" minlength="8" required>
+                    <div class="relative">
+                        <input type="password" id="confirm-password" name="confirm_password" 
+                               class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="Confirm new password" minlength="8" required>
+                        <button type="button" onclick="togglePasswordVisibility('confirm-password', 'confirm-password-toggle')" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                            <i id="confirm-password-toggle" class="fas fa-eye text-gray-400 hover:text-gray-600 cursor-pointer"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Error/Success Messages -->
@@ -305,5 +317,21 @@ document.getElementById('password-modal').addEventListener('click', function(e) 
         closePasswordModal();
     }
 });
+
+// Password visibility toggle function
+function togglePasswordVisibility(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
 </script>
 @endsection

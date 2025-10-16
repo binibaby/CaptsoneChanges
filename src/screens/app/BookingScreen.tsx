@@ -42,6 +42,7 @@ const BookingScreen: React.FC = () => {
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange | null>(null);
   const [loading, setLoading] = useState(true);
   const [sitterIsOnline, setSitterIsOnline] = useState<boolean>(true);
+  const [isCheckingDate, setIsCheckingDate] = useState<boolean>(false);
 
   useEffect(() => {
     if (sitterId) {
@@ -300,6 +301,71 @@ const BookingScreen: React.FC = () => {
     }
   };
 
+  // Check if the selected date is marked as full by the sitter
+  const checkIfDateIsFull = async () => {
+    if (!selectedDate || !sitterId) {
+      return; // No date or sitter selected, skip check
+    }
+
+    setIsCheckingDate(true);
+    
+    try {
+      const { makeApiCall } = await import('../../services/networkService');
+      const user = await authService.getCurrentUser();
+      
+      if (!user?.token) {
+        console.log('⚠️ No token available for date full check');
+        return;
+      }
+
+      console.log('🔍 Checking if date is marked as full:', selectedDate, 'for sitter:', sitterId);
+
+      // Call a new API endpoint to check if date is full
+      const response = await makeApiCall(`/api/sitters/${sitterId}/check-date-full/${selectedDate}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.is_full) {
+          const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric', 
+            year: 'numeric' 
+          });
+          
+          Alert.alert(
+            'Date Not Available',
+            `Sorry, ${sitterName || 'this sitter'} has marked ${formattedDate} as full and is not accepting new bookings for this day. Please choose a different date.`,
+            [
+              {
+                text: 'OK',
+                style: 'default'
+              }
+            ]
+          );
+          
+          throw new Error('DATE_FULL'); // Stop the booking process
+        }
+      } else {
+        console.log('⚠️ Could not check date full status, proceeding with booking');
+      }
+    } catch (error) {
+      if ((error as Error).message === 'DATE_FULL') {
+        throw error; // Re-throw to stop booking process
+      }
+      console.error('❌ Error checking date full status:', error);
+      // Continue with booking if check fails
+    } finally {
+      setIsCheckingDate(false);
+    }
+  };
+
 
 
 
@@ -316,6 +382,18 @@ const BookingScreen: React.FC = () => {
         Alert.alert('Error', 'Please log in to make a booking');
         return;
       }
+
+      // Check if the selected date is marked as full by the sitter
+      try {
+        await checkIfDateIsFull();
+      } catch (error) {
+        if ((error as Error).message === 'DATE_FULL') {
+          // Error already handled in checkIfDateIsFull function
+          return; // Stop execution - booking is blocked
+        }
+        // For other errors, continue with booking (fail-safe)
+        console.log('⚠️ Date check failed, proceeding with booking');
+      }
       
       console.log('📝 BookingScreen - Creating booking with data:', {
         sitterId,
@@ -324,6 +402,9 @@ const BookingScreen: React.FC = () => {
         endTime: selectedTimeRange.endTime,
         sitterRate
       });
+      
+      console.log('🚀 About to call bookingService.createBooking...');
+      console.log('🚀 This call should throw an error for DATE_FULL and never reach the success logs below');
       
       // Debug: Log the exact data being passed to createBooking
       console.log('📝 BookingScreen - Exact data for createBooking:', {
@@ -335,7 +416,7 @@ const BookingScreen: React.FC = () => {
         startTime: selectedTimeRange.startTime,
         endTime: selectedTimeRange.endTime,
         hourlyRate: parseFloat(sitterRate || '25'),
-        status: 'confirmed',
+        status: 'pending',
       });
       
       // Create booking using the service (which handles API call)
@@ -348,10 +429,13 @@ const BookingScreen: React.FC = () => {
         startTime: selectedTimeRange.startTime,
         endTime: selectedTimeRange.endTime,
         hourlyRate: parseFloat(sitterRate || '25'),
-        status: 'confirmed', // Auto-confirmed - no manual confirmation needed
+        status: 'pending', // Pending until payment is successful
       });
       
+      console.log('🚨 CRITICAL: This line should NEVER be reached for DATE_FULL errors!');
+      console.log('🚨 If you see this log, the bookingService.createBooking did NOT throw an error!');
       console.log('✅ New booking created:', newBooking);
+      console.log('🚀 Booking creation successful - proceeding with message creation...');
 
       // Note: Backend will create the notification with the correct data from the database
 
@@ -427,7 +511,41 @@ const BookingScreen: React.FC = () => {
       });
     } catch (error) {
       console.error('❌ BookingScreen - Error creating booking:', error);
-      Alert.alert('Error', 'Failed to send booking request. Please try again.');
+      console.error('🔍 Error type:', typeof error);
+      console.error('🔍 Error code:', (error as any).code);
+      console.error('🔍 Error message:', (error as Error).message);
+      
+      // Check if this is a DATE_FULL error
+      if ((error as any).code === 'DATE_FULL' || (error instanceof Error && error.message === 'DATE_FULL')) {
+        console.error('🚫 DATE_FULL error caught - showing alert and stopping execution');
+        console.error('🔍 Original message:', (error as any).originalMessage);
+        
+        const originalMessage = (error as any).originalMessage;
+        const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'long', 
+          day: 'numeric', 
+          year: 'numeric' 
+        });
+        
+        Alert.alert(
+          'Date Not Available',
+          originalMessage || `Sorry, ${sitterName || 'this sitter'} has marked ${formattedDate} as full and is not accepting new bookings for this day. Please choose a different date.`,
+          [
+            {
+              text: 'OK',
+              style: 'default'
+            }
+          ]
+        );
+        console.error('🚫 RETURNING - booking process stopped');
+        return; // CRITICAL: Stop execution here - do not proceed with booking
+      } else {
+        console.error('🚫 Other error caught - showing generic alert and stopping execution');
+        Alert.alert('Error', 'Failed to send booking request. Please try again.');
+        console.error('🚫 RETURNING - booking process stopped');
+        return; // Also stop execution for other errors
+      }
     }
   };
 
@@ -741,15 +859,27 @@ const BookingScreen: React.FC = () => {
         })() && (
           <View style={styles.buttonShadow}>
             <TouchableOpacity
-              style={styles.bookNowButton}
+              style={[styles.bookNowButton, { opacity: isCheckingDate ? 0.7 : 1 }]}
+              disabled={isCheckingDate}
               onPress={handleBookNow}
             >
               <View style={styles.buttonContent}>
-                <Ionicons name="calendar" size={24} color="#fff" />
-                <Text style={styles.bookNowButtonText}>
-                  Book Now
-                </Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" />
+                {isCheckingDate ? (
+                  <>
+                    <Ionicons name="hourglass" size={24} color="#fff" />
+                    <Text style={styles.bookNowButtonText}>
+                      Checking Availability...
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="calendar" size={24} color="#fff" />
+                    <Text style={styles.bookNowButtonText}>
+                      Book Now
+                    </Text>
+                    <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  </>
+                )}
               </View>
             </TouchableOpacity>
           </View>

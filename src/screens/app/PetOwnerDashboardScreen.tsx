@@ -12,12 +12,20 @@ import {
 } from 'react-native';
 import LocationDisplay from '../../components/LocationDisplay';
 import { useAuth } from '../../contexts/AuthContext';
+import { notificationService } from '../../services/notificationService';
+import { simpleMessagingService } from '../../services/simpleMessagingService';
 
 const PetOwnerDashboardScreen = () => {
   const router = useRouter();
   const { user, profileUpdateTrigger } = useAuth();
   const [imageError, setImageError] = useState<boolean>(false);
   const [imageRefreshKey, setImageRefreshKey] = useState<number>(0);
+  const [notificationCount, setNotificationCount] = useState<number>(0);
+  const [messageCount, setMessageCount] = useState<number>(0);
+  
+  console.log('🔔 PetOwnerDashboardScreen: Component rendered');
+  console.log('🔔 PetOwnerDashboardScreen: Current notification count:', notificationCount);
+  console.log('🔔 PetOwnerDashboardScreen: Current message count:', messageCount);
   
   // Helper function to check if image URI is valid
   const isValidImageUri = (uri: string | undefined): boolean => {
@@ -42,7 +50,7 @@ const PetOwnerDashboardScreen = () => {
       console.log('🔗 PetOwnerDashboardScreen: Generated URL for profile_images/ path:', fullUrl);
       return fullUrl;
     }
-    const fullUrl = `http://172.20.10.2:8000/storage/${uri}`;
+    const fullUrl = `http://192.168.100.197:8000/storage/${uri}`;
     console.log('🔗 PetOwnerDashboardScreen: Generated URL for fallback path:', fullUrl);
     return fullUrl;
   };
@@ -56,6 +64,43 @@ const PetOwnerDashboardScreen = () => {
   const handleImageLoad = () => {
     setImageError(false);
   };
+
+  // Load notification and message counts
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        console.log('🔔 PetOwnerDashboardScreen: Loading notification count...');
+        
+        // Force refresh notifications from API
+        await notificationService.forceRefreshFromAPI();
+        
+        const notificationCount = await notificationService.getUnreadCount();
+        console.log('🔔 PetOwnerDashboardScreen: Notification count loaded:', notificationCount);
+        console.log('🔔 PetOwnerDashboardScreen: Setting notification count state to:', notificationCount);
+        setNotificationCount(notificationCount);
+        console.log('🔔 PetOwnerDashboardScreen: State set, current state should be:', notificationCount);
+        
+        const messageCount = await simpleMessagingService.getUnreadCountForUser('owner');
+        console.log('📱 PetOwnerDashboardScreen: Message count loaded:', messageCount);
+        setMessageCount(messageCount);
+      } catch (error) {
+        console.error('Error loading counts:', error);
+      }
+    };
+
+    loadCounts();
+
+    // Subscribe to notification updates
+    const notificationUnsubscribe = notificationService.subscribe(async () => {
+      console.log('🔄 PetOwnerDashboardScreen: Notification update received, refreshing count...');
+      const count = await notificationService.getUnreadCount();
+      console.log('🔄 PetOwnerDashboardScreen: Updated notification count:', count);
+      setNotificationCount(count);
+      console.log('🔄 PetOwnerDashboardScreen: State updated to:', count);
+    });
+
+    return notificationUnsubscribe;
+  }, []);
 
   // Reset image error when profile updates
   useEffect(() => {
@@ -94,6 +139,7 @@ const PetOwnerDashboardScreen = () => {
   };
 
   const handleViewNotifications = () => {
+    console.log('🔔 PetOwnerDashboardScreen: Notification button clicked, count:', notificationCount);
     router.push('/pet-owner-notifications');
   };
 
@@ -105,10 +151,49 @@ const PetOwnerDashboardScreen = () => {
           <View style={styles.headerLeft}>
             <Text style={styles.greeting}>Good morning, {user?.name || 'User'}! 👋</Text>
             <Text style={styles.subtitle}>Ready to find care for your pets?</Text>
+            {/* Debug: Show notification count */}
+            <View style={{ backgroundColor: '#ffeb3b', padding: 8, marginTop: 4, borderRadius: 4 }}>
+              <Text style={{ fontSize: 14, color: '#000', fontWeight: 'bold' }}>
+                🔍 DEBUG: Notifications: {notificationCount} | Messages: {messageCount}
+              </Text>
+            </View>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={handleViewNotifications} style={{ marginRight: 16 }}>
+            <TouchableOpacity onPress={handleViewNotifications} style={{ marginRight: 16, position: 'relative' }}>
               <Ionicons name="notifications-outline" size={24} color="#222" />
+              {(() => {
+                console.log('🔔 PetOwnerDashboardScreen: Rendering notification badge, count:', notificationCount);
+                return notificationCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {notificationCount > 99 ? '99+' : notificationCount}
+                    </Text>
+                  </View>
+                );
+              })()}
+            </TouchableOpacity>
+            {/* Debug: Manual refresh button */}
+            <TouchableOpacity 
+              onPress={async () => {
+                console.log('🔄 Manual refresh triggered');
+                await notificationService.forceRefreshFromAPI();
+                const count = await notificationService.getUnreadCount();
+                setNotificationCount(count);
+                console.log('🔄 Manual refresh result:', count);
+              }}
+              style={{ marginRight: 8, padding: 4 }}
+            >
+              <Ionicons name="refresh" size={20} color="#666" />
+            </TouchableOpacity>
+            {/* Debug: Test button */}
+            <TouchableOpacity 
+              onPress={() => {
+                console.log('🧪 Test button clicked - setting count to 5');
+                setNotificationCount(5);
+              }}
+              style={{ marginRight: 8, padding: 8, backgroundColor: '#4CAF50', borderRadius: 4 }}
+            >
+              <Text style={{ fontSize: 14, color: '#fff', fontWeight: 'bold' }}>TEST</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.profileButton} onPress={handleViewProfile}>
               <Image 
@@ -181,6 +266,13 @@ const PetOwnerDashboardScreen = () => {
             <TouchableOpacity style={styles.actionCard} onPress={handleViewMessages}>
               <View style={styles.actionIcon}>
                 <Ionicons name="chatbubbles" size={24} color="#FF9800" />
+                {messageCount > 0 && (
+                  <View style={styles.messageBadge}>
+                    <Text style={styles.messageBadgeText}>
+                      {messageCount > 99 ? '99+' : messageCount}
+                    </Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.actionTitle}>Messages</Text>
               <Text style={styles.actionSubtitle}>Chat with sitters</Text>
@@ -385,6 +477,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  messageBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  messageBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

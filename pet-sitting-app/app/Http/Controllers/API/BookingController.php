@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Notification;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class BookingController extends Controller
@@ -165,6 +166,30 @@ class BookingController extends Controller
             ], 404);
         }
 
+        // Check if the sitter has marked this date as full
+        $bookingDate = $request->date;
+        $fullStatusKey = "sitter_availability_full_{$request->sitter_id}_{$bookingDate}";
+        $isMarkedAsFull = Cache::has($fullStatusKey);
+        
+        // Debug: Log the cache check details
+        \Log::info('🔍 DATE_FULL cache check:', [
+            'sitter_id' => $request->sitter_id,
+            'booking_date' => $bookingDate,
+            'cache_key' => $fullStatusKey,
+            'is_marked_as_full' => $isMarkedAsFull,
+            'cache_exists' => Cache::has($fullStatusKey),
+            'cache_value' => Cache::get($fullStatusKey)
+        ]);
+        
+        if ($isMarkedAsFull) {
+            $formattedDate = \Carbon\Carbon::parse($bookingDate)->format('M j, Y');
+            return response()->json([
+                'success' => false,
+                'message' => "Sorry, {$sitter->name} has marked {$formattedDate} as full and is not accepting new bookings for this day.",
+                'error_code' => 'DATE_FULL'
+            ], 422);
+        }
+
         // Determine if this is a weekly booking
         $isWeekly = $request->boolean('is_weekly', false);
         
@@ -191,7 +216,7 @@ class BookingController extends Controller
             'sitter_id' => $request->sitter_id,
             'date' => $request->date,
             'time' => $request->time,
-            'status' => 'confirmed',
+            'status' => 'pending',
             'is_weekly' => $isWeekly,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
@@ -248,7 +273,12 @@ class BookingController extends Controller
         ]);
 
         // Notify the sitter about new confirmed booking (auto-confirmed)
-        $this->notifySitterNewBooking($booking, $sitter);
+        // MOVED TO PAYMENT SUCCESS - Only notify after payment is confirmed
+        // $this->notifySitterNewBooking($booking, $sitter);
+
+        // Notify the pet owner about their booking creation
+        // MOVED TO PAYMENT SUCCESS - Only notify after payment is confirmed
+        // $this->notifyPetOwnerBookingCreated($booking, $user);
 
         return response()->json([
             'success' => true,
@@ -606,17 +636,7 @@ class BookingController extends Controller
             }
         }
         
-        $currentTime = Carbon::now();
-        $timeDifference = $startTime->diffInMinutes($currentTime, false);
-
-        // Allow starting session at any time (removed 3-minute restriction)
-        // Only prevent starting if it's more than 24 hours in the future
-        if ($timeDifference > 1440) { // 1440 minutes = 24 hours
-            return response()->json([
-                'success' => false,
-                'message' => 'Session cannot be started more than 24 hours in advance.'
-            ], 400);
-        }
+        // Allow starting session at any time - no time restrictions
 
         try {
             // Update booking status to active
@@ -732,7 +752,7 @@ class BookingController extends Controller
                     $owner->notifications()->create([
                         'type' => 'booking_completed',
                         'title' => 'Booking Completed',
-                        'message' => "Your booking with {$sitter->name} has been automatically completed. You can go to the Book Service page, open the Past tab, and rate and review your sitter.",
+                        'message' => "Your booking with {$sitter->name} has been automatically completed. Thank you for using our service!",
                         'data' => json_encode([
                             'booking_id' => $booking->id,
                             'sitter_name' => $sitter->name,
@@ -813,41 +833,32 @@ class BookingController extends Controller
             ], 403);
         }
 
-        // Check if booking is active
-        if ($booking->status !== 'active') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Booking must be active before completing the session.'
-            ], 400);
-        }
+        // Allow completing any booking - no status restrictions
 
         try {
+            // Get sitter and owner before updating
+            $sitter = $booking->sitter;
+            $owner = $booking->user;
+            
+            \Log::info('🔄 Completing booking:', [
+                'booking_id' => $booking->id,
+                'sitter_id' => $sitter->id,
+                'total_amount' => $booking->total_amount,
+                'current_status' => $booking->status
+            ]);
+            
             // Update booking status to completed
             $booking->update(['status' => 'completed']);
 
-            // Update sitter's wallet balance (90% of total amount)
-            $sitterShare = $booking->total_amount * 0.9;
-            $sitter->increment('wallet_balance', $sitterShare);
-
-            // Create wallet transaction record for the sitter
-            WalletTransaction::create([
-                'user_id' => $sitter->id,
-                'type' => 'credit',
-                'amount' => $sitterShare,
-                'status' => 'completed',
-                'reference_number' => 'BOOKING_' . $booking->id,
-                'notes' => 'Payment for completed booking #' . $booking->id,
-                'processed_at' => now(),
-            ]);
+            // REMOVED: Duplicate income addition - income already added when booking was paid
+            // No need to add income again when marking as completed
 
             // Create notification for the owner
-            $owner = $booking->user;
-            $sitter = $booking->sitter;
             
             $owner->notifications()->create([
                 'type' => 'booking_completed',
                 'title' => 'Booking Completed',
-                'message' => "Your booking with {$sitter->first_name} {$sitter->last_name} is now completed. You can go to the Book Service page, open the Past tab, and rate and review your sitter.",
+                'message' => "Your booking with {$sitter->first_name} {$sitter->last_name} is now completed. Thank you for using our service!",
                 'data' => json_encode([
                     'booking_id' => $booking->id,
                     'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
@@ -902,11 +913,18 @@ class BookingController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error completing booking: ' . $e->getMessage());
+            \Log::error('❌ Error completing booking:', [
+                'booking_id' => $booking->id,
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'error_trace' => $e->getTraceAsString()
+            ]);
             
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to complete booking. Please try again.'
+                'message' => 'Failed to complete booking. Please try again.',
+                'debug' => $e->getMessage()
             ], 500);
         }
     }
@@ -982,7 +1000,7 @@ class BookingController extends Controller
             $startTime = $this->safeParseTime($booking->start_time)->format('g:i A');
             $endTime = $this->safeParseTime($booking->end_time)->format('g:i A');
             
-            $message = "You have a new booking from {$booking->user->name}. Please check your schedule for details.";
+            $message = "You have a new weekly booking from {$booking->user->name} from {$startDate} to {$endDate}. Please check your schedule for details.";
         } else {
             // Daily booking message - parse date without timezone conversion
             $date = $this->safeParseDate($booking->date)->format('F j, Y');
@@ -996,7 +1014,7 @@ class BookingController extends Controller
                 $endTime = $this->safeParseTime($booking->time)->addHours($booking->duration ?? 8)->format('g:i A');
             }
             
-            $message = "You have a new booking from {$booking->user->name}. Please check your schedule for details.";
+            $message = "You have a new booking from {$booking->user->name} on {$date}. Please check your schedule for details.";
         }
         
         // Debug: Log the final message being created
@@ -1017,6 +1035,67 @@ class BookingController extends Controller
                 'booking_type' => $booking->is_weekly ? 'weekly' : 'daily',
                 'pet_owner_name' => $booking->user->name,
                 'sitter_name' => $sitter->name,
+                'date' => $booking->date,
+                'time' => $booking->time,
+                'start_date' => $booking->start_date,
+                'end_date' => $booking->end_date,
+                'start_time' => $booking->start_time,
+                'end_time' => $booking->end_time,
+                'hourly_rate' => $booking->hourly_rate,
+                'status' => $booking->status
+            ])
+        ]);
+    }
+
+    private function notifyPetOwnerBookingCreated($booking, $user)
+    {
+        // Debug: Log the booking data being used for notification
+        \Log::info('🔔 Creating pet owner notification for booking:', [
+            'booking_id' => $booking->id,
+            'date' => $booking->date,
+            'time' => $booking->time,
+            'start_time' => $booking->start_time,
+            'end_time' => $booking->end_time,
+            'duration' => $booking->duration,
+            'is_weekly' => $booking->is_weekly,
+            'pet_owner_name' => $user->name,
+            'sitter_name' => $booking->sitter->name
+        ]);
+        
+        $message = '';
+        
+        if ($booking->is_weekly) {
+            // Weekly booking message
+            $startDate = $this->safeParseDate($booking->start_date)->format('F j, Y');
+            $endDate = $this->safeParseDate($booking->end_date)->format('F j, Y');
+            $startTime = $this->safeParseTime($booking->start_time)->format('g:i A');
+            $endTime = $this->safeParseTime($booking->end_time)->format('g:i A');
+            
+            $message = "Your weekly booking with {$booking->sitter->name} has been created successfully from {$startDate} to {$endDate}.";
+        } else {
+            // Daily booking message
+            $date = $this->safeParseDate($booking->date)->format('F j, Y');
+            $time = $this->safeParseTime($booking->time)->format('g:i A');
+            
+            $message = "Your booking with {$booking->sitter->name} has been created successfully for {$date} at {$time}.";
+        }
+        
+        \Log::info('🔔 Pet owner notification message:', [
+            'message' => $message,
+            'formatted_start_time' => $startTime ?? 'N/A',
+            'formatted_end_time' => $endTime ?? 'N/A'
+        ]);
+        
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'booking',
+            'title' => 'Booking Created Successfully',
+            'message' => $message,
+            'data' => json_encode([
+                'booking_id' => $booking->id,
+                'booking_type' => $booking->is_weekly ? 'weekly' : 'daily',
+                'pet_owner_name' => $user->name,
+                'sitter_name' => $booking->sitter->name,
                 'date' => $booking->date,
                 'time' => $booking->time,
                 'start_date' => $booking->start_date,

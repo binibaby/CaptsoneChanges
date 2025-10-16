@@ -28,6 +28,7 @@ class NotificationController extends Controller
                     'title' => $notification->title ?: 'Notification',
                     'message' => $notification->message,
                     'read_at' => $notification->read_at,
+                    'isRead' => !is_null($notification->read_at), // Add isRead field for frontend
                     'created_at' => $notification->created_at->format('Y-m-d H:i:s'),
                     'data' => $notification->data ? json_decode($notification->data, true) : null
                 ];
@@ -99,8 +100,12 @@ class NotificationController extends Controller
                 // Pet sitters see: booking requests, messages, reviews, system notifications, profile updates, ID verification
                 return in_array($notification->type, [
                     'booking',
+                    'booking_confirmed',
+                    'booking_completed',
+                    'session_started',
                     'message', 
                     'review',
+                    'new_review',
                     'system',
                     'profile_update_approved',
                     'profile_update_rejected',
@@ -108,18 +113,15 @@ class NotificationController extends Controller
                     'id_verification_rejected'
                 ]);
             } else {
-                // Pet owners see: booking confirmations/cancellations, messages, system notifications, profile updates
+                // Pet owners see: all booking notifications, messages, system notifications, profile updates
                 // (NO ID verification notifications)
                 if (in_array($notification->type, ['id_verification_approved', 'id_verification_rejected'])) {
                     return false;
                 }
                 
+                // Show all booking notifications for pet owners
                 if ($notification->type === 'booking') {
-                    // Only show booking notifications with specific statuses
-                    $data = $notification->data ? json_decode($notification->data, true) : [];
-                    return isset($data['status']) && in_array($data['status'], ['confirmed', 'cancelled']) ||
-                           str_contains($notification->title ?? '', 'confirmed') ||
-                           str_contains($notification->title ?? '', 'cancelled');
+                    return true;
                 }
                 
                 return in_array($notification->type, [

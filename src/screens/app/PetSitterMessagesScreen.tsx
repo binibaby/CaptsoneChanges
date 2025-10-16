@@ -1,19 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { ReverbConversation, ReverbMessage, reverbMessagingService } from '../../services/reverbMessagingService';
@@ -78,11 +78,30 @@ const PetSitterMessagesScreen = () => {
   const loadConversations = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('💬 Sitter: Loading conversations for current user...');
+      
+      // Load conversations for current sitter
       const data = await reverbMessagingService.getConversations();
+      console.log('💬 Sitter conversations loaded:', data.length);
+      
+      // Additional safety check: verify conversations belong to current user
+      const { default: authService } = await import('../../services/authService');
+      const currentUser = await authService.getCurrentUser();
+      console.log('💬 Sitter current user ID:', currentUser?.id);
+      
+      if (data && data.length > 0) {
+        console.log('💬 Sitter conversation details:', data.map(conv => ({
+          conversation_id: conv.conversation_id,
+          other_user_id: conv.other_user?.id,
+          other_user_name: conv.other_user?.name
+        })));
+      }
+      
       setConversations(data);
+      
     } catch (error) {
       console.error('❌ Error loading conversations:', error);
-      Alert.alert('Error', 'Failed to load conversations');
+      setConversations([]);
     } finally {
       setLoading(false);
     }
@@ -190,6 +209,14 @@ const PetSitterMessagesScreen = () => {
     }
   }, [loadConversations, selectedConversation]);
 
+  // Refresh conversations when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('💬 PetSitterMessagesScreen: Screen focused, refreshing conversations...');
+      loadConversations();
+    }, [loadConversations])
+  );
+
   // Handle opening specific conversation when conversations are loaded
   useEffect(() => {
     if (params.conversationId && !hasAutoOpenedConversation) {
@@ -207,11 +234,11 @@ const PetSitterMessagesScreen = () => {
         const otherUserId = params.otherUserId;
         if (otherUserId) {
           const newConversation: ReverbConversation = {
-            conversation_id: params.conversationId,
+            conversation_id: Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId || '',
             other_user: {
-              id: otherUserId,
-              name: params.otherUserName || `Pet Owner ${otherUserId}`,
-              profile_image: params.otherUserImage || null
+              id: Array.isArray(otherUserId) ? otherUserId[0] : otherUserId || '',
+              name: Array.isArray(params.otherUserName) ? params.otherUserName[0] : params.otherUserName || `Pet Owner ${Array.isArray(otherUserId) ? otherUserId[0] : otherUserId}`,
+              profile_image: Array.isArray(params.otherUserImage) ? params.otherUserImage[0] : params.otherUserImage || null
             },
             last_message: null,
             unread_count: 0,

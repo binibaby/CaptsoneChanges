@@ -99,7 +99,7 @@ export const getApiUrlWithFallback = async (endpoint: string): Promise<string> =
 
 // Helper function to get headers with auth token
 export const getAuthHeaders = (token?: string) => {
-  const headers = { ...API_CONFIG.DEFAULT_HEADERS };
+  const headers: Record<string, string> = { ...API_CONFIG.DEFAULT_HEADERS };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }

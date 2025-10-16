@@ -28,9 +28,9 @@ try {
         $fixedImage = $originalImage;
 
         // Check if the profile_image contains a double URL
-        if (strpos($originalImage, 'http://192.168.100.192:8000/storage/http://192.168.100.192:8000/storage/') === 0) {
+        if (strpos($originalImage, 'http://172.20.10.2:8000/storage/http://172.20.10.2:8000/storage/') === 0) {
             // Extract the actual storage path
-            $fixedImage = str_replace('http://192.168.100.192:8000/storage/', '', $originalImage);
+            $fixedImage = str_replace('http://172.20.10.2:8000/storage/', '', $originalImage);
             echo "Fixing user {$user->id}: {$originalImage} -> {$fixedImage}\n";
             
             // Update the database
@@ -41,7 +41,7 @@ try {
             $fixedCount++;
         } elseif (strpos($originalImage, 'http://192.168.100.192:8000/storage/') === 0) {
             // This is a single full URL, convert to storage path
-            $fixedImage = str_replace('http://192.168.100.192:8000/storage/', '', $originalImage);
+            $fixedImage = str_replace('http://172.20.10.2:8000/storage/', '', $originalImage);
             echo "Converting full URL for user {$user->id}: {$originalImage} -> {$fixedImage}\n";
             
             // Update the database

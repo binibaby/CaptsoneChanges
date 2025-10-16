@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingService } from '../../services/bookingService';
@@ -42,7 +42,7 @@ const PetSitterNotificationsScreen: React.FC = () => {
       console.log('🔔 Loading notifications for pet sitter:', user.id);
       setLoading(true);
       
-      const fetchedNotifications = await notificationService.getNotifications();
+      const fetchedNotifications = await notificationService.forceRefreshFromAPI();
       console.log('📱 Fetched notifications:', fetchedNotifications.length);
       
       setNotifications(fetchedNotifications);
@@ -191,7 +191,8 @@ const PetSitterNotificationsScreen: React.FC = () => {
       
     } catch (error) {
       console.error(`Error ${action}ing booking:`, error);
-      Alert.alert('Error', `Failed to ${action} booking: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to ${action} booking: ${errorMessage}`);
     }
   };
 
@@ -203,7 +204,7 @@ const PetSitterNotificationsScreen: React.FC = () => {
     const initializeRealtime = async () => {
       try {
         console.log('🔔 Initializing real-time notifications for pet sitter:', user.id);
-        const token = user.token || '688|fg2lyoMmhIR8BGBwHgVp9MuohtviVQJ911IUJBrb4be87cba'; // Fallback token for sitter 126
+        const token = user.token || '';
         const connected = await realtimeNotificationService.initialize(user.id, token);
         setRealtimeConnected(connected);
         
@@ -318,6 +319,8 @@ const PetSitterNotificationsScreen: React.FC = () => {
           )}
         </View>
         
+        {/* Spacer to balance the back button */}
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Unread count banner */}
@@ -367,10 +370,14 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     marginRight: 8,
+    width: 40,
   },
   headerTitleContainer: {
     flex: 1,
     alignItems: 'center',
+  },
+  headerSpacer: {
+    width: 40,
   },
   headerTitle: {
     fontSize: 24,

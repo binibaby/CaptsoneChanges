@@ -150,6 +150,15 @@ class ReviewController extends Controller
 
             DB::commit();
 
+            \Log::info('✅ Review submitted successfully:', [
+                'review_id' => $review->id,
+                'sitter_id' => $sitter->id,
+                'sitter_name' => "{$sitter->first_name} {$sitter->last_name}",
+                'average_rating' => $sitter->getAverageRating(),
+                'rating' => $review->rating,
+                'review_text' => $review->review
+            ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Review submitted successfully.',

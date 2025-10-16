@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Certificate {
@@ -38,7 +38,7 @@ const CertificateViewer: React.FC<CertificateViewerProps> = ({
 
   // Helper function to get proper image source using network service
   const getImageSource = (imagePath: string) => {
-    if (!imagePath) return null;
+    if (!imagePath) return { uri: 'https://via.placeholder.com/150' };
     
     // If it's a URL (starts with http), use it directly
     if (imagePath.startsWith('http')) {

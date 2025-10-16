@@ -271,9 +271,7 @@ const PetOwnerJobsScreen = () => {
   // Updated filtering logic for new categories
   const activeBookings = bookings.filter(booking => booking.status === 'active');
   const upcomingBookings = bookings.filter(booking => 
-    booking.status !== 'completed' && 
-    booking.status !== 'cancelled' && 
-    booking.status !== 'active'
+    booking.status === 'confirmed'
   );
   const pastBookings = bookings.filter(booking => booking.status === 'completed' || booking.status === 'cancelled');
 

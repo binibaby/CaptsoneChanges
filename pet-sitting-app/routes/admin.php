@@ -110,6 +110,7 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
     // ID Verification Management
     Route::prefix('verifications')->name('verifications.')->group(function () {
         Route::get('/', [VerificationController::class, 'index'])->name('index');
+        Route::get('/id-access', [VerificationController::class, 'idAccess'])->name('id-access');
         Route::get('/{verification}', [VerificationController::class, 'show'])->name('show');
         Route::get('/{verification}/enhanced', [VerificationController::class, 'enhancedShow'])->name('enhanced-show');
         Route::post('/{verification}/approve', [VerificationController::class, 'approve'])->name('approve');
@@ -121,6 +122,10 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
     // ID Verification API Routes (AJAX) - REAL-TIME SYSTEM
     Route::prefix('api/verifications')->name('api.verifications.')->group(function () {
         Route::get('/', [VerificationController::class, 'getVerifications'])->name('list');
+        Route::get('/unverified-sitters', [VerificationController::class, 'getUnverifiedSitters'])->name('unverified-sitters');
+        Route::post('/{id}/manual-verify', [VerificationController::class, 'manualVerify'])->name('manual-verify');
+        Route::get('/debug', [VerificationController::class, 'debugVerifications'])->name('debug');
+        Route::post('/cleanup-statuses', [VerificationController::class, 'cleanupInconsistentStatuses'])->name('cleanup-statuses');
         Route::get('/{id}/details', [VerificationController::class, 'getVerificationDetails'])->name('details');
         Route::get('/status-updates', [VerificationController::class, 'getStatusUpdates'])->name('status-updates');
         Route::post('/bulk-action', [VerificationController::class, 'bulkAction'])->name('bulk');

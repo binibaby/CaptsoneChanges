@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { notificationService } from '../../services/notificationService';
@@ -41,7 +41,7 @@ const PetOwnerNotificationsScreen: React.FC = () => {
       console.log('🔔 Loading notifications for pet owner:', user.id);
       setLoading(true);
       
-      const fetchedNotifications = await notificationService.getNotifications();
+      const fetchedNotifications = await notificationService.forceRefreshFromAPI();
       console.log('📱 Fetched notifications:', fetchedNotifications.length);
       
       setNotifications(fetchedNotifications);
@@ -287,6 +287,8 @@ const PetOwnerNotificationsScreen: React.FC = () => {
           )}
         </View>
         
+        {/* Spacer to balance the back button */}
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Unread count banner */}
@@ -336,10 +338,14 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     marginRight: 8,
+    width: 40,
   },
   headerTitleContainer: {
     flex: 1,
     alignItems: 'center',
+  },
+  headerSpacer: {
+    width: 40,
   },
   headerTitle: {
     fontSize: 24,

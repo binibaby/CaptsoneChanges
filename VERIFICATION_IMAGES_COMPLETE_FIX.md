@@ -52,7 +52,7 @@ Added comprehensive location information display:
 - ✅ **Location**: Manila, Philippines
 - ✅ **Coordinates**: 14.5995, 120.9842
 - ✅ **Accuracy**: 2.5 meters (High Accuracy)
-- ✅ **Admin Panel**: http://0.0.0.0:8000/admin/verifications/105
+- ✅ **Admin Panel**: http://172.20.10.2:8000/admin/verifications/105
 
 ### Verification ID 78 (Without Images)
 - ✅ **Correctly shows**: "No Verification Documents Submitted"
@@ -76,13 +76,13 @@ Added comprehensive location information display:
 ## How to Test
 
 ### 1. Admin Panel with Images
-Visit: `http://0.0.0.0:8000/admin/verifications/105`
+Visit: `http://172.20.10.2:8000/admin/verifications/105`
 - Should display all 4 images (Front ID, Back ID, Selfie, Document)
 - Should show location information with accuracy
 - Images should be clickable and open in modal
 
 ### 2. Admin Panel without Images  
-Visit: `http://0.0.0.0:8000/admin/verifications/78`
+Visit: `http://172.20.10.2:8000/admin/verifications/78`
 - Should show "No Verification Documents Submitted"
 - Should display appropriate placeholder and status
 

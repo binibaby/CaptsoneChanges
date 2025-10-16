@@ -148,9 +148,9 @@ class DashboardService {
 
       // Helper function to check if booking is upcoming (future schedule)
       const isBookingUpcoming = (booking: any) => {
-        // Include confirmed, pending, and active bookings that are in the future
+        // Only include CONFIRMED bookings - exclude pending, completed, cancelled, active
         // 'active' means payment is successful but job hasn't started yet
-        if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
+        if (booking.status !== 'confirmed') {
           console.log(`  - ${booking.date} (${booking.status}): excluded status`);
           return false;
         }
@@ -309,9 +309,9 @@ class DashboardService {
 
       // Helper function to check if booking is upcoming (future schedule)
       const isBookingUpcoming = (booking: any) => {
-        // Include confirmed, pending, and active bookings that are in the future
+        // Only include CONFIRMED bookings - exclude pending, completed, cancelled, active
         // 'active' means payment is successful but job hasn't started yet
-        if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
+        if (booking.status !== 'confirmed') {
           console.log(`  - ${booking.date} (${booking.status}): excluded status`);
           return false;
         }

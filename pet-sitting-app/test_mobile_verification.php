@@ -105,7 +105,7 @@ try {
             echo "   Document file exists: " . (file_exists($docPath) ? '✅ YES' : '❌ NO') . "\n";
             
             echo "\n🌐 Admin panel URLs:\n";
-            echo "   Enhanced view: http://0.0.0.0:8000/admin/verifications/" . $verification->id . "\n";
+            echo "   Enhanced view: http://172.20.10.2:8000/admin/verifications/" . $verification->id . "\n";
             echo "   Should show: Images + Location + Accuracy data\n";
         }
     } else {

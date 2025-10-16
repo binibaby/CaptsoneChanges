@@ -1,17 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -27,7 +27,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -188,14 +187,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
           </View>
 
           <View style={styles.optionsContainer}>
-            <TouchableOpacity style={styles.rememberMeCheckbox} onPress={() => setRememberMe(!rememberMe)}>
-              <Ionicons
-                name={rememberMe ? 'checkbox-outline' : 'square-outline'}
-                size={24}
-                color={rememberMe ? '#F59E0B' : '#666'}
-              />
-              <Text style={styles.rememberMeText}>Remember me</Text>
-            </TouchableOpacity>
             <TouchableOpacity onPress={handleForgotPassword}>
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
@@ -296,15 +287,6 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 20,
     alignItems: 'center',
-  },
-  rememberMeCheckbox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rememberMeText: {
-    marginLeft: 5,
-    fontSize: 14,
-    color: '#666',
   },
   forgotPasswordText: {
     color: '#F59E0B',

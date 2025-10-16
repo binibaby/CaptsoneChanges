@@ -93,7 +93,7 @@
             
             try {
                 // Test with a simple API endpoint first
-                const response = await fetch('http://192.168.100.192:8000/api/health', {
+                const response = await fetch('http://172.20.10.2:8000/api/health', {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -135,7 +135,7 @@
             
             try {
                 // Test verification status endpoint
-                const response = await fetch('http://192.168.100.192:8000/api/verification/status', {
+                const response = await fetch('http://172.20.10.2:8000/api/verification/status', {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,

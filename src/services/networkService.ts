@@ -61,7 +61,7 @@ export class NetworkService {
   public async detectWorkingIP(): Promise<string> {
     console.log('🔍 Detecting working IP address for WiFi connection...');
 
-    // Try the most likely IPs first (prioritize Mobile Data)
+    // Try the most likely IPs first (prioritize mobile data)
     const priorityIPs = [
       '172.20.10.2',      // Mobile data IP (primary)
       '172.20.10.1',      // Mobile hotspot gateway

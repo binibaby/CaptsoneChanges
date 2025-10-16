@@ -4,15 +4,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Image,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import SitterLocationSharing from '../../components/SitterLocationSharing';
 import authService from '../../services/authService';
@@ -20,6 +20,7 @@ import { Booking, bookingService } from '../../services/bookingService';
 import { DashboardMetrics, dashboardService } from '../../services/dashboardService';
 import { notificationService } from '../../services/notificationService';
 import { realtimeService } from '../../services/realtimeService';
+import { reverbMessagingService } from '../../services/reverbMessagingService';
 
 const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
 
@@ -53,7 +54,10 @@ const PetSitterDashboard = () => {
     completedJobs: 0,
   });
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  // Removed notification count for fresh start
+  const [notificationCount, setNotificationCount] = useState<number>(0);
+  const [messageCount, setMessageCount] = useState<number>(0);
+  const [hasNewBookings, setHasNewBookings] = useState<boolean>(false);
+  const [newBookingsCount, setNewBookingsCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
   const [imageError, setImageError] = useState<boolean>(false);
@@ -171,6 +175,25 @@ const PetSitterDashboard = () => {
       if (metrics.walletBalance !== undefined) {
         setWalletBalance(metrics.walletBalance);
       }
+      
+      // Load notification count
+      const count = await notificationService.getUnreadCount();
+      setNotificationCount(count);
+      
+      // Load message count from conversations
+      try {
+        const conversations = await reverbMessagingService.getConversations();
+        let totalUnreadCount = 0;
+        conversations.forEach(conv => {
+          totalUnreadCount += conv.unread_count || 0;
+        });
+        setMessageCount(totalUnreadCount);
+      } catch (error) {
+        console.error('Error getting message count:', error);
+        // Fallback to the original method
+        const messageCount = await reverbMessagingService.getUnreadCount();
+        setMessageCount(messageCount);
+      }
     } catch (error) {
       console.error('Error loading dashboard metrics:', error);
     }
@@ -241,9 +264,10 @@ const PetSitterDashboard = () => {
       });
 
       // Subscribe to notification updates to refresh count
-      const notificationUnsubscribe = notificationService.subscribe(() => {
+      const notificationUnsubscribe = notificationService.subscribe(async () => {
         console.log('🔄 Notification update received, refreshing count');
-        // Removed notification count loading
+        const count = await notificationService.getUnreadCount();
+        setNotificationCount(count);
       });
 
       return () => {
@@ -316,6 +340,19 @@ const PetSitterDashboard = () => {
       console.log('🔄 Loading dashboard data for user:', currentUserId);
       console.log('📡 Fetching fresh data from API...');
       
+      // Restore availability data when dashboard loads
+      try {
+        const response = await fetch('/api/sitters/restore-availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          console.log('✅ Availability data restored on login');
+        }
+      } catch (error) {
+        console.log('⚠️ Could not restore availability:', error);
+      }
+      
       // Clear booking service cache to ensure fresh data
       await bookingService.clearCache();
       console.log('🧹 Booking service cache cleared');
@@ -337,6 +374,11 @@ const PetSitterDashboard = () => {
         console.log(`  - ${booking.date} (${booking.status}): ${booking.startTime}-${booking.endTime}`);
       });
       setUpcomingBookings(upcoming);
+      
+      // Check for new bookings - count only non-completed bookings
+      const newBookings = upcoming.filter(booking => booking.status !== 'completed');
+      setHasNewBookings(newBookings.length > 0);
+      setNewBookingsCount(newBookings.length);
 
       // Load active bookings
       const active = await bookingService.getActiveSitterBookings(currentUserId);
@@ -400,6 +442,28 @@ const PetSitterDashboard = () => {
       } catch (error) {
         console.log('🔌 Real-time refresh failed, continuing with API data:', error);
       }
+      
+      // Force refresh notifications from API
+      await notificationService.forceRefreshFromAPI();
+      
+      // Refresh notification count
+      const notificationCount = await notificationService.getUnreadCount();
+      setNotificationCount(notificationCount);
+      
+      // Refresh message count
+      try {
+        const conversations = await reverbMessagingService.getConversations();
+        let totalUnreadCount = 0;
+        conversations.forEach(conv => {
+          totalUnreadCount += conv.unread_count || 0;
+        });
+        setMessageCount(totalUnreadCount);
+      } catch (error) {
+        console.error('Error refreshing message count:', error);
+        // Fallback to the original method
+        const messageCount = await reverbMessagingService.getUnreadCount();
+        setMessageCount(messageCount);
+      }
     } catch (error) {
       console.error('❌ Error refreshing dashboard data:', error);
     } finally {
@@ -441,7 +505,13 @@ const PetSitterDashboard = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={() => router.push('/pet-sitter-notifications')} style={{ marginRight: 16, position: 'relative' }}>
               <Ionicons name="notifications-outline" size={24} color="#222" />
-              {/* Removed notification count badge for fresh start */}
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/pet-sitter-profile')} style={styles.profileButton}>
               <Image
@@ -551,12 +621,7 @@ const PetSitterDashboard = () => {
               <Ionicons name="calendar" size={24} color="#fff" />
             </View>
             <Text style={styles.statsValueWhite}>
-              {(() => {
-                console.log('📅 Rendering upcoming jobs from dashboardService:', dashboardMetrics.upcomingBookings);
-                console.log('📅 Rendering upcoming jobs from upcomingBookings:', upcomingBookings.length);
-                // Use dashboardService metrics if available, fallback to upcomingBookings
-                return typeof dashboardMetrics.upcomingBookings === 'number' ? dashboardMetrics.upcomingBookings : (upcomingBookings.length || 0);
-              })()}
+              {newBookingsCount}
             </Text>
             <Text style={styles.statsLabelWhite}>Upcoming Jobs</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
@@ -597,7 +662,14 @@ const PetSitterDashboard = () => {
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsRow}>
           {quickActions.map((action) => (
-            <TouchableOpacity key={action.title} style={styles.quickAction} onPress={() => router.push(action.route as any)}>
+            <TouchableOpacity key={action.title} style={styles.quickAction} onPress={() => {
+              // Clear NEW indicator and reset count when My Schedule is clicked
+              if (action.title === 'My Schedule') {
+                setHasNewBookings(false);
+                setNewBookingsCount(0);
+              }
+              router.push(action.route as any);
+            }}>
               <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}> 
                 {typeof action.icon === 'string' ? (
                   <Ionicons name={action.icon as any} size={24} color="#fff" />
@@ -608,8 +680,24 @@ const PetSitterDashboard = () => {
                     resizeMode="contain"
                   />
                 )}
+                {/* Show message count badge for Messages action */}
+                {action.title === 'Messages' && messageCount > 0 && (
+                  <View style={styles.messageBadge}>
+                    <Text style={styles.messageBadgeText}>
+                      {messageCount > 99 ? '99+' : messageCount}
+                    </Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.quickActionLabel}>{action.title}</Text>
+              {/* Show booking count badge for My Schedule action */}
+              {action.title === 'My Schedule' && newBookingsCount > 0 && (
+                <View style={styles.bookingCountBadge}>
+                  <Text style={styles.bookingCountBadgeText}>
+                    {newBookingsCount > 99 ? '99+' : newBookingsCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -951,6 +1039,55 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
+  },
+  messageBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  messageBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  newIndicator: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#10B981',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  newIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  bookingCountBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  bookingCountBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

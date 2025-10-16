@@ -143,7 +143,7 @@ class PaymentController extends Controller
                 $sitter->notifications()->create([
                     'type' => 'booking_confirmed',
                     'title' => 'New Booking Confirmed',
-                    'message' => "You have a new confirmed booking for {$booking->pet_name} on {$booking->date->format('M j, Y')} at {$booking->start_time}.",
+                    'message' => "You have a new confirmed booking from {$booking->user->name} on {$booking->date->format('M j, Y')}.",
                     'data' => json_encode([
                         'booking_id' => $booking->id,
                         'pet_owner_name' => $booking->user->first_name . ' ' . $booking->user->last_name,
@@ -252,7 +252,7 @@ class PaymentController extends Controller
                 $sitter->notifications()->create([
                     'type' => 'booking_confirmed',
                     'title' => 'New Booking Confirmed',
-                    'message' => "You have a new confirmed booking for {$booking->pet_name} on {$booking->date->format('M j, Y')} at {$booking->start_time}.",
+                    'message' => "You have a new confirmed booking from {$booking->user->name} on {$booking->date->format('M j, Y')}.",
                     'data' => json_encode([
                         'booking_id' => $booking->id,
                         'pet_owner_name' => $booking->user->first_name . ' ' . $booking->user->last_name,

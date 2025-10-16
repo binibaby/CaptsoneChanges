@@ -42,12 +42,6 @@
             <h2 class="text-xl font-semibold text-gray-900">Verification Actions</h2>
         </div>
         <div class="flex items-center space-x-3">
-            <button id="refresh-verifications" class="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 px-4 py-2 rounded-xl border border-blue-200 transition-all duration-200 flex items-center shadow-sm hover:shadow-md">
-                <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                Refresh
-            </button>
             <button id="export-verifications" class="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white px-4 py-2 rounded-xl transition-all duration-200 flex items-center shadow-lg hover:shadow-xl">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -70,7 +64,7 @@
                 </div>
                 <div class="ml-4 flex-1">
                     <div class="text-sm font-medium text-white drop-shadow-lg">Pending Reviews</div>
-                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::where('verification_status', 'pending')->count() }}</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg pending-count">{{ \App\Models\Verification::where('verification_status', 'pending')->where('status', 'pending')->count() }}</div>
                 </div>
             </div>
         </div>
@@ -86,7 +80,7 @@
                 </div>
                 <div class="ml-4 flex-1">
                     <div class="text-sm font-medium text-white drop-shadow-lg">Approved</div>
-                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::where('verification_status', 'approved')->count() }}</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg approved-count">{{ \App\Models\Verification::where('verification_status', 'approved')->where('status', 'approved')->count() }}</div>
                 </div>
             </div>
         </div>
@@ -102,7 +96,7 @@
                 </div>
                 <div class="ml-4 flex-1">
                     <div class="text-sm font-medium text-white drop-shadow-lg">Rejected</div>
-                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::where('verification_status', 'rejected')->count() }}</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg rejected-count">{{ \App\Models\Verification::where('status', 'rejected')->count() }}</div>
                 </div>
             </div>
         </div>
@@ -118,7 +112,7 @@
                 </div>
                 <div class="ml-4 flex-1">
                     <div class="text-sm font-medium text-white drop-shadow-lg">Total Submissions</div>
-                    <div class="text-3xl font-bold text-white drop-shadow-lg">{{ \App\Models\Verification::count() }}</div>
+                    <div class="text-3xl font-bold text-white drop-shadow-lg total-count">{{ \App\Models\Verification::count() }}</div>
                 </div>
             </div>
         </div>
@@ -185,6 +179,7 @@
 let currentStatus = 'pending';
 let verifications = [];
 
+
 // Load verifications from API
 async function loadVerifications(status = 'pending') {
     try {
@@ -194,6 +189,16 @@ async function loadVerifications(status = 'pending') {
         if (data.success) {
             verifications = data.verifications.data;
             renderVerifications();
+            
+            // Update stats if available
+            if (data.stats) {
+                updateStats(data.stats);
+            }
+            
+            // Update debug info if available
+            if (data.debug) {
+                console.log('Verification Debug:', data.debug);
+            }
         } else {
             console.error('Failed to load verifications:', data.message);
             showError('Failed to load verifications');
@@ -201,6 +206,33 @@ async function loadVerifications(status = 'pending') {
     } catch (error) {
         console.error('Error loading verifications:', error);
         showError('Error loading verifications');
+    }
+}
+
+// Update stats display
+function updateStats(stats) {
+    // Update pending count
+    const pendingElement = document.querySelector('.pending-count');
+    if (pendingElement) {
+        pendingElement.textContent = stats.pending;
+    }
+    
+    // Update approved count
+    const approvedElement = document.querySelector('.approved-count');
+    if (approvedElement) {
+        approvedElement.textContent = stats.approved;
+    }
+    
+    // Update rejected count
+    const rejectedElement = document.querySelector('.rejected-count');
+    if (rejectedElement) {
+        rejectedElement.textContent = stats.rejected;
+    }
+    
+    // Update total count
+    const totalElement = document.querySelector('.total-count');
+    if (totalElement) {
+        totalElement.textContent = stats.total;
     }
 }
 
@@ -346,10 +378,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loadVerifications(currentStatus);
     });
     
-    // Refresh button
-    document.getElementById('refresh-btn').addEventListener('click', function() {
-        loadVerifications(currentStatus);
-    });
 });
 
 // Auto-refresh verification status every 30 seconds

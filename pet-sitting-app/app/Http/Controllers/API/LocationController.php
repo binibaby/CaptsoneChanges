@@ -1039,4 +1039,225 @@ class LocationController extends Controller
             ]);
         }
     }
+
+    /**
+     * Mark availability as full for a specific date
+     */
+    public function markAvailabilityAsFull(Request $request)
+    {
+        // Set CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        $user = $request->user();
+        
+        if (!$user || $user->role !== 'pet_sitter') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pet sitters can mark availability as full'
+            ], 403);
+        }
+
+        $request->validate([
+            'date' => 'required|date',
+            'is_full' => 'required|boolean'
+        ]);
+
+        try {
+            $date = $request->input('date');
+            $isFull = $request->input('is_full');
+
+            // Store the full status in cache with a specific key
+            $fullStatusKey = "sitter_availability_full_{$user->id}_{$date}";
+            
+            // Debug: Log the cache key creation
+            Log::info('🔍 DATE_FULL cache key creation:', [
+                'user_id' => $user->id,
+                'date' => $date,
+                'cache_key' => $fullStatusKey,
+                'is_full' => $isFull
+            ]);
+            
+            if ($isFull) {
+                Cache::put($fullStatusKey, [
+                    'date' => $date,
+                    'is_full' => true,
+                    'marked_at' => now()->toISOString(),
+                    'sitter_id' => $user->id,
+                    'sitter_name' => $user->name
+                ], 86400 * 7); // Store for 7 days
+
+                Log::info('📝 Availability marked as full', [
+                    'sitter_id' => $user->id,
+                    'sitter_name' => $user->name,
+                    'date' => $date
+                ]);
+
+                // Send notifications to pet owners who might be interested
+                $this->notifyPetOwnersAvailabilityFull($user, $date);
+
+            } else {
+                // Remove the full status
+                Cache::forget($fullStatusKey);
+                
+                Log::info('📝 Availability full status removed', [
+                    'sitter_id' => $user->id,
+                    'sitter_name' => $user->name,
+                    'date' => $date
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $isFull ? 'Availability marked as full successfully' : 'Availability full status removed successfully',
+                'date' => $date,
+                'is_full' => $isFull
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error marking availability as full', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to mark availability as full'
+            ], 500);
+        }
+    }
+
+    /**
+     * Check if a specific date is marked as full for a sitter
+     */
+    public function checkDateFull(Request $request, $sitterId, $date)
+    {
+        // Set CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+
+        try {
+            // Validate the date format
+            $parsedDate = \Carbon\Carbon::parse($date);
+            
+            // Check if the sitter has marked this date as full
+            $fullStatusKey = "sitter_availability_full_{$sitterId}_{$date}";
+            $isMarkedAsFull = Cache::has($fullStatusKey);
+            
+            // Debug: Log all cache keys to see what's available
+            $allKeys = Cache::getStore()->getRedis()->keys('*sitter_availability_full*');
+            Log::info('🔍 All full status cache keys:', $allKeys);
+            
+            Log::info('🔍 Checking date full status', [
+                'sitter_id' => $sitterId,
+                'date' => $date,
+                'is_full' => $isMarkedAsFull
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'is_full' => $isMarkedAsFull,
+                'date' => $date,
+                'sitter_id' => $sitterId
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error checking date full status', [
+                'sitter_id' => $sitterId,
+                'date' => $date,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check date full status',
+                'is_full' => false
+            ], 500);
+        }
+    }
+
+    /**
+     * Notify pet owners when availability is marked as full
+     */
+    private function notifyPetOwnersAvailabilityFull($sitter, $date)
+    {
+        try {
+            // Get all pet owners who have shown interest in this sitter
+            // For now, we'll get all pet owners, but in a real app you'd filter by:
+            // - Users who have viewed this sitter's profile
+            // - Users who have this sitter in their favorites
+            // - Users who have previously booked with this sitter
+            
+            $petOwners = \App\Models\User::where('role', 'pet_owner')
+                ->where('id', '!=', $sitter->id)
+                ->get();
+
+            $dateFormatted = \Carbon\Carbon::parse($date)->format('M j, Y');
+            
+            foreach ($petOwners as $petOwner) {
+                // Store notification in database
+                \App\Models\Notification::create([
+                    'user_id' => $petOwner->id,
+                    'type' => 'availability_full',
+                    'title' => 'Sitter Availability Update',
+                    'message' => "{$sitter->name} has marked {$dateFormatted} as full and is no longer accepting new bookings for that day.",
+                    'data' => json_encode([
+                        'sitter_id' => $sitter->id,
+                        'sitter_name' => $sitter->name,
+                        'date' => $date,
+                        'date_formatted' => $dateFormatted
+                    ]),
+                    'is_read' => false
+                ]);
+
+                // Send real-time notification via WebSocket/Pusher
+                try {
+                    broadcast(new \App\Events\NotificationSent([
+                        'user_id' => $petOwner->id,
+                        'type' => 'availability_full',
+                        'title' => 'Sitter Availability Update',
+                        'message' => "{$sitter->name} has marked {$dateFormatted} as full and is no longer accepting new bookings for that day.",
+                        'data' => [
+                            'sitter_id' => $sitter->id,
+                            'sitter_name' => $sitter->name,
+                            'date' => $date,
+                            'date_formatted' => $dateFormatted
+                        ]
+                    ]));
+                } catch (\Exception $e) {
+                    Log::error('Failed to send real-time notification for availability full', [
+                        'user_id' => $petOwner->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            Log::info('📢 Notifications sent for availability full', [
+                'sitter_id' => $sitter->id,
+                'date' => $date,
+                'notifications_sent' => $petOwners->count()
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error sending availability full notifications', [
+                'sitter_id' => $sitter->id,
+                'date' => $date,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 }

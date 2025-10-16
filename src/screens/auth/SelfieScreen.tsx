@@ -3,13 +3,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { getAuthHeaders } from '../../constants/config';
 import { makeApiCall } from '../../services/networkService';
@@ -78,8 +78,6 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
       console.log('📍 SelfieScreen - Getting current location...');
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
-        maximumAge: 10000, // 10 seconds
-        timeout: 15000, // 15 seconds
       });
 
       console.log('📍 SelfieScreen - Location captured:', location);
@@ -458,12 +456,6 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.skipButton} 
-          onPress={handleSkip}
-        >
-          <Text style={styles.skipButtonText}>Skip for Now</Text>
-        </TouchableOpacity>
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>

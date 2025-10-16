@@ -7,6 +7,8 @@ import { ActivityIndicator, Image, RefreshControl, SafeAreaView, ScrollView, Sty
 import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
 import { DashboardMetrics } from '../../services/dashboardService';
+import { notificationService } from '../../services/notificationService';
+import { reverbMessagingService } from '../../services/reverbMessagingService';
 // @ts-ignore
 import FindIcon from '../../assets/icons/find.png';
 // @ts-ignore
@@ -55,6 +57,8 @@ const PetOwnerDashboard = () => {
     thisWeek: '₱0',
   });
   const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics>({});
+  const [notificationCount, setNotificationCount] = useState<number>(0);
+  const [messageCount, setMessageCount] = useState<number>(0);
   
   console.log('💳 Current ownerStats state:', ownerStats);
   
@@ -67,12 +71,55 @@ const PetOwnerDashboard = () => {
     checkAuthentication();
     loadDashboardData();
     
+    // Load notification and message counts
+    const loadCounts = async () => {
+      try {
+        // Force refresh notifications from API
+        await notificationService.forceRefreshFromAPI();
+        
+        const notificationCount = await notificationService.getUnreadCount();
+        setNotificationCount(notificationCount);
+        
+        // Add a small delay to ensure messaging service is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Calculate unread count from conversations
+        try {
+          console.log('📱 PetOwnerDashboard: Loading message count...');
+          const conversations = await reverbMessagingService.getConversations();
+          console.log('📱 PetOwnerDashboard: Conversations loaded:', conversations.length);
+          
+          let totalUnreadCount = 0;
+          conversations.forEach(conv => {
+            console.log('📱 PetOwnerDashboard: Conversation', conv.conversation_id, 'unread_count:', conv.unread_count);
+            totalUnreadCount += conv.unread_count || 0;
+          });
+          
+          console.log('📱 PetOwnerDashboard: Total unread count:', totalUnreadCount);
+          setMessageCount(totalUnreadCount);
+        } catch (error) {
+          console.error('Error getting message count:', error);
+          // Fallback to the original method
+          const messageCount = await reverbMessagingService.getUnreadCount();
+          console.log('📱 PetOwnerDashboard: Fallback message count:', messageCount);
+          setMessageCount(messageCount);
+        }
+      } catch (error) {
+        console.error('Error loading counts:', error);
+      }
+    };
+
+    loadCounts();
+    
     // Subscribe to notification updates to refresh dashboard data
-    const { notificationService } = require('../../services/notificationService');
-    const unsubscribeNotifications = notificationService.subscribe(() => {
-      console.log('🔔 Notification received, refreshing dashboard data...');
+    const unsubscribeNotifications = notificationService.subscribe(async () => {
       loadDashboardData();
+      
+      // Also refresh notification count
+      const count = await notificationService.getUnreadCount();
+      setNotificationCount(count);
     });
+
     
     // Subscribe to booking updates to refresh dashboard data
     const { bookingService } = require('../../services/bookingService');
@@ -87,13 +134,59 @@ const PetOwnerDashboard = () => {
     };
   }, []);
 
+  // Refresh message count when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const refreshMessageCount = async () => {
+        try {
+          console.log('📱 PetOwnerDashboard: Screen focused, refreshing message count...');
+          const conversations = await reverbMessagingService.getConversations();
+          let totalUnreadCount = 0;
+          conversations.forEach(conv => {
+            totalUnreadCount += conv.unread_count || 0;
+          });
+          setMessageCount(totalUnreadCount);
+          console.log('📱 PetOwnerDashboard: Focus refresh message count:', totalUnreadCount);
+        } catch (error) {
+          console.error('Error refreshing message count on focus:', error);
+        }
+      };
+
+      refreshMessageCount();
+    }, [])
+  );
+
   // Handle pull to refresh
   const onRefresh = useCallback(async () => {
     console.log('🔄 Pull to refresh triggered');
     setRefreshing(true);
     try {
+      // Refresh dashboard data
       await loadDashboardData();
-      console.log('✅ Dashboard data refreshed successfully');
+      
+      // Force refresh notifications from API
+      await notificationService.forceRefreshFromAPI();
+      
+      // Refresh notification count
+      const notificationCount = await notificationService.getUnreadCount();
+      setNotificationCount(notificationCount);
+      
+      // Refresh message count
+      try {
+        const conversations = await reverbMessagingService.getConversations();
+        let totalUnreadCount = 0;
+        conversations.forEach(conv => {
+          totalUnreadCount += conv.unread_count || 0;
+        });
+        setMessageCount(totalUnreadCount);
+      } catch (error) {
+        console.error('Error refreshing message count:', error);
+        // Fallback to the original method
+        const messageCount = await reverbMessagingService.getUnreadCount();
+        setMessageCount(messageCount);
+      }
+      
+      console.log('✅ Dashboard data, notifications, and messages refreshed successfully');
     } catch (error) {
       console.error('❌ Error refreshing dashboard data:', error);
     } finally {
@@ -145,9 +238,7 @@ const PetOwnerDashboard = () => {
         // Use the exact same filtering logic as My Bookings screen
         activeBookings = ownerBookings.filter((booking: any) => booking.status === 'active');
         upcomingBookings = ownerBookings.filter((booking: any) => 
-          booking.status !== 'completed' && 
-          booking.status !== 'cancelled' && 
-          booking.status !== 'active'
+          booking.status === 'confirmed'
         );
         
         console.log('📊 Active bookings count (My Bookings logic):', activeBookings.length);
@@ -481,6 +572,7 @@ const PetOwnerDashboard = () => {
           />
         }
       >
+        
         {/* Header */}
         <View style={styles.headerCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -495,8 +587,15 @@ const PetOwnerDashboard = () => {
             )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => router.push('/pet-owner-notifications')} style={{ marginRight: 16 }}>
+            <TouchableOpacity onPress={() => router.push('/pet-owner-notifications')} style={{ marginRight: 16, position: 'relative' }}>
               <Ionicons name="notifications-outline" size={24} color="#222" />
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/pet-owner-profile')} style={styles.profileButton}>
               <Image
@@ -603,6 +702,14 @@ const PetOwnerDashboard = () => {
             <TouchableOpacity key={action.title} style={styles.quickAction} onPress={() => router.push(action.route as any)}>
               <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}> 
                 <Image source={action.icon} style={styles.quickActionImage} resizeMode="contain" />
+                {/* Message badge for Messages action */}
+                {action.title === 'Messages' && messageCount > 0 && (
+                  <View style={styles.messageBadge}>
+                    <Text style={styles.messageBadgeText}>
+                      {messageCount > 99 ? '99+' : messageCount}
+                    </Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.quickActionLabel}>{action.title}</Text>
             </TouchableOpacity>
@@ -865,6 +972,42 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  messageBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  messageBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

@@ -289,7 +289,9 @@ class BookingService {
       let token = user.token;
       if (!token) {
         // Fallback to hardcoded tokens for testing
-        if (user.id === '5') {
+        if (user.id === '4') {
+          token = '877|5nCSvQynFG95KddrYypcmpqCeNyGimOVfBlrAuJy14cc9101';
+        } else if (user.id === '5') {
           token = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b';
         } else if (user.id === '21') {
           token = '67|uCtobaBZatzbzDOeK8k1DytVHby0lpa07ERJJczu3cdfa507';
@@ -617,20 +619,58 @@ class BookingService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ API booking failed:', response.status, errorText);
+        
+        // Try to parse error response for specific error handling
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error('🔍 Parsed error data:', errorData);
+          
+          if (errorData.error_code === 'DATE_FULL') {
+            // Create a specific error for date full
+            const dateFullError = new Error('DATE_FULL'); // Use DATE_FULL as the message for easy detection
+            (dateFullError as any).code = 'DATE_FULL';
+            (dateFullError as any).originalMessage = errorData.message || 'This date is marked as full';
+            console.error('🚫 DATE_FULL error detected - blocking booking completely');
+            console.error('🚫 Original message:', errorData.message);
+            console.error('🚫 About to throw DATE_FULL error:', dateFullError);
+            console.error('🚫 Error object structure:', {
+              message: dateFullError.message,
+              code: (dateFullError as any).code,
+              originalMessage: (dateFullError as any).originalMessage
+            });
+            throw dateFullError;
+          } else if (errorData.message) {
+            console.error('🚫 Validation error detected:', errorData.message);
+            throw new Error(errorData.message);
+          }
+        } catch (parseError) {
+          console.error('❌ Could not parse error response:', parseError);
+          // If parsing fails, use generic error
+        }
+        
+        console.error('🚫 Generic API error - blocking booking');
         throw new Error(`API booking failed: ${response.status}`);
       }
 
       const apiResponse = await response.json();
       console.log('✅ API booking successful:', apiResponse);
+      console.log('🔍 API booking status:', apiResponse.booking?.status);
 
       // Create local booking object with API response
       const newBooking: Booking = {
         ...bookingData,
         id: apiResponse.booking?.id?.toString() || Date.now().toString(),
+        status: apiResponse.booking?.status || 'pending', // Use status from API response
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+      
+      console.log('🔍 Final booking status:', newBooking.status);
 
+      // Clear cache to ensure fresh data
+      this.cachedBookings = null;
+      this.cacheExpiry = 0;
+      
       // Save to local storage as well
       const bookings = await this.getBookings();
       bookings.push(newBooking);
@@ -641,8 +681,36 @@ class BookingService {
 
     } catch (error) {
       console.error('❌ Error creating booking:', error);
+      console.error('🔍 Error type:', typeof error);
+      console.error('🔍 Error code property:', (error as any).code);
+      console.error('🔍 Error message:', error instanceof Error ? error.message : 'Not an Error object');
       
-      // Fallback to local storage only
+      // If this is a DATE_FULL error, NEVER fall back to local storage
+      if ((error as any).code === 'DATE_FULL') {
+        console.error('🚫 DATE_FULL error - booking completely blocked');
+        throw error; // Re-throw the specific error - DO NOT CREATE ANY BOOKING
+      }
+      
+      // Also check the error message for DATE_FULL
+      if (error instanceof Error && error.message === 'DATE_FULL') {
+        console.error('🚫 DATE_FULL error (from message) - booking completely blocked');
+        throw error; // Re-throw the specific error - DO NOT CREATE ANY BOOKING
+      }
+      
+      // For other errors, check if it's a network error vs validation error
+      if (error instanceof Error && error.message.includes('API booking failed: 422')) {
+        console.error('🚫 Validation error (422) - booking blocked by backend');
+        throw error; // Don't create local booking for validation errors
+      }
+      
+      // Also check for any 422 status in the error message
+      if (error instanceof Error && error.message.includes('422')) {
+        console.error('🚫 HTTP 422 error - booking blocked by backend');
+        throw error; // Don't create local booking for any 422 errors
+      }
+      
+      // Fallback to local storage ONLY for network/connection errors
+      console.log('⚠️ Network error - creating local booking as fallback');
       const bookings = await this.getBookings();
       const newBooking: Booking = {
         ...bookingData,
@@ -757,10 +825,15 @@ class BookingService {
       const newBooking: WeeklyBooking = {
         ...bookingData,
         id: apiResponse.booking?.id?.toString() || `weekly_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        status: apiResponse.booking?.status || 'pending', // Use status from API response
         totalAmount: totalAmount,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      // Clear cache to ensure fresh data
+      this.cachedBookings = null;
+      this.cacheExpiry = 0;
 
       // Save weekly booking to a separate storage key
       const weeklyBookings = await this.getWeeklyBookings();
@@ -940,9 +1013,10 @@ class BookingService {
 
     // Helper function to check if booking is upcoming (future schedule)
     const isBookingUpcoming = (booking: any) => {
-      // Include all non-completed, non-cancelled, non-active bookings
-      if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
-        console.log(`  - ${booking.date} (${booking.status}): excluded status`);
+      // Only include CONFIRMED bookings - exclude pending, completed, cancelled, active
+      console.log(`🔍 Checking booking ${booking.id}: status=${booking.status}, date=${booking.date}`);
+      if (booking.status !== 'confirmed') {
+        console.log(`  - ${booking.date} (${booking.status}): excluded status - only confirmed bookings shown`);
         return false;
       }
       
@@ -1002,9 +1076,9 @@ class BookingService {
 
     // Helper function to check if booking is upcoming (future schedule)
     const isBookingUpcoming = (booking: any) => {
-      // Include all non-completed, non-cancelled, non-active bookings (same logic as owner)
-      if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'active') {
-        console.log(`  - ${booking.date} (${booking.status}): excluded status`);
+      // Only include CONFIRMED bookings - exclude pending, completed, cancelled, active
+      if (booking.status !== 'confirmed') {
+        console.log(`  - ${booking.date} (${booking.status}): excluded status - only confirmed bookings shown`);
         return false;
       }
       
@@ -1050,8 +1124,10 @@ class BookingService {
 
   // Get pending bookings for a sitter
   async getPendingSitterBookings(sitterId: string): Promise<Booking[]> {
-    const sitterBookings = await this.getSitterBookings(sitterId);
-    return sitterBookings.filter(b => b.status === 'pending');
+    // Sitters should not see pending bookings until payment is confirmed
+    // Only return empty array - no pending bookings shown to sitters
+    console.log('🚫 Sitters cannot see pending bookings until payment is confirmed');
+    return [];
   }
 
   // Get completed bookings for a sitter

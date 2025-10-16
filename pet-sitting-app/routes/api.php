@@ -110,6 +110,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sitters/availability', [LocationController::class, 'saveSitterAvailability']);
     Route::get('/sitters/{sitterId}/availability-status', [LocationController::class, 'getSitterAvailabilityStatus']);
     Route::post('/sitters/availability/restore', [LocationController::class, 'restoreAvailabilityData']);
+    Route::post('/sitters/mark-availability-full', [LocationController::class, 'markAvailabilityAsFull']);
+    Route::get('/sitters/{sitterId}/check-date-full/{date}', [LocationController::class, 'checkDateFull']);
     
     // Weekly availability routes
     Route::get('/sitters/{sitterId}/weekly-availability', [LocationController::class, 'getWeeklyAvailability']);

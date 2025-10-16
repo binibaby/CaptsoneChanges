@@ -2,13 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  FlatList,
-  Image,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    FlatList,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import authService from '../../services/authService';
 import { Booking, bookingService } from '../../services/bookingService';
@@ -69,9 +68,6 @@ const CompletedJobsScreen = () => {
     console.log('View job details:', job.id);
   };
 
-  const handleContactOwner = (job: Booking) => {
-    router.push('/pet-sitter-messages');
-  };
 
   const calculateEarnings = (job: Booking) => {
     const startTime = new Date(`2000-01-01 ${job.startTime}`);
@@ -104,16 +100,6 @@ const CompletedJobsScreen = () => {
       onPress={() => handleJobPress(item)}
     >
       <View style={styles.jobHeader}>
-        <View style={styles.petInfo}>
-          <Image 
-            source={item.petImage ? { uri: item.petImage } : require('../../assets/images/default-avatar.png')} 
-            style={styles.petImage} 
-          />
-          <View style={styles.petDetails}>
-            <Text style={styles.petName}>{item.petName || 'Pet'}</Text>
-            <Text style={styles.ownerName}>{item.petOwnerName}</Text>
-          </View>
-        </View>
         <View style={styles.earningsContainer}>
           <Text style={styles.earningsAmount}>₱{calculateEarnings(item).toFixed(0)}</Text>
           <Text style={styles.earningsLabel}>Earned</Text>
@@ -138,13 +124,6 @@ const CompletedJobsScreen = () => {
       </View>
 
       <View style={styles.jobActions}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => handleContactOwner(item)}
-        >
-          <Ionicons name="chatbubble-outline" size={16} color="#3B82F6" />
-          <Text style={styles.actionButtonText}>Contact Owner</Text>
-        </TouchableOpacity>
         <View style={styles.statusBadge}>
           <Ionicons name="checkmark-circle" size={16} color="#10B981" />
           <Text style={styles.statusText}>Completed</Text>

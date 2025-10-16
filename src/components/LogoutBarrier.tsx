@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 
 interface LogoutBarrierProps {
@@ -58,7 +58,7 @@ export default function LogoutBarrier({ children }: LogoutBarrierProps) {
     return (
       <View style={styles.lockedContainer}>
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <WelcomeScreen />
+        <WelcomeScreen onGetStarted={() => {}} />
       </View>
     );
   }

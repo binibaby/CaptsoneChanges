@@ -53,10 +53,41 @@ class MessageController extends Controller
                 ], 401);
             }
 
-            \Log::info('📱 Getting conversations for user:', ['user_id' => $user->id]);
+            \Log::info('📱 Getting conversations for user:', [
+                'user_id' => $user->id,
+                'user_name' => $user->first_name . ' ' . $user->last_name,
+                'user_email' => $user->email,
+                'auth_header' => $authHeader ? 'present' : 'missing'
+            ]);
 
-            $conversations = Message::where('sender_id', $user->id)
-                ->orWhere('receiver_id', $user->id)
+            // First, let's check if there are any messages at all
+            $allMessages = Message::where(function($query) use ($user) {
+                    $query->where('sender_id', $user->id)
+                          ->orWhere('receiver_id', $user->id);
+                })
+                ->get();
+            
+            \Log::info('📱 ALL MESSAGES FOR USER:', [
+                'user_id' => $user->id,
+                'user_name' => $user->first_name . ' ' . $user->last_name,
+                'user_email' => $user->email,
+                'total_messages' => $allMessages->count(),
+                'messages' => $allMessages->map(function($msg) {
+                    return [
+                        'id' => $msg->id,
+                        'conversation_id' => $msg->conversation_id,
+                        'sender_id' => $msg->sender_id,
+                        'receiver_id' => $msg->receiver_id,
+                        'message' => $msg->message,
+                        'created_at' => $msg->created_at
+                    ];
+                })->toArray()
+            ]);
+
+            $conversations = Message::where(function($query) use ($user) {
+                    $query->where('sender_id', $user->id)
+                          ->orWhere('receiver_id', $user->id);
+                })
                 ->with(['sender', 'receiver'])
                 ->orderBy('created_at', 'desc')
                 ->get()
@@ -89,11 +120,26 @@ class MessageController extends Controller
                 })
                 ->values();
 
-            \Log::info('📱 Found conversations:', ['count' => $conversations->count()]);
+            \Log::info('📱 Found conversations:', [
+                'count' => $conversations->count(),
+                'user_id' => $user->id,
+                'conversations' => $conversations->map(function($conv) {
+                    return [
+                        'conversation_id' => $conv['conversation_id'],
+                        'other_user_id' => $conv['other_user']['id'],
+                        'other_user_name' => $conv['other_user']['name']
+                    ];
+                })->toArray()
+            ]);
 
             return response()->json([
                 'success' => true,
                 'conversations' => $conversations,
+                'debug_info' => [
+                    'authenticated_user_id' => $user->id,
+                    'authenticated_user_name' => $user->first_name . ' ' . $user->last_name,
+                    'total_conversations' => $conversations->count()
+                ]
             ]);
         } catch (\Exception $e) {
             \Log::error('❌ Error in getConversations:', [
@@ -209,6 +255,14 @@ class MessageController extends Controller
         }
 
         $conversationId = Message::generateConversationId($user->id, $receiverId);
+        
+        \Log::info('💬 SENDING MESSAGE DEBUG:', [
+            'sender_id' => $user->id,
+            'receiver_id' => $receiverId,
+            'conversation_id' => $conversationId,
+            'message' => $request->message,
+            'type' => $request->type ?? 'text'
+        ]);
 
         $message = Message::create([
             'conversation_id' => $conversationId,
@@ -220,10 +274,19 @@ class MessageController extends Controller
             'metadata' => $request->metadata,
         ]);
 
+        \Log::info('💬 MESSAGE CREATED:', [
+            'message_id' => $message->id,
+            'conversation_id' => $message->conversation_id,
+            'sender_id' => $message->sender_id,
+            'receiver_id' => $message->receiver_id,
+            'message_text' => $message->message,
+            'created_at' => $message->created_at
+        ]);
+
         $message->load(['sender', 'receiver']);
 
-        // Broadcast the message (temporarily disabled for testing)
-        // broadcast(new MessageSent($message));
+        // Broadcast the message to notify the receiver
+        broadcast(new MessageSent($message));
 
         return response()->json([
             'success' => true,

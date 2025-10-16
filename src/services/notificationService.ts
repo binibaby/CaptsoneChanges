@@ -3,7 +3,7 @@ import { makeApiCall } from './networkService';
 
 export interface Notification {
   id: string;
-  type: 'booking' | 'message' | 'review' | 'system' | 'payment_success';
+  type: 'booking' | 'booking_confirmed' | 'booking_completed' | 'session_started' | 'message' | 'review' | 'new_review' | 'system' | 'payment_success' | 'profile_update_approved' | 'profile_update_rejected' | 'id_verification_approved' | 'id_verification_rejected';
   title: string;
   message: string;
   time: string;
@@ -12,6 +12,7 @@ export interface Notification {
   action?: string;
   data?: any; // Additional data for the notification
   userId?: string; // Optional userId to target specific user
+  readAt?: string; // Timestamp when notification was read
 }
 
 class NotificationService {
@@ -110,51 +111,15 @@ class NotificationService {
       // Clean up any notifications with invalid timestamps first
       await this.cleanupInvalidTimestamps();
       
-      // First try to get from API
+      // Get fresh data from API only - no local storage merge
       const apiNotifications = await this.fetchNotificationsFromAPI();
       console.log('📱 API notifications fetched:', apiNotifications.length);
-        
-      // Get local notifications
-        const stored = await AsyncStorage.getItem('notifications');
-        const localNotifications = stored ? JSON.parse(stored) : [];
-      console.log('📱 Local notifications:', localNotifications.length);
       
-      // Merge API and local notifications, prioritizing local storage for read status
-      const allNotifications = [...apiNotifications];
-      
-      // Update API notifications with read status from local storage (local storage takes priority)
-      allNotifications.forEach(apiNotif => {
-        const localNotif = localNotifications.find(local => local.id === apiNotif.id);
-        if (localNotif) {
-          // If notification exists in local storage, use local read status
-          console.log(`📱 Using local read status for notification ${apiNotif.id}: ${localNotif.isRead}`);
-          apiNotif.isRead = localNotif.isRead;
-        } else if (apiNotif.isRead) {
-          console.log(`📱 Using API read status for notification ${apiNotif.id}`);
-        }
-      });
-      
-      // Add local notifications that don't exist in API
-      localNotifications.forEach(localNotif => {
-        const existsInAPI = apiNotifications.some(apiNotif => apiNotif.id === localNotif.id);
-        if (!existsInAPI) {
-          console.log(`📱 Adding local notification ${localNotif.id} (not in API)`);
-          allNotifications.push(localNotif);
-        }
-      });
-        
-        console.log('📱 Total notifications after merge:', allNotifications.length);
-      
-      // Save merged notifications to local storage
-        await this.saveNotifications(allNotifications);
-      
-      // Sync any locally read notifications to API in background
-      this.syncReadStatusToAPI(allNotifications).catch(error => {
-        console.warn('⚠️ Failed to sync read status to API:', error);
-      });
+      // Save API notifications to local storage for offline access
+      await this.saveNotifications(apiNotifications);
       
       // Filter and return notifications for current user
-      const filtered = await this.filterNotificationsByUserType(allNotifications);
+      const filtered = await this.filterNotificationsByUserType(apiNotifications);
       console.log('📱 Filtered notifications for user:', filtered.length);
       
       return filtered;
@@ -218,6 +183,8 @@ class NotificationService {
       if (response.ok) {
         const data = await response.json();
         console.log('📱 API notifications response:', data);
+        console.log('📱 API notifications count:', data.notifications?.length || 0);
+        console.log('📱 API unread count:', data.unread_count || 0);
         
         if (data.success && data.notifications && Array.isArray(data.notifications)) {
           // Convert API format to local format
@@ -343,16 +310,12 @@ class NotificationService {
           console.log(`🔍 Pet sitter notification ${notification.id} (${notification.type}): ${matches}`);
           return matches;
         } else {
-          // Pet owners see: booking confirmations/cancellations, messages, system notifications, profile updates, payment success
-          const isBookingWithStatus = notification.type === 'booking' && 
-                 (notification.data?.status === 'confirmed' || 
-                  notification.data?.status === 'cancelled' ||
-                  notification.title?.includes('confirmed') ||
-                  notification.title?.includes('cancelled'));
+          // Pet owners see: all booking notifications, messages, system notifications, profile updates, payment success
+          const isBooking = notification.type === 'booking';
           const isMessageOrSystem = notification.type === 'message' || notification.type === 'system';
           const isProfileUpdate = notification.type === 'profile_update_approved' || notification.type === 'profile_update_rejected';
           const isPaymentSuccess = notification.type === 'payment_success';
-          const matches = isBookingWithStatus || isMessageOrSystem || isProfileUpdate || isPaymentSuccess;
+          const matches = isBooking || isMessageOrSystem || isProfileUpdate || isPaymentSuccess;
           console.log(`🔍 Pet owner notification ${notification.id} (${notification.type}): ${matches}`);
           return matches;
         }
@@ -493,7 +456,7 @@ class NotificationService {
       const notificationData = {
         type: 'booking' as const,
         title: `New ${bookingType} Booking Request`,
-        message: `You have a new booking from ${bookingData.petOwnerName}. Please check your schedule for details.`,
+        message: `You have a new booking from ${bookingData.petOwnerName} on ${formattedDate}. Please check your schedule for details.`,
         action: 'View Request',
         data: {
           bookingId: bookingData.bookingId,
@@ -565,7 +528,7 @@ class NotificationService {
       const notificationData = {
         type: 'booking' as const,
         title: 'New Weekly Booking Request',
-        message: `You have a new booking from ${bookingData.petOwnerName}. Please check your schedule for details.`,
+        message: `You have a new weekly booking from ${bookingData.petOwnerName} from ${formattedStartDate} to ${formattedEndDate}. Please check your schedule for details.`,
         action: 'View Request',
         data: {
           bookingId: bookingData.bookingId,
@@ -600,7 +563,15 @@ class NotificationService {
     try {
       console.log('📖 Marking notification as read:', notificationId);
       
-      // Update local storage first (immediate UI update)
+      // Mark as read via API first (synchronous)
+      console.log('🔑 Starting API call to mark notification as read:', notificationId);
+      const apiSuccess = await this.markAsReadViaAPI(notificationId);
+      console.log('🔑 API call result:', apiSuccess);
+      if (!apiSuccess) {
+        console.warn('⚠️ API call failed, but continuing with local update');
+      }
+      
+      // Update local storage after API call
       const stored = await AsyncStorage.getItem('notifications');
       const notifications = stored ? JSON.parse(stored) : [];
       
@@ -611,13 +582,6 @@ class NotificationService {
         await this.saveNotifications(notifications);
         this.notifyListeners(notifications);
         console.log('📖 Notification marked as read locally with timestamp:', notification.readAt);
-      }
-      
-      // Try to mark as read via API (in background)
-      const apiSuccess = await this.markAsReadViaAPI(notificationId);
-      if (!apiSuccess) {
-        console.warn('⚠️ API call failed, but local update succeeded');
-        // Don't throw error here as local update succeeded
       }
       
     } catch (error) {
@@ -648,7 +612,7 @@ class NotificationService {
       }
 
       // Find notifications that are read locally but might not be synced to API
-      const readNotifications = notifications.filter(n => n.isRead && n.readAt);
+      const readNotifications = notifications.filter((n: Notification) => n.isRead && n.readAt);
       
       if (readNotifications.length === 0) {
         console.log('📱 No read notifications to sync to API');
@@ -711,7 +675,7 @@ class NotificationService {
 
       console.log('🔑 Marking notification as read via API for user:', user.id);
 
-      const response = await makeApiCall(`/api/notifications/${notificationId}/read`, {
+      const response = await makeApiCall(`/api/notifications/${notificationId}/mark-read`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -719,10 +683,12 @@ class NotificationService {
       });
 
       if (response.ok) {
-        console.log('✅ Notification marked as read via API');
+        const responseData = await response.json();
+        console.log('✅ Notification marked as read via API:', responseData);
         return true;
       } else {
-        console.log('⚠️ API call failed:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.log('⚠️ API call failed:', response.status, response.statusText, errorData);
         return false;
       }
     } catch (error) {
@@ -736,7 +702,10 @@ class NotificationService {
     try {
       console.log('📖 Marking all notifications as read');
       
-      // Update local storage first (immediate UI update)
+      // Mark all as read via API first (synchronous)
+      await this.markAllAsReadViaAPI();
+      
+      // Update local storage after API call
       const stored = await AsyncStorage.getItem('notifications');
       const notifications = stored ? JSON.parse(stored) : [];
       
@@ -747,11 +716,6 @@ class NotificationService {
       await this.saveNotifications(notifications);
       this.notifyListeners(notifications);
       console.log('📖 All notifications marked as read locally');
-      
-      // Try to mark all as read via API (in background)
-      this.markAllAsReadViaAPI().catch(error => {
-        console.log('⚠️ API call failed, but local update succeeded:', error);
-      });
       
     } catch (error) {
       console.error('❌ Error marking all notifications as read:', error);
@@ -785,7 +749,7 @@ class NotificationService {
 
       console.log('🔑 Marking all notifications as read via API for user:', user.id);
 
-      const response = await makeApiCall('/api/notifications/read-all', {
+      const response = await makeApiCall('/api/notifications/mark-all-read', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -819,10 +783,19 @@ class NotificationService {
   // Get unread count
   async getUnreadCount(): Promise<number> {
     try {
-      // Clear all notifications for fresh start
-      await AsyncStorage.removeItem('notifications');
-      console.log('🧹 Cleared all notifications for fresh start');
-      return 0;
+      console.log('🔔 Getting unread notification count...');
+      
+      // Get all notifications
+      const notifications = await this.getNotifications();
+      
+      // Count unread notifications
+      const unreadCount = notifications.filter(notification => !notification.isRead).length;
+      
+      console.log('📊 Total notifications:', notifications.length);
+      console.log('📊 Unread notifications count:', unreadCount);
+      console.log('📊 Notification read statuses:', notifications.map(n => ({ id: n.id, isRead: n.isRead, title: n.title })));
+      
+      return unreadCount;
     } catch (error) {
       console.error('❌ Error getting unread count:', error);
       return 0;
@@ -837,6 +810,18 @@ class NotificationService {
       console.log('✅ Notification cache cleared');
     } catch (error) {
       console.error('❌ Error clearing notification cache:', error);
+    }
+  }
+
+  // Clear cache and force fresh data from API (useful when user logs in)
+  async forceRefreshFromAPI(): Promise<Notification[]> {
+    try {
+      console.log('🔄 Force refreshing notifications from API...');
+      await this.clearCache();
+      return await this.getNotifications();
+    } catch (error) {
+      console.error('❌ Error force refreshing notifications:', error);
+      return [];
     }
   }
 

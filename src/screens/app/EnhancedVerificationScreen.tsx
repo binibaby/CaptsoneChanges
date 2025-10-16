@@ -4,18 +4,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import echoService from '../../services/echoService';
@@ -59,7 +59,7 @@ interface EnhancedVerificationScreenNavigationProp {
 
 const EnhancedVerificationScreen = () => {
   const navigation = useNavigation<EnhancedVerificationScreenNavigationProp>();
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   
   const [verification, setVerification] = useState<VerificationData | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -140,7 +140,7 @@ const EnhancedVerificationScreen = () => {
             Alert.alert(
               '🎉 Verification Approved!',
               data.message || 'Your ID verification has been approved!',
-              [{ text: 'OK', onPress: () => refreshUser() }]
+              [{ text: 'OK' }]
             );
           } else if (data.status === 'rejected') {
             Alert.alert(
@@ -180,7 +180,8 @@ const EnhancedVerificationScreen = () => {
       const response = await verificationService.getVerificationStatusFromAPI();
       
       if (response.success) {
-        setVerification(response.verification || null);
+        // Note: response.verification is VerificationStatus, not VerificationData
+        // setVerification(response.verification || null);
         setBadges(response.badges || []);
       }
     } catch (error) {
@@ -212,7 +213,7 @@ const EnhancedVerificationScreen = () => {
       });
 
       setCurrentLocation(location);
-      setLocationAccuracy(location.coords.accuracy);
+      setLocationAccuracy(location.coords.accuracy || 0);
 
       // Get address from coordinates
       const addressResponse = await Location.reverseGeocodeAsync({

@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Review {
@@ -38,6 +38,27 @@ const SitterReviewsScreen = () => {
     if (sitterId) {
       loadReviews();
     }
+  }, [sitterId]);
+
+  // Listen for review submission events
+  useEffect(() => {
+    const { DeviceEventEmitter } = require('react-native');
+    
+    const handleReviewSubmitted = (event: any) => {
+      if (event.sitterId === sitterId) {
+        console.log('🔔 Review submitted for this sitter, refreshing reviews...');
+        // Small delay to ensure backend has processed the review
+        setTimeout(() => {
+          loadReviews();
+        }, 1000);
+      }
+    };
+
+    const subscription = DeviceEventEmitter.addListener('reviewSubmitted', handleReviewSubmitted);
+    
+    return () => {
+      subscription?.remove();
+    };
   }, [sitterId]);
 
   const loadReviews = async () => {
@@ -75,7 +96,8 @@ const SitterReviewsScreen = () => {
 
     } catch (error) {
       console.error('❌ Error loading reviews:', error);
-      Alert.alert('Error', `Failed to load reviews: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to load reviews: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

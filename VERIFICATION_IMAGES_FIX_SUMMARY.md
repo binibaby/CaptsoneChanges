@@ -73,12 +73,12 @@ This script:
 ## How to Test
 
 ### Test 1: Verification with Images
-Visit: `http://0.0.0.0:8000/admin/verifications/103`
+Visit: `http://172.20.10.2:8000/admin/verifications/103`
 - Should display actual images for Front ID, Back ID, and Selfie
 - Images should be clickable and open in modal
 
 ### Test 2: Verification without Images  
-Visit: `http://0.0.0.0:8000/admin/verifications/78`
+Visit: `http://172.20.10.2:8000/admin/verifications/78`
 - Should show "No Verification Documents Submitted" message
 - Should display placeholder icon and "Awaiting Document Submission" status
 

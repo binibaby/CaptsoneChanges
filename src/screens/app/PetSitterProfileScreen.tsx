@@ -3,18 +3,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import CertificateAlbum from '../../components/CertificateAlbum';
 // import PullToRefreshWrapper from '../../components/PullToRefreshWrapper';
@@ -526,21 +526,6 @@ const PetSitterProfileScreen = () => {
     }
   };
 
-  const handleDeleteCertificate = async (id: string) => {
-    try {
-      const updatedCertificates = certificates.filter(cert => cert.id !== id);
-      setCertificates(updatedCertificates);
-      
-      // Save to API
-      await saveCertificatesToAPI(updatedCertificates);
-      
-      Alert.alert('Success', 'Certificate deleted successfully!');
-    } catch (error) {
-      console.error('Error deleting certificate:', error);
-      Alert.alert('Error', 'Failed to delete certificate. Please try again.');
-    }
-  };
-
   const saveCertificatesToAPI = async (certificatesToSave: any[]) => {
     try {
       const { makeApiCall } = await import('../../services/networkService');
@@ -593,14 +578,28 @@ const PetSitterProfileScreen = () => {
         }
       }
       
+      // Debug: Log the data being sent
+      console.log('📋 Sending certificates to API:', {
+        certificates: certificatesToSave,
+        count: certificatesToSave.length,
+        data: certificatesToSave
+      });
+
+      // Ensure we always send a valid array, even if empty
+      const certificatesArray = Array.isArray(certificatesToSave) ? certificatesToSave : [];
+      const requestBody = { certificates: certificatesArray };
+      console.log('📋 Request body:', JSON.stringify(requestBody, null, 2));
+
       const response = await makeApiCall('/api/profile/save-certificates', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${currentUser.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ certificates: certificatesToSave }),
+        body: JSON.stringify(requestBody),
       });
+
+      console.log('📋 API Response status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1545,7 +1544,6 @@ const PetSitterProfileScreen = () => {
         onClose={() => setCertificateAlbumVisible(false)}
         certificates={certificates}
         onAddCertificate={handleAddCertificate}
-        onDeleteCertificate={handleDeleteCertificate}
       />
     </SafeAreaView>
   );
