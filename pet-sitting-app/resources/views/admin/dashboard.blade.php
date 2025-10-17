@@ -51,7 +51,7 @@
     </div>
 
     <!-- KPI Cards -->
-    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
         <!-- Total Users -->
         <div class="group relative overflow-hidden bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover-lift">
             <div class="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 opacity-0 group-hover:opacity-5 transition-opacity duration-300"></div>
@@ -191,20 +191,66 @@
                 </div>
             </div>
         </div>
+
+        <!-- Analytics Overview -->
+        <div class="group relative overflow-hidden bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 hover-lift cursor-pointer" onclick="window.location.href='{{ route('admin.analytics.index') }}'">
+            <div class="absolute inset-0 bg-gradient-to-br from-indigo-500 to-indigo-600 opacity-0 group-hover:opacity-5 transition-opacity duration-300"></div>
+            <div class="relative p-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">Analytics</p>
+                                <p class="text-3xl font-bold text-gray-900">📊</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500 text-sm">Growth & Revenue</span>
+                            <a href="{{ route('admin.analytics.index') }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">View →</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Section Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900">Analytics & Insights</h2>
+            <p class="text-gray-600">Track user growth and revenue trends with detailed analytics</p>
+        </div>
+        <a href="{{ route('admin.analytics.index') }}" class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            <span>View Full Analytics</span>
+        </a>
     </div>
 
     <!-- Analytics Section -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- User Growth Chart -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover-lift">
+        <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover-lift cursor-pointer group" onclick="window.location.href='{{ route('admin.analytics.index') }}'">
             <div class="flex items-center justify-between mb-6">
                 <div>
-                    <h3 class="text-xl font-semibold text-gray-900">User Growth</h3>
+                    <h3 class="text-xl font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">User Growth</h3>
                     <p class="text-sm text-gray-600">Monthly user registration trends</p>
                 </div>
                 <div class="flex items-center space-x-2">
                     <button class="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors">Month</button>
                     <button class="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Year</button>
+                    <a href="{{ route('admin.analytics.index') }}" class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center ml-2">
+                        View Details
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
                 </div>
             </div>
             
@@ -215,15 +261,21 @@
         </div>
 
         <!-- Revenue Chart -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover-lift">
+        <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover-lift cursor-pointer group" onclick="window.location.href='{{ route('admin.analytics.index') }}'">
             <div class="flex items-center justify-between mb-6">
                 <div>
-                    <h3 class="text-xl font-semibold text-gray-900">Revenue Trends</h3>
+                    <h3 class="text-xl font-semibold text-gray-900 group-hover:text-green-600 transition-colors">Revenue Trends</h3>
                     <p class="text-sm text-gray-600">Monthly revenue performance</p>
                 </div>
                 <div class="flex items-center space-x-2">
                     <button class="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 transition-colors">Month</button>
                     <button class="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Year</button>
+                    <a href="{{ route('admin.analytics.index') }}" class="text-green-600 hover:text-green-700 text-sm font-medium flex items-center ml-2">
+                        View Details
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
                 </div>
             </div>
             

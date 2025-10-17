@@ -3,19 +3,20 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import ProfilePopupModal from '../../components/ProfilePopupModal';
 import ReviewModal from '../../components/ReviewModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingService } from '../../services/bookingService';
@@ -68,6 +69,10 @@ const PetOwnerMessagesScreen = () => {
   const [availableBookings, setAvailableBookings] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  
+  // Profile popup state
+  const [profilePopupVisible, setProfilePopupVisible] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
 
   // Filter conversations based on search query
   const filteredConversations = conversations.filter(conversation =>
@@ -80,6 +85,65 @@ const PetOwnerMessagesScreen = () => {
     if (isSearchVisible) {
       setSearchQuery('');
     }
+  };
+
+  // Handle profile click
+  const handleProfileClick = async (conversation: ReverbConversation) => {
+    console.log('🔍 Profile clicked for:', conversation.other_user.name);
+    console.log('🔍 Conversation data:', conversation);
+    
+    try {
+      // Try to fetch detailed profile information from API
+      let detailedProfile = null;
+      let sitterRating = 0;
+      
+      try {
+        const { default: networkService } = await import('../../services/networkService');
+        
+        // Fetch user profile
+        const profileResponse = await networkService.get(`/api/profile`);
+        detailedProfile = profileResponse.data.user;
+        console.log('🔍 Fetched detailed profile:', detailedProfile);
+        
+        // Fetch sitter rating if it's a sitter
+        if (conversation.other_user.role === 'pet_sitter') {
+          try {
+            const ratingResponse = await networkService.get(`/api/sitters/${conversation.other_user.id}/reviews`);
+            sitterRating = ratingResponse.data.sitter.average_rating || 0;
+            console.log('🔍 Fetched sitter rating:', sitterRating);
+          } catch (ratingError) {
+            console.log('⚠️ Could not fetch sitter rating, using default');
+          }
+        }
+      } catch (apiError) {
+        console.log('⚠️ Could not fetch detailed profile from API, using conversation data');
+      }
+      
+      // Use detailed profile data if available, otherwise fall back to conversation data
+      const profileData = {
+        id: conversation.other_user.id,
+        name: conversation.other_user.name,
+        profile_image: conversation.other_user.profile_image,
+        phone: detailedProfile?.phone || conversation.other_user.phone || 'Not provided',
+        address: detailedProfile?.address || conversation.other_user.address || 'Not provided',
+        rating: sitterRating || detailedProfile?.rating || conversation.other_user.rating || 0,
+        role: 'pet_sitter' as const,
+      };
+      
+      console.log('🔍 Setting profile data:', profileData);
+      setSelectedProfile(profileData);
+      setProfilePopupVisible(true);
+      console.log('🔍 Profile popup should now be visible');
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+      Alert.alert('Error', 'Failed to load profile information');
+    }
+  };
+
+  // Close profile popup
+  const handleCloseProfile = () => {
+    setProfilePopupVisible(false);
+    setSelectedProfile(null);
   };
   
 
@@ -562,7 +626,15 @@ const PetOwnerMessagesScreen = () => {
         style={styles.conversationItem} 
         onPress={() => handleChatPress(item)}
       >
-        <View style={styles.avatarContainer}>
+        <TouchableOpacity 
+          style={styles.avatarContainer}
+          onPress={(e) => {
+            e.stopPropagation();
+            console.log('🔍 Avatar clicked for:', item.other_user.name);
+            handleProfileClick(item);
+          }}
+          activeOpacity={0.7}
+        >
           {item.other_user.profile_image ? (
             <Image 
               source={{ uri: item.other_user.profile_image }} 
@@ -584,7 +656,7 @@ const PetOwnerMessagesScreen = () => {
             </View>
           )}
           {isLocationTracking && <View style={styles.onlineIndicator} />}
-        </View>
+        </TouchableOpacity>
       
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
@@ -622,7 +694,15 @@ const PetOwnerMessagesScreen = () => {
               <Ionicons name="arrow-back" size={24} color="#333" />
             </TouchableOpacity>
             
-            <View style={styles.chatHeaderInfo}>
+            <TouchableOpacity 
+              style={styles.chatHeaderInfo}
+              onPress={(e) => {
+                e.stopPropagation();
+                console.log('🔍 Chat header avatar clicked for:', selectedConversation.other_user.name);
+                handleProfileClick(selectedConversation);
+              }}
+              activeOpacity={0.7}
+            >
               <Image source={{ uri: selectedConversation.other_user.profile_image || 'https://via.placeholder.com/50' }} style={styles.chatAvatar} />
               <View style={styles.chatHeaderText}>
                 <Text style={styles.chatHeaderName}>{selectedConversation.other_user.name}</Text>
@@ -632,7 +712,7 @@ const PetOwnerMessagesScreen = () => {
                   </Text>
                 )}
               </View>
-            </View>
+            </TouchableOpacity>
             
             {/* Rate & Review Button - Owner Side Only */}
             {!reviewModalVisible && (
@@ -695,6 +775,14 @@ const PetOwnerMessagesScreen = () => {
             onReviewSubmitted={handleReviewSubmitted}
           />
         )}
+
+        {/* Profile Popup Modal */}
+        <ProfilePopupModal
+          visible={profilePopupVisible}
+          onClose={handleCloseProfile}
+          profileData={selectedProfile}
+          userRole="pet_owner"
+        />
       </SafeAreaView>
     );
   }
@@ -763,6 +851,25 @@ const PetOwnerMessagesScreen = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={[styles.searchButton, { backgroundColor: '#8B5CF6', marginRight: 10 }]} 
+            onPress={() => {
+              console.log('🔍 Test button clicked');
+              const testProfile = {
+                id: '1',
+                name: 'Test Sitter',
+                profile_image: null,
+                phone: '+639123456789',
+                address: 'Manila, Philippines',
+                rating: 4.5,
+                role: 'pet_sitter' as const,
+              };
+              setSelectedProfile(testProfile);
+              setProfilePopupVisible(true);
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 12 }}>Test</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.searchButton} onPress={toggleSearch}>
             <Ionicons name={isSearchVisible ? "close" : "search"} size={24} color="#333" />
           </TouchableOpacity>

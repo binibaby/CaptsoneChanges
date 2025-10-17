@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\NameUpdateController;
 use App\Http\Controllers\Admin\PasswordResetController;
 use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\AnalyticsController;
 
 // Handle admin redirect for unauthenticated users
 Route::get('/admin', function () {
@@ -33,6 +34,13 @@ Route::middleware(['web', 'auth'])->prefix('admin')->name('admin.')->group(funct
 
     // Announcements
     Route::get('/announcements', [DashboardController::class, 'announcements'])->name('announcements');
+
+    // Analytics
+    Route::prefix('analytics')->name('analytics.')->group(function () {
+        Route::get('/', [AnalyticsController::class, 'index'])->name('index');
+        Route::get('/data', [AnalyticsController::class, 'getData'])->name('data');
+        Route::get('/export', [AnalyticsController::class, 'export'])->name('export');
+    });
 
     // User Management
     Route::prefix('users')->name('users.')->group(function () {

@@ -2,19 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import ProfilePopupModal from '../../components/ProfilePopupModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { ReverbConversation, ReverbMessage, reverbMessagingService } from '../../services/reverbMessagingService';
 
@@ -60,6 +61,10 @@ const PetSitterMessagesScreen = () => {
   const [hasAutoOpenedConversation, setHasAutoOpenedConversation] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  
+  // Profile popup state
+  const [profilePopupVisible, setProfilePopupVisible] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
 
   // Filter conversations based on search query
   const filteredConversations = conversations.filter(conversation =>
@@ -72,6 +77,53 @@ const PetSitterMessagesScreen = () => {
     if (isSearchVisible) {
       setSearchQuery('');
     }
+  };
+
+  // Handle profile click
+  const handleProfileClick = async (conversation: ReverbConversation) => {
+    console.log('🔍 Profile clicked for:', conversation.other_user.name);
+    console.log('🔍 Conversation data:', conversation);
+    
+    try {
+      // Try to fetch detailed profile information from API
+      let detailedProfile = null;
+      
+      try {
+        const { default: networkService } = await import('../../services/networkService');
+        
+        // Fetch user profile
+        const profileResponse = await networkService.get(`/api/profile`);
+        detailedProfile = profileResponse.data.user;
+        console.log('🔍 Fetched detailed profile:', detailedProfile);
+      } catch (apiError) {
+        console.log('⚠️ Could not fetch detailed profile from API, using conversation data');
+      }
+      
+      // Use detailed profile data if available, otherwise fall back to conversation data
+      const profileData = {
+        id: conversation.other_user.id,
+        name: conversation.other_user.name,
+        profile_image: conversation.other_user.profile_image,
+        phone: detailedProfile?.phone || conversation.other_user.phone || 'Not provided',
+        address: detailedProfile?.address || conversation.other_user.address || 'Not provided',
+        rating: detailedProfile?.rating || conversation.other_user.rating || 0,
+        role: 'pet_owner' as const,
+      };
+      
+      console.log('🔍 Setting profile data:', profileData);
+      setSelectedProfile(profileData);
+      setProfilePopupVisible(true);
+      console.log('🔍 Profile popup should now be visible');
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+      Alert.alert('Error', 'Failed to load profile information');
+    }
+  };
+
+  // Close profile popup
+  const handleCloseProfile = () => {
+    setProfilePopupVisible(false);
+    setSelectedProfile(null);
   };
 
   // Load conversations
@@ -329,7 +381,15 @@ const PetSitterMessagesScreen = () => {
         style={styles.conversationItem} 
         onPress={() => handleChatPress(item)}
       >
-        <View style={styles.avatarContainer}>
+        <TouchableOpacity 
+          style={styles.avatarContainer}
+          onPress={(e) => {
+            e.stopPropagation();
+            console.log('🔍 Avatar clicked for:', item.other_user.name);
+            handleProfileClick(item);
+          }}
+          activeOpacity={0.7}
+        >
           {item.other_user.profile_image ? (
             <Image 
               source={{ uri: item.other_user.profile_image }} 
@@ -351,7 +411,7 @@ const PetSitterMessagesScreen = () => {
             </View>
           )}
           {isLocationTracking && <View style={styles.onlineIndicator} />}
-        </View>
+        </TouchableOpacity>
       
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
@@ -447,7 +507,15 @@ const PetSitterMessagesScreen = () => {
               <Ionicons name="arrow-back" size={24} color="#333" />
             </TouchableOpacity>
             
-            <View style={styles.chatHeaderInfo}>
+            <TouchableOpacity 
+              style={styles.chatHeaderInfo}
+              onPress={(e) => {
+                e.stopPropagation();
+                console.log('🔍 Chat header avatar clicked for:', selectedConversation.other_user.name);
+                handleProfileClick(selectedConversation);
+              }}
+              activeOpacity={0.7}
+            >
               <Image source={{ uri: selectedConversation.other_user.profile_image || 'https://via.placeholder.com/50' }} style={styles.chatAvatar} />
               <View style={styles.chatHeaderText}>
                 <Text style={styles.chatHeaderName}>{selectedConversation.other_user.name}</Text>
@@ -457,7 +525,7 @@ const PetSitterMessagesScreen = () => {
                   </Text>
                 )}
               </View>
-            </View>
+            </TouchableOpacity>
             
             <TouchableOpacity style={styles.moreButton}>
               <Ionicons name="ellipsis-vertical" size={24} color="#333" />
@@ -618,6 +686,14 @@ const PetSitterMessagesScreen = () => {
             </TouchableOpacity>
           </View>
         }
+      />
+
+      {/* Profile Popup Modal */}
+      <ProfilePopupModal
+        visible={profilePopupVisible}
+        onClose={handleCloseProfile}
+        profileData={selectedProfile}
+        userRole="pet_sitter"
       />
     </SafeAreaView>
   );

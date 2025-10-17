@@ -3,15 +3,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Alert,
-    AppState,
-    Image,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  AppState,
+  Image,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import PlatformMap, { PlatformMarker } from '../../components/PlatformMap';
 import SitterProfilePopup from '../../components/SitterProfilePopup';
@@ -187,7 +187,8 @@ const FindSitterMapScreen = () => {
         console.log('💬 Navigated to messages screen with conversation:', conversationResult.conversation_id);
       } catch (error) {
         console.error('❌ Error starting conversation:', error);
-        Alert.alert('Error', `Failed to start conversation: ${error.message || 'Unknown error'}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        Alert.alert('Error', `Failed to start conversation: ${errorMessage}`);
       }
     };
 
@@ -213,10 +214,11 @@ const FindSitterMapScreen = () => {
           await startLocationTracking(1000);
           // Wait a moment for location to be acquired
           setTimeout(() => {
-            if (currentLocation) {
+            const location: any = currentLocation;
+            if (location && location.coords) {
               realtimeLocationService.forceClearAndRefresh(
-                currentLocation.coords.latitude,
-                currentLocation.coords.longitude,
+                location.coords.latitude,
+                location.coords.longitude,
                 50
               );
             }

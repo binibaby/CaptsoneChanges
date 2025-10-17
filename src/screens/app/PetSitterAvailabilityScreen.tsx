@@ -62,6 +62,32 @@ const PetSitterAvailabilityScreen = () => {
     return markedDates[date]?.selectedColor === '#8B5CF6';
   };
   
+  // Group availabilities by day of the week
+  const groupAvailabilitiesByDay = () => {
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const groupedByDay: { [day: string]: Array<[string, TimeRange[]]> } = {};
+    
+    // Initialize empty arrays for each day
+    daysOfWeek.forEach(day => {
+      groupedByDay[day] = [];
+    });
+    
+    // Group availabilities by day of the week
+    Object.entries(availabilities).forEach(([date, timeRanges]) => {
+      const dayName = new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
+      if (groupedByDay[dayName]) {
+        groupedByDay[dayName].push([date, timeRanges]);
+      }
+    });
+    
+    // Sort each day's availabilities by date
+    Object.keys(groupedByDay).forEach(day => {
+      groupedByDay[day].sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+    });
+    
+    return groupedByDay;
+  };
+  
   // Weekly availability state (for repeat weekly feature only)
   const [weeklyAvailabilities, setWeeklyAvailabilities] = useState<{[key: string]: any}>({});
   
@@ -1135,10 +1161,10 @@ const PetSitterAvailabilityScreen = () => {
         </View>
 
 
-        {/* Show selected availabilities */}
+        {/* Show selected availabilities organized by day columns */}
         <View style={styles.availabilitiesSection}>
           {Object.keys(availabilities).length > 0 && isAvailabilityEnabled && (
-            <Text style={styles.availabilitiesTitle}>Single Day Availabilities</Text>
+            <Text style={styles.availabilitiesTitle}>Weekly Schedule</Text>
           )}
           {!isAvailabilityEnabled && Object.keys(availabilities).length > 0 && (
             <View style={styles.availabilityDisabledMessage}>
@@ -1151,74 +1177,91 @@ const PetSitterAvailabilityScreen = () => {
               </Text>
             </View>
           )}
-          {isAvailabilityEnabled && Object.entries(availabilities).map(([date, timeRanges], index) => {
-            // Check if this is a recurring availability
-            const isRecurring = isRecurringAvailability(date);
-            
-            return (
-            <View key={date} style={[styles.availabilityCard, { backgroundColor: availabilityCardColors[index % availabilityCardColors.length] }]}>
-              <View style={styles.availabilityCardHeader}>
-                <View style={styles.dateContainer}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={styles.dateText}>{formatDate(date)}</Text>
-                    {isRecurring && (
-                      <View style={{ 
-                        marginLeft: 8, 
-                        backgroundColor: 'rgba(139, 92, 246, 0.2)', 
-                        paddingHorizontal: 6, 
-                        paddingVertical: 2, 
-                        borderRadius: 8 
-                      }}>
-                        <Text style={{ 
-                          fontSize: 10, 
-                          color: '#8B5CF6', 
-                          fontWeight: '600' 
-                        }}>
-                          🔄 WEEKLY
-                        </Text>
+          
+          {/* Day-based column layout */}
+          {isAvailabilityEnabled && (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.daysContainer}
+              contentContainerStyle={styles.daysContentContainer}
+            >
+              {Object.entries(groupAvailabilitiesByDay()).map(([dayName, dayAvailabilities]) => (
+                <View key={dayName} style={styles.dayColumn}>
+                  {/* Day Header */}
+                  <View style={styles.dayHeader}>
+                    <Text style={styles.dayHeaderText}>{dayName}</Text>
+                    <Text style={styles.dayCountText}>
+                      {dayAvailabilities.length} schedule{dayAvailabilities.length !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  
+                  {/* Schedule Cards for this day */}
+                  <ScrollView 
+                    style={styles.dayScheduleContainer}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.dayScheduleContent}
+                  >
+                    {dayAvailabilities.map(([date, timeRanges], index) => {
+                      const isRecurring = isRecurringAvailability(date);
+                      
+                      return (
+                        <View key={date} style={[styles.scheduleCard, { backgroundColor: availabilityCardColors[index % availabilityCardColors.length] }]}>
+                          <View style={styles.scheduleCardHeader}>
+                            <View style={styles.scheduleDateContainer}>
+                              <Text style={styles.scheduleDateText}>{formatDate(date)}</Text>
+                              {isRecurring && (
+                                <View style={styles.recurringBadge}>
+                                  <Text style={styles.recurringBadgeText}>🔄 WEEKLY</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          
+                          <View style={styles.scheduleTimeSlots}>
+                            {timeRanges.map((range, rangeIndex) => (
+                              <View key={rangeIndex} style={styles.scheduleTimeSlot}>
+                                <Text style={styles.scheduleTimeText}>{range.startTime} - {range.endTime}</Text>
+                              </View>
+                            ))}
+                          </View>
+                          
+                          <View style={styles.scheduleCardFooter}>
+                            <View style={styles.scheduleStats}>
+                              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                              <Text style={styles.scheduleStatsText}>{timeRanges.length} time{timeRanges.length > 1 ? 's' : ''}</Text>
+                            </View>
+                            <View style={styles.scheduleActions}>
+                              <TouchableOpacity 
+                                style={styles.scheduleEditButton}
+                                onPress={() => handleEditAvailability(date)}
+                              >
+                                <Ionicons name="pencil" size={14} color="#8B5CF6" />
+                              </TouchableOpacity>
+                              <TouchableOpacity 
+                                style={styles.scheduleDeleteButton}
+                                onPress={() => handleDeleteAvailability(date)}
+                              >
+                                <Ionicons name="trash" size={14} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                    
+                    {/* Empty state for days with no schedules */}
+                    {dayAvailabilities.length === 0 && (
+                      <View style={styles.emptyDayState}>
+                        <Ionicons name="calendar-outline" size={24} color="#CCC" />
+                        <Text style={styles.emptyDayText}>No schedules</Text>
                       </View>
                     )}
-                  </View>
-                  <Text style={styles.dayText}>{getDayName(date)}</Text>
+                  </ScrollView>
                 </View>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.timeSlotsContainer}
-                  contentContainerStyle={{ paddingRight: 8 }}
-                >
-                  {timeRanges.map((range, rangeIndex) => (
-                    <View key={rangeIndex} style={styles.timeSlotBadge}>
-                      <Text style={styles.timeSlotText}>{range.startTime} - {range.endTime}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-              <View style={styles.availabilityCardFooter}>
-                <View style={styles.availabilityStats}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                  <Text style={styles.availabilityStatsText}>{timeRanges.length} time range{timeRanges.length > 1 ? 's' : ''} available</Text>
-                </View>
-                <View style={styles.cardActions}>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={() => handleEditAvailability(date)}
-                  >
-                    <Ionicons name="pencil" size={16} color="#8B5CF6" />
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteAvailability(date)}
-                  >
-                    <Ionicons name="trash" size={16} color="#EF4444" />
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-            );
-          })}
+              ))}
+            </ScrollView>
+          )}
         </View>
 
       </ScrollView>
@@ -1778,13 +1821,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  dayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 15,
-    backgroundColor: '#F0F0F0',
-  },
   availableDayHeader: {
     backgroundColor: '#E8F5E8',
   },
@@ -1889,6 +1925,141 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
+  },
+  daysContainer: {
+    marginTop: 8,
+  },
+  daysContentContainer: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  dayColumn: {
+    width: 200,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dayHeader: {
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  dayHeaderText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  dayCountText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  dayScheduleContainer: {
+    maxHeight: 500,
+  },
+  dayScheduleContent: {
+    paddingBottom: 8,
+  },
+  scheduleCard: {
+    borderRadius: 12,
+    marginBottom: 10,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  scheduleCardHeader: {
+    marginBottom: 8,
+  },
+  scheduleDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  scheduleDateText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  recurringBadge: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  recurringBadgeText: {
+    fontSize: 8,
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  scheduleTimeSlots: {
+    marginBottom: 8,
+  },
+  scheduleTimeSlot: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  scheduleTimeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  scheduleCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  scheduleStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  scheduleStatsText: {
+    fontSize: 10,
+    color: '#10B981',
+    fontWeight: '500',
+  },
+  scheduleActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  scheduleEditButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  scheduleDeleteButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
+  emptyDayState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  emptyDayText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 8,
+    textAlign: 'center',
   },
   availabilityCard: {
     borderRadius: 16,

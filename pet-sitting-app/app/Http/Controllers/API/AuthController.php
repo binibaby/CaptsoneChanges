@@ -496,7 +496,7 @@ class AuthController extends Controller
         }
 
         // Check if user account is active
-        if ($user->status !== 'banned') {
+        if ($user->status === 'banned') {
             return response()->json([
                 'success' => false,
                 'message' => 'Your account has been suspended. Please contact support.',
@@ -512,7 +512,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login successful!',
             'user' => $this->buildUserProfile($user),
-            //'token' => $token,
+            'token' => $token,
             'verification_status' => $verificationStatus,
         ]);
     }

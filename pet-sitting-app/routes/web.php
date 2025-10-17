@@ -11,7 +11,6 @@ Route::get('/', function () {
 
 // Simple admin login route
 Route::get('/admin/login', function () {
-    return "Hello";
     return view('admin.login');
 })->name('admin.login');
 
@@ -105,3 +104,29 @@ Route::get('/admin-verifications', function () {
         'verifications' => collect([]),
     ]);
 })->name('admin.verifications.simple');
+
+// Admin Analytics Page
+Route::get('/admin-analytics', function () {
+    return view('admin.analytics', [
+        'analyticsData' => [
+            'period' => 'monthly',
+            'date_range' => ['start' => now()->subMonths(12)->format('Y-m-d'), 'end' => now()->format('Y-m-d')],
+            'user_growth' => collect([]),
+            'revenue_data' => collect([]),
+            'booking_data' => collect([]),
+            'verification_data' => collect([]),
+            'totals' => [
+                'users' => 0,
+                'revenue' => 0,
+                'app_earnings' => 0,
+                'bookings' => 0,
+                'verifications' => 0
+            ],
+            'growth_rates' => [
+                'users' => 0,
+                'revenue' => 0
+            ]
+        ]
+    ]);
+})->name('admin.analytics.simple');
+
