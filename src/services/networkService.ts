@@ -332,7 +332,7 @@ export const makeApiCall = async (
           // Update headers with new token, preserving other headers
           const updatedHeaders = {
             ...headers,
-            'Authorization': `Bearer ${refreshedUser.token}`,
+              'Authorization': `Bearer ${refreshedUser.token}`,
           };
           
           // Retry with new token
