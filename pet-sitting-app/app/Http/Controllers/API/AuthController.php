@@ -855,22 +855,25 @@ class AuthController extends Controller
                 return $this->simulateSMS($phone, $verificationCode, $timestamp);
             }
         } catch (\Exception $e) {
-            \Log::error("❌ SEMAPHORE SMS - Exception occurred: " . $e->getMessage());
-            \Log::error("❌ SEMAPHORE SMS - Stack trace: " . $e->getTraceAsString());
-            
-            // Fallback to simulation mode if Semaphore fails
-            \Log::info("🔄 SEMAPHORE SMS - Falling back to simulation mode due to exception");
-            return $this->simulateSMS($phone, $verificationCode, $timestamp);
-        } catch (\Exception $e) {
             try {
-                \Log::error("❌ sendPhoneVerificationCode error: " . $e->getMessage());
+                \Log::error("❌ SEMAPHORE SMS - Exception occurred: " . $e->getMessage());
+                \Log::error("❌ SEMAPHORE SMS - Stack trace: " . $e->getTraceAsString());
+                
+                // Fallback to simulation mode if Semaphore fails
+                \Log::info("🔄 SEMAPHORE SMS - Falling back to simulation mode due to exception");
+                return $this->simulateSMS($phone, $verificationCode, $timestamp);
             } catch (\Exception $logError) {
-                // Ignore logging errors
+                // If logging fails, still try to return simulation mode response
+                try {
+                    return $this->simulateSMS($phone, $verificationCode, $timestamp);
+                } catch (\Exception $simError) {
+                    // If everything fails, return error response
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'An error occurred while sending verification code. Please try again.',
+                    ], 500);
+                }
             }
-            return response()->json([
-                'success' => false,
-                'message' => 'An error occurred while sending verification code. Please try again.',
-            ], 500);
         }
     }
 
