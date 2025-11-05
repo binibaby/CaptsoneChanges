@@ -1,4 +1,4 @@
-import { NETWORK_FALLBACK } from '../constants/config';
+import { NETWORK_FALLBACK, API_BASE_URL } from '../constants/config';
 
 // Network detection and fallback service
 export class NetworkService {
@@ -7,6 +7,13 @@ export class NetworkService {
   private isConnected: boolean = false;
 
   private constructor() {
+    // In production, use Render URL directly - no local IP detection needed
+    if (!__DEV__) {
+      this.currentBaseUrl = API_BASE_URL;
+      this.isConnected = true;
+      return;
+    }
+    // Only detect local IPs in development mode
     this.initializeNetwork();
   }
 
@@ -61,6 +68,12 @@ export class NetworkService {
 
   // Detect which IP address is currently working (optimized for WiFi connection)
   public async detectWorkingIP(): Promise<string> {
+    // In production, always use Render URL - no local IP detection
+    if (!__DEV__) {
+      this.currentBaseUrl = API_BASE_URL;
+      this.isConnected = true;
+      return API_BASE_URL;
+    }
     // Silently detect working IP
     // console.log('🔍 Detecting working IP address for WiFi connection...');
 
@@ -147,6 +160,10 @@ export class NetworkService {
 
   // Get current working base URL
   public getBaseUrl(): string {
+    // In production, always return Render URL
+    if (!__DEV__) {
+      return API_BASE_URL;
+    }
     return this.currentBaseUrl;
   }
 
@@ -192,6 +209,12 @@ export class NetworkService {
 
   // Force network re-detection (useful when switching networks)
   public async forceReconnect(): Promise<string> {
+    // In production, no need to reconnect - always use Render URL
+    if (!__DEV__) {
+      this.currentBaseUrl = API_BASE_URL;
+      this.isConnected = true;
+      return API_BASE_URL;
+    }
     // Silently force reconnect
     // console.log('🔄 Forcing network re-detection...');
     this.isConnected = false;
