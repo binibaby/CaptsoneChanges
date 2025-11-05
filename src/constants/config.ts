@@ -4,7 +4,8 @@ const getNetworkIP = () => {
     // Use current WiFi IP for development
     return '192.168.100.215';
   }
-  return 'https://your-production-domain.com';
+  // Production: Use your Render backend URL
+  return 'https://myapp.onrender.com';
 };
 
 // Network fallback configuration for dual connectivity
@@ -53,7 +54,11 @@ export const NETWORK_FALLBACK = {
 };
 
 // API Configuration
-export const API_BASE_URL = getNetworkIP() + ':8000';
+// In development, use local network IP with port
+// In production, use Render URL (no port needed as Render handles it)
+export const API_BASE_URL = __DEV__ 
+  ? getNetworkIP() + ':8000'
+  : 'https://myapp.onrender.com';
 
 export const API_CONFIG = {
   // Dynamic IP detection for both WiFi and mobile data
