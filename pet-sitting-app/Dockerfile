@@ -66,7 +66,9 @@ chmod -R 775 /var/www/html/storage\n\
 chmod -R 777 /var/www/html/storage/logs\n\
 # Run migrations automatically on startup (show output for debugging)\n\
 echo "Running database migrations..."\n\
-php artisan migrate --force\n\
+php artisan migrate --force 2>&1 | tee /tmp/migration.log\n\
+echo "Migration exit code: $?"\n\
+cat /tmp/migration.log\n\
 echo "Migrations completed"\n\
 # Optimize Laravel for production (continue even if caching fails)\n\
 php artisan config:cache || true\n\
