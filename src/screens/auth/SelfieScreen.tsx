@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { getAuthHeaders } from '../../constants/config';
 import { makeApiCall } from '../../services/networkService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SelfieScreenProps {
   userData?: any;
@@ -26,6 +27,7 @@ interface SelfieScreenProps {
 const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, phoneVerified: propPhoneVerified, frontImage: propFrontImage, backImage: propBackImage, documentType: propDocumentType, onSelfieComplete }) => {
   const navigation = useNavigation();
   const route = useRoute();
+  const { user: authUser } = useAuth(); // Get user from auth context as fallback
   
   // Get data from either props or route params
   const userData = propUserData || (route.params as any)?.userData;
@@ -216,11 +218,13 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
         location: currentLocation ? `${currentLocation.address} (${currentLocation.latitude}, ${currentLocation.longitude})` : 'No location'
       });
 
-      // Get authentication token
-      const authToken = userData?.token;
-      console.log('🔐 SelfieScreen - Auth token:', authToken ? 'Present' : 'Missing');
-      console.log('🔐 SelfieScreen - Token value:', authToken);
+      // Get authentication token from userData or auth context
+      let authToken = userData?.token || authUser?.token;
+      console.log('🔐 SelfieScreen - Auth token from userData:', userData?.token ? 'Present' : 'Missing');
+      console.log('🔐 SelfieScreen - Auth token from authUser:', authUser?.token ? 'Present' : 'Missing');
+      console.log('🔐 SelfieScreen - Final auth token:', authToken ? 'Present' : 'Missing');
       console.log('🔐 SelfieScreen - User data:', userData);
+      console.log('🔐 SelfieScreen - Auth user:', authUser);
       
       if (!authToken) {
         Alert.alert('Error', 'Authentication required. Please log in again.');

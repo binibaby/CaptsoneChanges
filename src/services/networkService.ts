@@ -246,12 +246,15 @@ export const makeApiCall = async (
     // console.log(`🌐 Making API call to: ${url}`);
     
     // Get user token if no Authorization header is provided
+    // IMPORTANT: Preserve Authorization header from options.headers if provided
+    const providedHeaders = options.headers as Record<string, string> || {};
     let headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      ...(options.headers as Record<string, string>),
+      ...providedHeaders,
     };
     
+    // Only add token from authService if Authorization header is not already provided
     if (!headers['Authorization'] && !headers['authorization']) {
       try {
         const { default: authService } = await import('./authService');
@@ -270,6 +273,9 @@ export const makeApiCall = async (
         // Silently handle token error
         // console.log('⚠️ Could not get user token:', error);
       }
+    } else {
+      // Log that Authorization header was already provided
+      console.log('🔑 makeApiCall - Using provided Authorization header');
     }
     
     const response = await fetch(url, {

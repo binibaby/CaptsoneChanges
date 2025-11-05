@@ -429,8 +429,15 @@ export default function Auth() {
         console.log('Backend user hourly_rate value:', JSON.stringify(backendUser.hourly_rate));
         await storeUserFromBackend(backendUser);
 
+        // IMPORTANT: Include token in completeUser so verification screens can use it
+        const completeUserWithToken = {
+          ...completeUser,
+          token: result.token || null, // Include token from registration response
+        };
+        console.log('🔑 onRegistrationComplete - Token included in userData:', !!completeUserWithToken.token);
+
         // After breed selection, go to phone verification for both pet sitters and pet owners
-        setSignupData({ ...signupData, userData: completeUser });
+        setSignupData({ ...signupData, userData: completeUserWithToken });
         setAuthStep('phone-verification');
       } else {
         // Silently handle backend save failure
