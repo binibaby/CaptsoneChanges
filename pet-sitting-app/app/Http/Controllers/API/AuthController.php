@@ -861,6 +861,16 @@ class AuthController extends Controller
             // Fallback to simulation mode if Semaphore fails
             \Log::info("🔄 SEMAPHORE SMS - Falling back to simulation mode due to exception");
             return $this->simulateSMS($phone, $verificationCode, $timestamp);
+        } catch (\Exception $e) {
+            try {
+                \Log::error("❌ sendPhoneVerificationCode error: " . $e->getMessage());
+            } catch (\Exception $logError) {
+                // Ignore logging errors
+            }
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while sending verification code. Please try again.',
+            ], 500);
         }
     }
 
