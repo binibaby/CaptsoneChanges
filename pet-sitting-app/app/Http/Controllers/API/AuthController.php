@@ -18,16 +18,6 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-            // Add debugging (safe logging - don't fail if logging fails)
-            try {
-                \Log::info('🔔 USER REGISTRATION REQUEST RECEIVED');
-                \Log::info('📝 Request data:', ['data' => $request->all()]);
-                \Log::info('🌐 Request IP:', ['ip' => $request->ip()]);
-                \Log::info('👤 User Agent:', ['user_agent' => $request->userAgent()]);
-            } catch (\Exception $logError) {
-                // Ignore logging errors
-            }
-
         try {
             $request->validate([
                 'name' => 'required|string|max:255',
@@ -706,105 +696,88 @@ class AuthController extends Controller
                 'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
             ]);
 
-        $phone = $this->formatPhoneNumber($request->phone);
-        
-        // Verify the phone number matches the user's registered phone
-        $user = $request->user();
-        if ($user && $user->phone !== $phone) {
-            \Log::warning("📱 PHONE MISMATCH - User phone: {$user->phone}, Requested phone: {$phone}");
-            return response()->json([
-                'success' => false,
-                'message' => 'Phone number does not match your registered phone number.',
-            ], 400);
-        }
-        
-        // If no authenticated user, find the most recent user with this phone (for registration flow)
-        if (!$user) {
-            // Check if phone column exists before querying
-            if (Schema::hasColumn('users', 'phone')) {
-                try {
-                    $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
-                    try {
-                        \Log::info("🔍 SEND CODE - Found user by phone: " . ($user ? "Found (ID: {$user->id}, Created: {$user->created_at})" : "NULL"));
-                    } catch (\Exception $logError) {
-                        // Ignore logging errors
-                    }
-                } catch (\Exception $e) {
-                    try {
-                        \Log::warning("⚠️ Could not find user by phone: " . $e->getMessage());
-                    } catch (\Exception $logError) {
-                        // Ignore logging errors
-                    }
-                    $user = null;
-                }
-            } else {
-                // Phone column doesn't exist yet - migration hasn't run
-                try {
-                    \Log::warning("⚠️ Phone column does not exist yet - migration may not have run");
-                } catch (\Exception $logError) {
-                    // Ignore logging errors
-                }
-                $user = null;
-            }
-        }
-        $timestamp = now()->format('Y-m-d H:i:s');
-
-        // Generate a 6-digit verification code
-        $verificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        
-        // Create cache key with original phone number
-        $cacheKey = "phone_verification_{$phone}";
-        
-        // Store the code in cache for verification (expires in 10 minutes)
-        \Cache::put($cacheKey, $verificationCode, 600);
-        
-        // Safe logging - don't fail if logging fails
-        try {
-            \Log::info("📱 SEND SMS - Generated code: {$verificationCode}");
-            \Log::info("📱 Use this code to verify phone: {$phone}");
-        } catch (\Exception $logError) {
-            // Ignore logging errors
-        }
-
-        // Format phone number for display
-        $formattedPhone = $this->formatPhoneForSMS($phone);
-        
-        // Check if simulation mode is enabled
-        $simulationMode = $this->isSimulationMode();
-        
-        if ($simulationMode) {
-            return $this->simulateSMS($phone, $verificationCode, $timestamp);
-        }
-
-        // Send SMS using Semaphore service
-        try {
-            $semaphoreService = new SemaphoreService();
-            $message = $verificationCode; // Send only the 6-digit code
+            $phone = $this->formatPhoneNumber($request->phone);
             
-            $smsResult = $semaphoreService->sendSMS($phone, $message);
-            
-            if ($smsResult['success']) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Verification code sent successfully via SMS!',
-                    'provider' => 'semaphore',
-                    'timestamp' => $timestamp,
-                ]);
-            } else {
-                // Fallback to simulation mode if Semaphore fails
-                return $this->simulateSMS($phone, $verificationCode, $timestamp);
-            }
-        } catch (\Exception $e) {
-            // Fallback to simulation mode if Semaphore fails
-            try {
-                return $this->simulateSMS($phone, $verificationCode, $timestamp);
-            } catch (\Exception $simError) {
-                // If everything fails, return error response
+            // Verify the phone number matches the user's registered phone
+            $user = $request->user();
+            if ($user && $user->phone !== $phone) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'An error occurred while sending verification code. Please try again.',
-                ], 500);
+                    'message' => 'Phone number does not match your registered phone number.',
+                ], 400);
             }
+            
+            // If no authenticated user, find the most recent user with this phone (for registration flow)
+            if (!$user) {
+                // Check if phone column exists before querying
+                if (Schema::hasColumn('users', 'phone')) {
+                    try {
+                        $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
+                    } catch (\Exception $e) {
+                        $user = null;
+                    }
+                } else {
+                    // Phone column doesn't exist yet - migration hasn't run
+                    $user = null;
+                }
+            }
+            
+            $timestamp = now()->format('Y-m-d H:i:s');
+
+            // Generate a 6-digit verification code
+            $verificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            
+            // Create cache key with original phone number
+            $cacheKey = "phone_verification_{$phone}";
+            
+            // Store the code in cache for verification (expires in 10 minutes)
+            \Cache::put($cacheKey, $verificationCode, 600);
+
+            // Format phone number for display
+            $formattedPhone = $this->formatPhoneForSMS($phone);
+            
+            // Check if simulation mode is enabled
+            $simulationMode = $this->isSimulationMode();
+            
+            if ($simulationMode) {
+                return $this->simulateSMS($phone, $verificationCode, $timestamp);
+            }
+
+            // Send SMS using Semaphore service
+            try {
+                $semaphoreService = new SemaphoreService();
+                $message = $verificationCode; // Send only the 6-digit code
+                
+                $smsResult = $semaphoreService->sendSMS($phone, $message);
+                
+                if ($smsResult['success']) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Verification code sent successfully via SMS!',
+                        'provider' => 'semaphore',
+                        'timestamp' => $timestamp,
+                    ]);
+                } else {
+                    // Fallback to simulation mode if Semaphore fails
+                    return $this->simulateSMS($phone, $verificationCode, $timestamp);
+                }
+            } catch (\Exception $e) {
+                // Fallback to simulation mode if Semaphore fails
+                try {
+                    return $this->simulateSMS($phone, $verificationCode, $timestamp);
+                } catch (\Exception $simError) {
+                    // If everything fails, return error response
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'An error occurred while sending verification code. Please try again.',
+                    ], 500);
+                }
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while sending verification code. Please try again.',
+            ], 500);
         }
     }
 
