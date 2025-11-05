@@ -50,8 +50,8 @@ RUN chown -R www-data:www-data /var/www/html \
 
 # Create startup script for Laravel optimization
 RUN echo '#!/bin/bash\n\
-# Run migrations (if needed, uncomment the line below)\n\
-# php artisan migrate --force\n\
+# Run migrations automatically on startup\n\
+php artisan migrate --force || true\n\
 # Optimize Laravel for production (continue even if caching fails)\n\
 php artisan config:cache || true\n\
 php artisan route:cache || true\n\
