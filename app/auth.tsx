@@ -182,6 +182,7 @@ export default function Auth() {
             last_name: user.lastName || '',
             email: user.email,
             password: user.password,
+            password_confirmation: user.password, // Required by backend validation
             role: user.userRole === 'Pet Owner' ? 'pet_owner' : 'pet_sitter',
             phone: user.phone,
             address: user.address,
@@ -195,6 +196,20 @@ export default function Auth() {
             bio: user.aboutMe || '',
           }),
         });
+
+        // Check if response is ok before parsing JSON
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to save user data';
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorJson.error || errorMessage;
+          } catch (e) {
+            errorMessage = errorText || `Server error: ${response.status}`;
+          }
+          console.error('❌ Registration failed:', response.status, errorMessage);
+          throw new Error(errorMessage);
+        }
 
         const result = await response.json();
         
@@ -228,10 +243,14 @@ export default function Auth() {
           await storeUserFromBackend(result.user);
         } else {
           console.error('Failed to save user data to backend in onAuthSuccess:', result);
+          throw new Error(result.message || 'Failed to save user data');
         }
       }
     } catch (error) {
-      console.error('Error updating user profile:', error);
+      console.error('Error saving user data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save user data';
+      Alert.alert('Registration Error', errorMessage);
+      throw error; // Re-throw to prevent navigation on error
     }
 
     // Navigate based on user role
