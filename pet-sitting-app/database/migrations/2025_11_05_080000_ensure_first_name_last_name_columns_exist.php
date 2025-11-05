@@ -24,7 +24,14 @@ return new class extends Migration
             
             // Add gender if it doesn't exist
             if (!Schema::hasColumn('users', 'gender')) {
-                $table->string('gender')->nullable()->after('last_name');
+                // Check if we can use enum (MySQL) or use string (PostgreSQL)
+                $driver = Schema::getConnection()->getDriverName();
+                if ($driver === 'mysql') {
+                    $table->enum('gender', ['male', 'female', 'other'])->nullable()->after('last_name');
+                } else {
+                    // PostgreSQL doesn't support enum easily, use string with check constraint
+                    $table->string('gender')->nullable()->after('last_name');
+                }
             }
             
             // Add age if it doesn't exist
@@ -60,6 +67,31 @@ return new class extends Migration
             // Add bio if it doesn't exist
             if (!Schema::hasColumn('users', 'bio')) {
                 $table->text('bio')->nullable();
+            }
+            
+            // Add profile_image if it doesn't exist
+            if (!Schema::hasColumn('users', 'profile_image')) {
+                $table->string('profile_image')->nullable();
+            }
+            
+            // Add is_admin if it doesn't exist
+            if (!Schema::hasColumn('users', 'is_admin')) {
+                $table->boolean('is_admin')->default(false);
+            }
+            
+            // Add id_verified_at if it doesn't exist
+            if (!Schema::hasColumn('users', 'id_verified_at')) {
+                $table->timestamp('id_verified_at')->nullable();
+            }
+            
+            // Add verification_status if it doesn't exist
+            if (!Schema::hasColumn('users', 'verification_status')) {
+                $table->string('verification_status')->nullable();
+            }
+            
+            // Add can_accept_bookings if it doesn't exist
+            if (!Schema::hasColumn('users', 'can_accept_bookings')) {
+                $table->boolean('can_accept_bookings')->default(false);
             }
         });
     }
