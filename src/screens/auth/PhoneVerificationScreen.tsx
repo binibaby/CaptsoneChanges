@@ -144,7 +144,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       if (error.name === 'AbortError') {
         errorMessage = 'Request timed out. Please check your internet connection and try again.';
       } else if (error.message?.includes('Network request failed')) {
-        errorMessage = 'Unable to connect to server. Please check:\n\n1. Your internet connection\n2. Server is running and accessible\n3. Both devices are on same network';
+        errorMessage = 'Unable to connect to server. Please check:\n\n1. Your internet connection (WiFi or mobile data)\n2. Server is running and accessible';
       } else if (error.message?.includes('JSON')) {
         errorMessage = 'Invalid response from server. Please try again.';
       } else if (error.message?.includes('fetch')) {
@@ -407,7 +407,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
                     <Text style={styles.tipsText}>• Try switching between WiFi and mobile data</Text>
                     <Text style={styles.tipsText}>• Wait a few minutes before retrying</Text>
                     <Text style={styles.tipsText}>• Verify server is running and accessible</Text>
-                    <Text style={styles.tipsText}>• Ensure both devices are on same network</Text>
+                    <Text style={styles.tipsText}>• Works on WiFi or mobile data</Text>
                   </View>
                 </View>
               )}

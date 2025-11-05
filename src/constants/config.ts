@@ -5,7 +5,7 @@ const getNetworkIP = () => {
     return '192.168.100.215';
   }
   // Production: Use your Render backend URL
-  return 'https://myapp.onrender.com';
+  return 'https://pet-sitting-backend.onrender.com';
 };
 
 // Network fallback configuration for dual connectivity
@@ -57,8 +57,8 @@ export const NETWORK_FALLBACK = {
 // In development, use local network IP with port
 // In production, use Render URL (no port needed as Render handles it)
 export const API_BASE_URL = __DEV__ 
-  ? getNetworkIP() + ':8000'
-  : 'https://myapp.onrender.com';
+  ? `http://${getNetworkIP()}:8000`
+  : 'https://pet-sitting-backend.onrender.com';
 
 export const API_CONFIG = {
   // Dynamic IP detection for both WiFi and mobile data

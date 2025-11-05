@@ -37,10 +37,9 @@ const SimpleSitterProfilePopup: React.FC<SimpleSitterProfilePopupProps> = ({
           currentImageSource.current = { uri: sitter.profileImage };
           return currentImageSource.current;
         }
-        // Try to construct full URL
-        const { getNetworkIP } = require('../constants/config');
-        const ip = getNetworkIP();
-        const fullUrl = `http://${ip}:8000/storage/${sitter.profileImage}`;
+        // Try to construct full URL using network service
+        const { networkService } = require('../services/networkService');
+        const fullUrl = networkService.getImageUrl(`/storage/${sitter.profileImage}`);
         currentImageSource.current = { uri: fullUrl };
         return currentImageSource.current;
       }
@@ -52,9 +51,8 @@ const SimpleSitterProfilePopup: React.FC<SimpleSitterProfilePopupProps> = ({
           currentImageSource.current = { uri: sitter.imageSource };
           return currentImageSource.current;
         }
-        const { getNetworkIP } = require('../constants/config');
-        const ip = getNetworkIP();
-        const fullUrl = `http://${ip}:8000/storage/${sitter.imageSource}`;
+        const { networkService } = require('../services/networkService');
+        const fullUrl = networkService.getImageUrl(`/storage/${sitter.imageSource}`);
         currentImageSource.current = { uri: fullUrl };
         return currentImageSource.current;
       }
@@ -67,9 +65,8 @@ const SimpleSitterProfilePopup: React.FC<SimpleSitterProfilePopupProps> = ({
           currentImageSource.current = { uri: firstImage };
           return currentImageSource.current;
         }
-        const { getNetworkIP } = require('../constants/config');
-        const ip = getNetworkIP();
-        const fullUrl = `http://${ip}:8000/storage/${firstImage}`;
+        const { networkService } = require('../services/networkService');
+        const fullUrl = networkService.getImageUrl(`/storage/${firstImage}`);
         currentImageSource.current = { uri: fullUrl };
         return currentImageSource.current;
       }

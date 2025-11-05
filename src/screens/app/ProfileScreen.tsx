@@ -125,9 +125,10 @@ const ProfileScreen = () => {
         return fullUrl;
       } catch (error) {
         console.error('❌ ProfileScreen: Error getting image URL:', error);
-        // Fallback to hardcoded URL if network service fails
+        // Fallback to Render URL in production, or network service in dev
         const storagePath = uri.startsWith('/storage/') ? uri : `/storage/${uri}`;
-        const fallbackUrl = `http://192.168.100.215:8000${storagePath}`;
+        const { API_BASE_URL } = require('../../constants/config');
+        const fallbackUrl = `${API_BASE_URL}${storagePath}`;
         console.log('🔗 ProfileScreen: Using fallback URL:', fallbackUrl);
         return fallbackUrl;
       }
@@ -534,8 +535,9 @@ const ProfileScreen = () => {
         setImageError(false);
         setJustUploadedImage(true); // Flag to prevent useEffect from overriding
         
-        // Also try with a hardcoded URL to test
-        const testUrl = `http://192.168.100.215:8000/storage/${result.profile_image}`;
+        // Also try with a test URL using network service
+        const { networkService } = require('../../services/networkService');
+        const testUrl = networkService.getImageUrl(`/storage/${result.profile_image}`);
         console.log('ProfileScreen: TEST URL:', testUrl);
         setTimeout(() => {
           console.log('ProfileScreen: Trying test URL after 500ms');
@@ -861,8 +863,9 @@ const ProfileScreen = () => {
             <TouchableOpacity 
               style={[styles.testButton, { backgroundColor: '#FF6B6B', marginTop: 10 }]} 
               onPress={() => {
-                const testUrl = `http://192.168.100.215:8000/storage/profile_images/h0SuQ7rQBRwmpycUgSBgtmsm8CXFTSeTVc7tHJyr.jpg`;
-                console.log('🧪 FORCE TEST: Setting hardcoded URL:', testUrl);
+                const { networkService } = require('../../services/networkService');
+                const testUrl = networkService.getImageUrl('/storage/profile_images/h0SuQ7rQBRwmpycUgSBgtmsm8CXFTSeTVc7tHJyr.jpg');
+                console.log('🧪 FORCE TEST: Setting URL:', testUrl);
                 setProfileImage(testUrl);
                 setImageError(false);
                 Alert.alert('Force Test', `Set hardcoded URL: ${testUrl}`);

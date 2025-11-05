@@ -1,0 +1,56 @@
+# ============================================
+# MINIMUM REQUIRED VARIABLES FOR RENDER
+# Copy these to Render Environment Variables
+# ============================================
+
+APP_NAME=PetsitConnect
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=
+
+DB_CONNECTION=pgsql
+DB_HOST=dpg-d45cdq95pdvs73burvng-a.oregon-postgres.render.com
+DB_PORT=5432
+DB_DATABASE=pet_sitting_db
+DB_USERNAME=pet_sitting_db_user
+DB_PASSWORD=oFwIDD42ZUtxMGIenKQlTOTGLTq0RYLs
+
+LOG_CHANNEL=stack
+LOG_LEVEL=error
+
+SESSION_DRIVER=file
+CACHE_DRIVER=file
+QUEUE_CONNECTION=sync
+
+# ============================================
+# OPTIONAL: Add these if you're using them
+# ============================================
+
+# Semaphore SMS
+SEMAPHORE_API_KEY=your_semaphore_api_key_here
+SEMAPHORE_ENABLED=true
+SMS_SIMULATION_MODE=false
+
+# Xendit Payments
+XENDIT_SECRET_KEY=your_xendit_secret_key_here
+XENDIT_WEBHOOK_TOKEN=your_webhook_token_here
+
+# Veriff ID Verification
+VERIFF_API_KEY=your_veriff_api_key_here
+VERIFF_API_SECRET=your_veriff_secret_here
+
+# ============================================
+# HOW TO USE IN RENDER:
+# ============================================
+# 1. Go to your web service in Render
+# 2. Click "Environment" tab
+# 3. Click "Add Environment Variable"
+# 4. For each line above:
+#    Variable Name = (left side of =)
+#    Variable Value = (right side of =)
+# 5. Leave APP_KEY and APP_URL empty for now
+#    - APP_KEY will be auto-generated
+#    - APP_URL: update after deployment
+# ============================================
+

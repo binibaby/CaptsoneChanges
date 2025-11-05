@@ -40,19 +40,18 @@ const PetOwnerDashboardScreen = () => {
     if (uri.startsWith('http')) {
       return uri;
     }
-    if (uri.startsWith('/storage/')) {
-      const fullUrl = `http://192.168.100.215:8000${uri}`;
-      console.log('🔗 PetOwnerDashboardScreen: Generated URL for /storage/ path:', fullUrl);
+    try {
+      const { networkService } = require('../../services/networkService');
+      const storagePath = uri.startsWith('/storage/') ? uri : `/storage/${uri}`;
+      const fullUrl = networkService.getImageUrl(storagePath);
+      console.log('🔗 PetOwnerDashboardScreen: Generated URL:', fullUrl);
       return fullUrl;
+    } catch (error) {
+      console.error('Error getting image URL, using fallback:', error);
+      const { API_BASE_URL } = require('../../constants/config');
+      const storagePath = uri.startsWith('/storage/') ? uri : `/storage/${uri}`;
+      return `${API_BASE_URL}${storagePath}`;
     }
-    if (uri.includes('profile_images/')) {
-      const fullUrl = `http://192.168.100.215:8000/storage/${uri}`;
-      console.log('🔗 PetOwnerDashboardScreen: Generated URL for profile_images/ path:', fullUrl);
-      return fullUrl;
-    }
-    const fullUrl = `http://192.168.100.215:8000/storage/${uri}`;
-    console.log('🔗 PetOwnerDashboardScreen: Generated URL for fallback path:', fullUrl);
-    return fullUrl;
   };
 
   // Handle image load error
