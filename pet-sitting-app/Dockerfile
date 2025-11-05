@@ -44,15 +44,30 @@ COPY . /var/www/html
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Set proper permissions for Laravel storage and cache directories
-RUN chown -R www-data:www-data /var/www/html \
+RUN mkdir -p /var/www/html/storage/logs \
+    && mkdir -p /var/www/html/storage/framework/cache \
+    && mkdir -p /var/www/html/storage/framework/sessions \
+    && mkdir -p /var/www/html/storage/framework/views \
+    && chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
     && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
+    && chmod -R 775 /var/www/html/bootstrap/cache \
+    && chmod -R 777 /var/www/html/storage/logs
 
 # Create startup script for Laravel optimization
 RUN echo '#!/bin/bash\n\
-# Run migrations automatically on startup\n\
-php artisan migrate --force || true\n\
+# Ensure storage directories exist and have proper permissions\n\
+mkdir -p /var/www/html/storage/logs\n\
+mkdir -p /var/www/html/storage/framework/cache\n\
+mkdir -p /var/www/html/storage/framework/sessions\n\
+mkdir -p /var/www/html/storage/framework/views\n\
+chown -R www-data:www-data /var/www/html/storage\n\
+chmod -R 775 /var/www/html/storage\n\
+chmod -R 777 /var/www/html/storage/logs\n\
+# Run migrations automatically on startup (show output for debugging)\n\
+echo "Running database migrations..."\n\
+php artisan migrate --force\n\
+echo "Migrations completed"\n\
 # Optimize Laravel for production (continue even if caching fails)\n\
 php artisan config:cache || true\n\
 php artisan route:cache || true\n\
