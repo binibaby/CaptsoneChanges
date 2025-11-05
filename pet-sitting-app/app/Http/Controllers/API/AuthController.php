@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -72,28 +73,53 @@ class AuthController extends Controller
             ]);
 
             // Debug: Log the exact data being passed to User::create
+            // Only include fields that exist in the database to avoid column errors
             $userData = [
                 'name' => $request->name,
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
                 'status' => $request->role === 'pet_sitter' ? 'pending_verification' : 'pending',
                 'phone' => $formattedPhone,
-                'address' => $request->address,
-                'gender' => $request->gender,
-                'age' => $request->age,
-                'experience' => $request->experience,
-                'hourly_rate' => $request->hourly_rate,
-                'pet_breeds' => $request->pet_breeds,
-                'specialties' => $request->specialties,
-                'selected_pet_types' => $request->selected_pet_types,
-                'bio' => $request->bio,
                 'phone_verification_code' => $phoneVerificationCode,
                 'email_verified_at' => now(),
                 'phone_verified_at' => null,
             ];
+            
+            // Only add fields if the columns exist in the database
+            if (Schema::hasColumn('users', 'first_name')) {
+                $userData['first_name'] = $request->first_name;
+            }
+            if (Schema::hasColumn('users', 'last_name')) {
+                $userData['last_name'] = $request->last_name;
+            }
+            if (Schema::hasColumn('users', 'address')) {
+                $userData['address'] = $request->address;
+            }
+            if (Schema::hasColumn('users', 'gender')) {
+                $userData['gender'] = $request->gender;
+            }
+            if (Schema::hasColumn('users', 'age')) {
+                $userData['age'] = $request->age;
+            }
+            if (Schema::hasColumn('users', 'experience')) {
+                $userData['experience'] = $request->experience;
+            }
+            if (Schema::hasColumn('users', 'hourly_rate')) {
+                $userData['hourly_rate'] = $request->hourly_rate;
+            }
+            if (Schema::hasColumn('users', 'pet_breeds')) {
+                $userData['pet_breeds'] = $request->pet_breeds;
+            }
+            if (Schema::hasColumn('users', 'specialties')) {
+                $userData['specialties'] = $request->specialties;
+            }
+            if (Schema::hasColumn('users', 'selected_pet_types')) {
+                $userData['selected_pet_types'] = $request->selected_pet_types;
+            }
+            if (Schema::hasColumn('users', 'bio')) {
+                $userData['bio'] = $request->bio;
+            }
             
             \Log::info('🔍 EXACT USER CREATE DATA:', $userData);
 
