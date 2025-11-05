@@ -12,6 +12,42 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            // Essential columns for registration - add these first
+            if (!Schema::hasColumn('users', 'role')) {
+                $driver = Schema::getConnection()->getDriverName();
+                if ($driver === 'mysql') {
+                    $table->enum('role', ['admin', 'pet_owner', 'pet_sitter'])->default('pet_owner')->after('email');
+                } else {
+                    // PostgreSQL uses string with check constraint
+                    $table->string('role')->default('pet_owner')->after('email');
+                }
+            }
+            
+            if (!Schema::hasColumn('users', 'status')) {
+                $driver = Schema::getConnection()->getDriverName();
+                if ($driver === 'mysql') {
+                    $table->enum('status', ['pending', 'active', 'suspended', 'banned', 'denied', 'pending_verification'])->default('pending')->after('role');
+                } else {
+                    $table->string('status')->default('pending')->after('role');
+                }
+            }
+            
+            if (!Schema::hasColumn('users', 'phone')) {
+                $table->string('phone')->nullable()->after('status');
+            }
+            
+            if (!Schema::hasColumn('users', 'address')) {
+                $table->text('address')->nullable()->after('phone');
+            }
+            
+            if (!Schema::hasColumn('users', 'phone_verification_code')) {
+                $table->string('phone_verification_code')->nullable();
+            }
+            
+            if (!Schema::hasColumn('users', 'phone_verified_at')) {
+                $table->timestamp('phone_verified_at')->nullable();
+            }
+            
             // Add first_name if it doesn't exist
             if (!Schema::hasColumn('users', 'first_name')) {
                 $table->string('first_name')->nullable()->after('name');
