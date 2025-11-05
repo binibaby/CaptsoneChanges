@@ -52,29 +52,11 @@ class AuthController extends Controller
                 'id_image' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             ]);
 
-            \Log::info('✅ Validation passed successfully');
-
             // Format phone number to standard format
             $formattedPhone = $this->formatPhoneNumber($request->phone);
-            \Log::info('📱 Phone number formatted:', [
-                'original' => $request->phone,
-                'formatted' => $formattedPhone
-            ]);
 
             // Generate phone verification code only
             $phoneVerificationCode = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-
-            \Log::info('🔍 Creating user with data:', [
-                'name' => $request->name,
-                'role' => $request->role,
-                'experience' => $request->experience,
-                'hourly_rate' => $request->hourly_rate,
-                'hourly_rate_type' => gettype($request->hourly_rate),
-                'specialties' => $request->specialties,
-                'raw_pet_breeds' => $request->pet_breeds,
-                'formatted_pet_breeds' => $this->formatBreedNames($request->pet_breeds),
-                'selected_pet_types' => $request->selected_pet_types,
-            ]);
 
             // Debug: Log the exact data being passed to User::create
             // Only include fields that exist in the database to avoid column errors
@@ -137,37 +119,7 @@ class AuthController extends Controller
                 $userData['bio'] = $request->bio;
             }
             
-            \Log::info('🔍 EXACT USER CREATE DATA:', $userData);
-
             $user = User::create($userData);
-            
-            // Immediately check what was actually saved
-            \Log::info('🔍 IMMEDIATELY AFTER CREATE - User object:', [
-                'pet_breeds_in_memory' => $user->pet_breeds,
-                'selected_pet_types_in_memory' => $user->selected_pet_types,
-                'attributes' => $user->getAttributes(),
-            ]);
-            
-            // Also check fresh from database
-            $freshUser = User::find($user->id);
-            \Log::info('🔍 FRESH FROM DB - User data:', [
-                'pet_breeds_fresh' => $freshUser->pet_breeds,
-                'selected_pet_types_fresh' => $freshUser->selected_pet_types,
-            ]);
-
-            \Log::info('✅ User created successfully:', [
-                'id' => $user->id,
-                'name' => $user->name,
-                'role' => $user->role,
-                'experience' => $user->experience,
-                'hourly_rate' => $user->hourly_rate,
-                'hourly_rate_type' => gettype($user->hourly_rate),
-                'specialties' => $user->specialties,
-                'pet_breeds_saved' => $user->pet_breeds,
-                'selected_pet_types_saved' => $user->selected_pet_types,
-            ]);
-
-            \Log::info('✅ User created successfully - ID: ' . $user->id);
 
             // Handle ID verification for pet sitters
             // Only create verification record if verifications table exists
@@ -205,7 +157,6 @@ class AuthController extends Controller
                     'notes' => $notes
                         ]);
                     } catch (\Exception $e) {
-                        \Log::warning('Could not create verification record (table may not exist): ' . $e->getMessage());
                         // Continue without verification record - migrations will create table later
                     }
                 }
@@ -220,11 +171,8 @@ class AuthController extends Controller
                 try {
                     $token = $user->createToken('mobile-app')->plainTextToken;
                 } catch (\Exception $e) {
-                    \Log::warning('Could not create token (table may not exist): ' . $e->getMessage());
                     // Continue without token - user can login later to get token
                 }
-            } else {
-                \Log::warning('personal_access_tokens table does not exist - skipping token creation');
             }
 
             $response = [
@@ -248,21 +196,23 @@ class AuthController extends Controller
                 'id_verification' => $request->role === 'pet_sitter',
             ];
 
-            \Log::info('✅ Registration response prepared:', $response);
-            \Log::info('🎉 USER REGISTRATION COMPLETED SUCCESSFULLY');
-
+            // Registration successful - don't log (might fail due to permissions)
             return response()->json($response, 201);
 
         } catch (ValidationException $e) {
-            try {
-                \Log::error('❌ Validation failed:', $e->errors());
-            } catch (\Exception $logError) {
-                // Ignore logging errors
+            // Don't try to log - just return error response
+            $errors = $e->errors();
+            $errorMessage = 'Validation failed.';
+            
+            // Check for duplicate email error
+            if (isset($errors['email']) && in_array('The email has already been taken.', $errors['email'])) {
+                $errorMessage = 'This email is already registered. Please use a different email or try logging in.';
             }
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'message' => $errorMessage,
+                'errors' => $errors
             ], 422);
         } catch (\Illuminate\Database\QueryException $e) {
             // Handle duplicate email or other database errors
@@ -770,17 +720,34 @@ class AuthController extends Controller
         
         // If no authenticated user, find the most recent user with this phone (for registration flow)
         if (!$user) {
-            $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
-            \Log::info("🔍 SEND CODE - Found user by phone: " . ($user ? "Found (ID: {$user->id}, Created: {$user->created_at})" : "NULL"));
+            // Check if phone column exists before querying
+            if (Schema::hasColumn('users', 'phone')) {
+                try {
+                    $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
+                    try {
+                        \Log::info("🔍 SEND CODE - Found user by phone: " . ($user ? "Found (ID: {$user->id}, Created: {$user->created_at})" : "NULL"));
+                    } catch (\Exception $logError) {
+                        // Ignore logging errors
+                    }
+                } catch (\Exception $e) {
+                    try {
+                        \Log::warning("⚠️ Could not find user by phone: " . $e->getMessage());
+                    } catch (\Exception $logError) {
+                        // Ignore logging errors
+                    }
+                    $user = null;
+                }
+            } else {
+                // Phone column doesn't exist yet - migration hasn't run
+                try {
+                    \Log::warning("⚠️ Phone column does not exist yet - migration may not have run");
+                } catch (\Exception $logError) {
+                    // Ignore logging errors
+                }
+                $user = null;
+            }
         }
         $timestamp = now()->format('Y-m-d H:i:s');
-        
-        // Enhanced logging for phone verification
-        \Log::info("🔔 PHONE VERIFICATION PROCESS STARTED");
-        \Log::info("📱 SEND SMS - Received phone verification request for: " . $phone);
-        \Log::info("⏰ Timestamp: " . $timestamp);
-        \Log::info("🌐 Request IP: " . $request->ip());
-        \Log::info("👤 User Agent: " . $request->userAgent());
 
         // Generate a 6-digit verification code
         $verificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -791,32 +758,16 @@ class AuthController extends Controller
         // Store the code in cache for verification (expires in 10 minutes)
         \Cache::put($cacheKey, $verificationCode, 600);
         
-        \Log::info("📱 SEND SMS - Stored code in cache with key: {$cacheKey}");
-        \Log::info("📱 SEND SMS - Generated code: {$verificationCode}");
-        \Log::info("⏳ Cache expiration: 10 minutes from now");
-        
-        // Make the verification code very visible in logs
-        \Log::info("🔢 ========================================");
-        \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
-        \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
-        \Log::info("🔢 PHONE VERIFICATION CODE: {$verificationCode}");
-        \Log::info("🔢 ========================================");
-        \Log::info("📱 Use this code to verify phone: {$phone}");
-        \Log::info("⏰ Code expires in 10 minutes");
-        \Log::info("🔑 Cache key: {$cacheKey}");
-        
-        // Log to dedicated verification codes file
-        \Log::channel('verification')->info("🔢 VERIFICATION CODE FOR {$phone}: {$verificationCode}");
-        \Log::channel('verification')->info("⏰ Generated at: {$timestamp}");
-        \Log::channel('verification')->info("📱 Phone: {$phone}");
-        \Log::channel('verification')->info("🔑 Cache Key: {$cacheKey}");
-        \Log::channel('verification')->info("⏳ Expires in: 10 minutes");
-        \Log::channel('verification')->info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        // Safe logging - don't fail if logging fails
+        try {
+            \Log::info("📱 SEND SMS - Generated code: {$verificationCode}");
+            \Log::info("📱 Use this code to verify phone: {$phone}");
+        } catch (\Exception $logError) {
+            // Ignore logging errors
+        }
 
         // Format phone number for display
         $formattedPhone = $this->formatPhoneForSMS($phone);
-        \Log::info("📞 Original phone: {$phone}");
-        \Log::info("📞 Formatted phone: {$formattedPhone}");
         
         // Check if simulation mode is enabled
         $simulationMode = $this->isSimulationMode();
@@ -830,16 +781,9 @@ class AuthController extends Controller
             $semaphoreService = new SemaphoreService();
             $message = $verificationCode; // Send only the 6-digit code
             
-            \Log::info("📱 SEMAPHORE SMS - Attempting to send SMS via Semaphore");
-            \Log::info("📱 SEMAPHORE SMS - Phone: {$phone}");
-            \Log::info("📱 SEMAPHORE SMS - Message: {$message}");
-            
             $smsResult = $semaphoreService->sendSMS($phone, $message);
             
             if ($smsResult['success']) {
-                \Log::info("✅ SEMAPHORE SMS - Message sent successfully via Semaphore");
-                \Log::info("📊 SEMAPHORE SMS - Response: " . json_encode($smsResult['response']));
-                
                 return response()->json([
                     'success' => true,
                     'message' => 'Verification code sent successfully via SMS!',
@@ -847,21 +791,12 @@ class AuthController extends Controller
                     'timestamp' => $timestamp,
                 ]);
             } else {
-                \Log::error("❌ SEMAPHORE SMS - Failed to send via Semaphore");
-                \Log::error("❌ SEMAPHORE SMS - Error: " . ($smsResult['error'] ?? 'Unknown error'));
-                
                 // Fallback to simulation mode if Semaphore fails
-                \Log::info("🔄 SEMAPHORE SMS - Falling back to simulation mode");
                 return $this->simulateSMS($phone, $verificationCode, $timestamp);
             }
         } catch (\Exception $e) {
-            try {
-                \Log::error("❌ SEMAPHORE SMS - Exception occurred: " . $e->getMessage());
-                \Log::error("❌ SEMAPHORE SMS - Stack trace: " . $e->getTraceAsString());
-                
-                // Fallback to simulation mode if Semaphore fails
-                \Log::info("🔄 SEMAPHORE SMS - Falling back to simulation mode due to exception");
-                return $this->simulateSMS($phone, $verificationCode, $timestamp);
+            // Fallback to simulation mode if Semaphore fails
+            return $this->simulateSMS($phone, $verificationCode, $timestamp);
             } catch (\Exception $logError) {
                 // If logging fails, still try to return simulation mode response
                 try {

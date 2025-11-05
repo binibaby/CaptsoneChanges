@@ -48,11 +48,10 @@ RUN mkdir -p /var/www/html/storage/logs \
     && mkdir -p /var/www/html/storage/framework/cache \
     && mkdir -p /var/www/html/storage/framework/sessions \
     && mkdir -p /var/www/html/storage/framework/views \
-    && chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache \
-    && chmod -R 777 /var/www/html/storage/logs
+    && chown -R www-data:www-data /var/www/html/storage \
+    && chown -R www-data:www-data /var/www/html/bootstrap/cache \
+    && chmod -R 777 /var/www/html/storage \
+    && chmod -R 777 /var/www/html/bootstrap/cache
 
 # Create startup script for Laravel optimization
 RUN echo '#!/bin/bash\n\
@@ -61,10 +60,16 @@ mkdir -p /var/www/html/storage/logs\n\
 mkdir -p /var/www/html/storage/framework/cache\n\
 mkdir -p /var/www/html/storage/framework/sessions\n\
 mkdir -p /var/www/html/storage/framework/views\n\
+# Set ownership first\n\
 chown -R www-data:www-data /var/www/html/storage\n\
+chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
+# Then set permissions (777 allows full access)\n\
 chmod -R 777 /var/www/html/storage\n\
-chmod -R 777 /var/www/html/storage/logs\n\
 chmod -R 777 /var/www/html/bootstrap/cache\n\
+# Ensure log file is writable\n\
+touch /var/www/html/storage/logs/laravel.log\n\
+chown www-data:www-data /var/www/html/storage/logs/laravel.log\n\
+chmod 666 /var/www/html/storage/logs/laravel.log\n\
 # Run migrations automatically on startup (show output for debugging)\n\
 echo "Running database migrations..."\n\
 php artisan migrate --force 2>&1 | tee /tmp/migration.log\n\
