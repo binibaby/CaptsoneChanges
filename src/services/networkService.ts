@@ -247,7 +247,19 @@ export const makeApiCall = async (
     
     // Get user token if no Authorization header is provided
     // IMPORTANT: Preserve Authorization header from options.headers if provided
-    const providedHeaders = options.headers as Record<string, string> || {};
+    // Convert headers to plain object if it's a Headers object or undefined
+    let providedHeaders: Record<string, string> = {};
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        // Convert Headers object to plain object
+        options.headers.forEach((value, key) => {
+          providedHeaders[key] = value;
+        });
+      } else if (typeof options.headers === 'object') {
+        providedHeaders = options.headers as Record<string, string>;
+      }
+    }
+    
     let headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -259,36 +271,55 @@ export const makeApiCall = async (
       try {
         const { default: authService } = await import('./authService');
         const user = await authService.getCurrentUser();
-        // Silently get user token
-        // console.log('🔍 makeApiCall - User from authService:', user);
-        // console.log('🔍 makeApiCall - User ID:', user?.id);
-        // console.log('🔍 makeApiCall - User token available:', !!user?.token);
         if (user?.token) {
           headers['Authorization'] = `Bearer ${user.token}`;
-          // console.log(`🔑 Added auth token for user: ${user.id}`);
+          console.log(`🔑 makeApiCall - Added auth token for user: ${user.id}`);
         } else {
-          // console.log('⚠️ No user token available for API call');
+          console.log('⚠️ makeApiCall - No user token available for API call');
         }
       } catch (error) {
-        // Silently handle token error
-        // console.log('⚠️ Could not get user token:', error);
+        console.log('⚠️ makeApiCall - Could not get user token:', error);
       }
     } else {
       // Log that Authorization header was already provided
-      console.log('🔑 makeApiCall - Using provided Authorization header');
+      const authHeader = headers['Authorization'] || headers['authorization'];
+      console.log('🔑 makeApiCall - Using provided Authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'empty');
     }
     
+    // Create new options without headers to avoid conflicts
+    const { headers: _, ...optionsWithoutHeaders } = options;
+    
     const response = await fetch(url, {
-      ...options,
+      ...optionsWithoutHeaders,
       headers,
     });
 
-    // Silently check response
-    // console.log(`📡 API response status: ${response.status} for ${url}`);
+    // Check response and handle authentication errors
+    const responseStatus = response.status;
+    console.log(`📡 makeApiCall - Response status: ${responseStatus} for ${endpoint}`);
 
-    // Handle 401 Unauthorized - try to refresh token and retry
-    if (response.status === 401 && !hasTriedTokenRefresh) {
-      console.log('🔄 401 Unauthorized - attempting token refresh');
+    // Handle 401 Unauthorized or 500 with "Unauthenticated" - try to refresh token and retry
+    let isAuthError = false;
+    let responseData: any = null;
+    
+    if (responseStatus === 401) {
+      isAuthError = true;
+    } else if (responseStatus === 500) {
+      // Check if response contains "Unauthenticated" error
+      try {
+        const clonedResponse = response.clone();
+        responseData = await clonedResponse.json().catch(() => null);
+        if (responseData && (responseData?.error === 'Unauthenticated.' || responseData?.message === 'Unauthenticated.')) {
+          isAuthError = true;
+          console.log('🔐 makeApiCall - Detected 500 with Unauthenticated error, treating as auth error');
+        }
+      } catch (e) {
+        // If we can't parse the response, don't treat it as auth error
+      }
+    }
+
+    if (isAuthError && !hasTriedTokenRefresh) {
+      console.log('🔄 Authentication error detected - attempting token refresh');
       try {
         const { default: authService } = await import('./authService');
         await authService.refreshUserToken();
@@ -298,17 +329,17 @@ export const makeApiCall = async (
         if (refreshedUser?.token) {
           console.log('✅ Token refreshed successfully, retrying API call');
           
-          // Update headers with new token
-          const newOptions = {
-            ...options,
-            headers: {
-              ...options.headers,
-              'Authorization': `Bearer ${refreshedUser.token}`,
-            },
+          // Update headers with new token, preserving other headers
+          const updatedHeaders = {
+            ...headers,
+            'Authorization': `Bearer ${refreshedUser.token}`,
           };
           
           // Retry with new token
-          return makeApiCall(endpoint, newOptions, retryCount, true);
+          return makeApiCall(endpoint, {
+            ...optionsWithoutHeaders,
+            headers: updatedHeaders,
+          }, retryCount, true);
         } else {
           console.error('❌ Token refresh failed - no new token available');
           throw new Error('Authentication failed: Token refresh unsuccessful');
@@ -319,11 +350,15 @@ export const makeApiCall = async (
       }
     }
 
-    if (!response.ok && retryCount < 1) {
+    if (!response.ok && retryCount < 1 && !isAuthError) {
       console.log(`⚠️ API call failed (${response.status}), retrying... (${retryCount + 1}/1)`);
       // Force network re-detection on failure
       await networkService.forceReconnect();
-      return makeApiCall(endpoint, options, retryCount + 1, hasTriedTokenRefresh);
+      // Preserve headers when retrying
+      return makeApiCall(endpoint, {
+        ...optionsWithoutHeaders,
+        headers: headers,
+      }, retryCount + 1, hasTriedTokenRefresh);
     }
 
     return response;

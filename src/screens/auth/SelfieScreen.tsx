@@ -223,13 +223,14 @@ const SelfieScreen: React.FC<SelfieScreenProps> = ({ userData: propUserData, pho
       console.log('🔐 SelfieScreen - Auth token from userData:', userData?.token ? 'Present' : 'Missing');
       console.log('🔐 SelfieScreen - Auth token from authUser:', authUser?.token ? 'Present' : 'Missing');
       console.log('🔐 SelfieScreen - Final auth token:', authToken ? 'Present' : 'Missing');
-      console.log('🔐 SelfieScreen - User data:', userData);
-      console.log('🔐 SelfieScreen - Auth user:', authUser);
       
       if (!authToken) {
         Alert.alert('Error', 'Authentication required. Please log in again.');
         return;
       }
+      
+      // Log token (truncated for security)
+      console.log('🔐 SelfieScreen - Using token:', authToken ? `${authToken.substring(0, 20)}...` : 'none');
 
       const headers = getAuthHeaders(authToken);
       console.log('🔐 SelfieScreen - Headers being sent:', headers);
