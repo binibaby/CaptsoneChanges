@@ -210,7 +210,18 @@ class AuthController extends Controller
             // Phone verification is handled separately in the new flow
             // No need to send verification code automatically during registration
 
-            $token = $user->createToken('mobile-app')->plainTextToken;
+            // Create token only if personal_access_tokens table exists
+            $token = null;
+            if (Schema::hasTable('personal_access_tokens')) {
+                try {
+                    $token = $user->createToken('mobile-app')->plainTextToken;
+                } catch (\Exception $e) {
+                    \Log::warning('Could not create token (table may not exist): ' . $e->getMessage());
+                    // Continue without token - user can login later to get token
+                }
+            } else {
+                \Log::warning('personal_access_tokens table does not exist - skipping token creation');
+            }
 
             $response = [
                 'success' => true,
@@ -218,7 +229,16 @@ class AuthController extends Controller
                     ? 'Registration successful! Please verify your phone number, then complete ID verification to start accepting bookings.'
                     : 'Registration successful! Please verify your phone number to complete your account setup.',
                 'user' => $this->buildUserProfile($user),
-                'token' => $token,
+            ];
+            
+            // Only include token if it was created successfully
+            if ($token) {
+                $response['token'] = $token;
+            } else {
+                $response['warning'] = 'Authentication token will be available after login. Please log in to get your access token.';
+            }
+            
+            $response = array_merge($response, [
                 'verification_required' => [
                     'email' => false, // Email is auto-verified
                     'phone' => !empty($user->phone),
