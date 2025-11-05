@@ -166,19 +166,22 @@ class AuthController extends Controller
             \Log::info('✅ User created successfully - ID: ' . $user->id);
 
             // Handle ID verification for pet sitters
-            if ($request->role === 'pet_sitter' && $request->filled(['id_type', 'id_number']) && $request->hasFile('id_image')) {
-                $this->submitIdVerification($request, $user);
-            } else {
-                // Create verification record for all users
-                $documentType = $request->role === 'pet_sitter' ? 'skipped' : 'not_required';
-                $verificationStatus = $request->role === 'pet_sitter' ? 'pending' : 'approved';
-                $status = $request->role === 'pet_sitter' ? 'skipped' : 'approved';
-                $verificationMethod = $request->role === 'pet_sitter' ? 'manual_skip' : 'not_required';
-                $notes = $request->role === 'pet_sitter' 
-                    ? 'User needs to complete ID verification to become active.'
-                    : 'Pet owner - ID verification not required.';
-                
-                Verification::create([
+            // Only create verification record if verifications table exists
+            if (Schema::hasTable('verifications')) {
+                if ($request->role === 'pet_sitter' && $request->filled(['id_type', 'id_number']) && $request->hasFile('id_image')) {
+                    $this->submitIdVerification($request, $user);
+                } else {
+                    // Create verification record for all users
+                    $documentType = $request->role === 'pet_sitter' ? 'skipped' : 'not_required';
+                    $verificationStatus = $request->role === 'pet_sitter' ? 'pending' : 'approved';
+                    $status = $request->role === 'pet_sitter' ? 'skipped' : 'approved';
+                    $verificationMethod = $request->role === 'pet_sitter' ? 'manual_skip' : 'not_required';
+                    $notes = $request->role === 'pet_sitter' 
+                        ? 'User needs to complete ID verification to become active.'
+                        : 'Pet owner - ID verification not required.';
+                    
+                    try {
+                        Verification::create([
                     'user_id' => $user->id,
                     'document_type' => $documentType,
                     'document_number' => null,
@@ -196,7 +199,12 @@ class AuthController extends Controller
                         'can_complete_later' => $request->role === 'pet_sitter'
                     ]),
                     'notes' => $notes
-                ]);
+                        ]);
+                    } catch (\Exception $e) {
+                        \Log::warning('Could not create verification record (table may not exist): ' . $e->getMessage());
+                        // Continue without verification record - migrations will create table later
+                    }
+                }
             }
 
             // Phone verification is handled separately in the new flow
