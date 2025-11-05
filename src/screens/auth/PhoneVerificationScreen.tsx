@@ -72,11 +72,14 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       // Test server connectivity
       console.log('Testing server connectivity...');
       try {
+        const pingController = new AbortController();
+        const pingTimeout = setTimeout(() => pingController.abort(), 15000);
         const pingResponse = await fetch(apiUrl.replace('/api/send-verification-code', '/'), {
           method: 'HEAD',
           mode: 'cors',
-          signal: AbortSignal.timeout(15000) // Increased timeout
+          signal: pingController.signal
         });
+        clearTimeout(pingTimeout);
         console.log('Server ping successful:', pingResponse.status);
       } catch (pingError) {
         console.log('Server ping failed:', pingError);
@@ -323,11 +326,14 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       console.log('Testing network connectivity...');
       
       // Try to make a simple request to check connectivity
+      const networkController = new AbortController();
+      const networkTimeout = setTimeout(() => networkController.abort(), 10000);
       const response = await fetch('https://www.google.com', { 
         method: 'HEAD',
         mode: 'no-cors',
-        signal: AbortSignal.timeout(10000) // Increased to 10 second timeout
+        signal: networkController.signal
       });
+      clearTimeout(networkTimeout);
       console.log('Network check successful - internet connection available');
       return true;
     } catch (error) {
@@ -566,7 +572,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
-  tipText: {
+  tipsText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 5,
