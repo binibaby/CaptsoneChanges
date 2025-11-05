@@ -33,6 +33,7 @@ interface CertificateAlbumProps {
   onClose: () => void;
   certificates: Certificate[];
   onAddCertificate: (certificate: Omit<Certificate, 'id'>) => void;
+  onDeleteCertificate?: (certificateId: string) => void;
 }
 
 const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
@@ -40,6 +41,7 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
   onClose,
   certificates,
   onAddCertificate,
+  onDeleteCertificate,
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const { user } = useAuth();
@@ -209,6 +211,28 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
     }
   };
 
+  const handleDelete = (certificateId: string, certificateName: string) => {
+    Alert.alert(
+      'Delete Certificate',
+      `Are you sure you want to delete "${certificateName}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            if (onDeleteCertificate) {
+              onDeleteCertificate(certificateId);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderCertificate = ({ item }: { item: CertificateItem }) => {
     // Type guard to check if it's a Certificate
     if ('isAddButton' in item && item.isAddButton) {
@@ -218,7 +242,18 @@ const CertificateAlbum: React.FC<CertificateAlbumProps> = ({
     const certificate = item as Certificate;
     return (
       <View style={styles.certificateItem}>
-        <Image source={getImageSource(certificate.image)} style={styles.certificateImage} />
+        <View style={styles.imageWrapper}>
+          <Image source={getImageSource(certificate.image)} style={styles.certificateImage} />
+          {onDeleteCertificate && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDelete(certificate.id, certificate.name)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trash" size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={styles.certificateInfo}>
           <Text style={styles.certificateName} numberOfLines={2}>
             {certificate.name}
@@ -342,11 +377,32 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  imageWrapper: {
+    position: 'relative',
+    marginBottom: 8,
+  },
   certificateImage: {
     width: '100%',
     height: 120,
     borderRadius: 8,
     backgroundColor: '#f0f0f0',
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 20,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
   },
   certificateInfo: {
     marginTop: 8,

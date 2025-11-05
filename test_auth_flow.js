@@ -9,7 +9,8 @@ const http = require('http');
 
 // Test configuration
 const testIPs = [
-  '192.168.100.192',  // WiFi IP (primary)
+  '192.168.100.204',  // Current WiFi IP (primary)
+  '192.168.100.192',  // Previous WiFi IP (fallback)
   '172.20.10.2',      // Mobile data IP (fallback)
   'localhost',         // Local development
 ];

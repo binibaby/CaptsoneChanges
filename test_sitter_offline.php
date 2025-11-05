@@ -5,7 +5,7 @@
  */
 
 // Configuration
-$baseUrl = 'http://172.20.10.2:8000'; // Mobile data backend URL
+$baseUrl = 'http://192.168.100.204:8000'; // Current WiFi backend URL
 $sitterId = '71'; // Change this to the sitter ID you want to test
 $token = '257|6UmRqC1AOhFOnLfh1o5OI6PaclO5seLZdgtllw2zd8c86930'; // You'll need to get a valid token
 

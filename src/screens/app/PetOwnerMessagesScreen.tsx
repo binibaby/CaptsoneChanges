@@ -16,8 +16,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import ProfilePopupModal from '../../components/ProfilePopupModal';
 import ReviewModal from '../../components/ReviewModal';
+import SimpleSitterProfilePopup from '../../components/SimpleSitterProfilePopup';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingService } from '../../services/bookingService';
 import { ReverbConversation, ReverbMessage, reverbMessagingService } from '../../services/reverbMessagingService';
@@ -50,7 +50,7 @@ interface SupportMessage {
 const PetOwnerMessagesScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { isLocationTracking } = useAuth();
+  const { isLocationTracking, currentLocation } = useAuth();
   const [conversations, setConversations] = useState<ReverbConversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ReverbConversation | null>(null);
   const [messages, setMessages] = useState<ReverbMessage[]>([]);
@@ -72,7 +72,7 @@ const PetOwnerMessagesScreen = () => {
   
   // Profile popup state
   const [profilePopupVisible, setProfilePopupVisible] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState<any>(null);
+  const [selectedSitter, setSelectedSitter] = useState<any>(null);
 
   // Filter conversations based on search query
   const filteredConversations = conversations.filter(conversation =>
@@ -96,42 +96,95 @@ const PetOwnerMessagesScreen = () => {
       // Try to fetch detailed profile information from API
       let detailedProfile = null;
       let sitterRating = 0;
+      let locationData = null;
       
       try {
         const { default: networkService } = await import('../../services/networkService');
+        const { makeApiCall } = await import('../../services/networkService');
         
-        // Fetch user profile
-        const profileResponse = await networkService.get(`/api/profile`);
-        detailedProfile = profileResponse.data.user;
-        console.log('🔍 Fetched detailed profile:', detailedProfile);
-        
-        // Fetch sitter rating if it's a sitter
+        // Fetch sitter profile and rating if it's a sitter
         if (conversation.other_user.role === 'pet_sitter') {
           try {
-            const ratingResponse = await networkService.get(`/api/sitters/${conversation.other_user.id}/reviews`);
-            sitterRating = ratingResponse.data.sitter.average_rating || 0;
-            console.log('🔍 Fetched sitter rating:', sitterRating);
+            // Fetch sitter reviews to get rating
+            const ratingResponse = await makeApiCall(`/api/sitters/${conversation.other_user.id}/reviews`, {
+              method: 'GET',
+            });
+            sitterRating = ratingResponse.data?.sitter?.average_rating || 0;
+            detailedProfile = ratingResponse.data?.sitter || {};
+            console.log('🔍 Fetched sitter rating and profile:', { sitterRating, detailedProfile });
           } catch (ratingError) {
-            console.log('⚠️ Could not fetch sitter rating, using default');
+            console.log('⚠️ Could not fetch sitter profile, using conversation data');
+          }
+
+          // Try to get location data from nearby sitters endpoint or cache
+          try {
+            const { default: realtimeLocationService } = await import('../../services/realtimeLocationService');
+            
+            // Get current user's location if available for better search
+            let searchLat = 0;
+            let searchLng = 0;
+            if (currentLocation) {
+              searchLat = currentLocation.coords.latitude;
+              searchLng = currentLocation.coords.longitude;
+            }
+            
+            const nearbySitters = await realtimeLocationService.getSittersNearby(searchLat, searchLng, 50, true);
+            const sitterWithLocation = nearbySitters.find(s => s.id === conversation.other_user.id);
+            if (sitterWithLocation?.location) {
+              locationData = sitterWithLocation.location;
+              console.log('🔍 Found location data for sitter:', locationData);
+            }
+          } catch (locationError) {
+            console.log('⚠️ Could not fetch location data');
           }
         }
       } catch (apiError) {
         console.log('⚠️ Could not fetch detailed profile from API, using conversation data');
       }
       
-      // Use detailed profile data if available, otherwise fall back to conversation data
-      const profileData = {
-        id: conversation.other_user.id,
-        name: conversation.other_user.name,
-        profile_image: conversation.other_user.profile_image,
-        phone: detailedProfile?.phone || conversation.other_user.phone || 'Not provided',
-        address: detailedProfile?.address || conversation.other_user.address || 'Not provided',
-        rating: sitterRating || detailedProfile?.rating || conversation.other_user.rating || 0,
-        role: 'pet_sitter' as const,
+      // Get address from various sources
+      const address = detailedProfile?.address || 
+                     locationData?.address || 
+                     conversation.other_user.address || 
+                     'Location not available';
+      
+      // Structure location object with fallbacks
+      const location = locationData || {
+        latitude: detailedProfile?.latitude || 0,
+        longitude: detailedProfile?.longitude || 0,
+        address: address,
       };
       
-      console.log('🔍 Setting profile data:', profileData);
-      setSelectedProfile(profileData);
+      // Use detailed profile data if available, otherwise fall back to conversation data
+      const sitterData = {
+        id: conversation.other_user.id,
+        userId: conversation.other_user.id,
+        name: conversation.other_user.name,
+        email: detailedProfile?.email || conversation.other_user.email || '',
+        location: location,
+        profileImage: conversation.other_user.profile_image || detailedProfile?.profile_image || detailedProfile?.profile_image_url,
+        phone: detailedProfile?.phone || conversation.other_user.phone || 'Not provided',
+        rating: sitterRating || detailedProfile?.rating || conversation.other_user.rating || 0,
+        reviews: detailedProfile?.reviews_count || detailedProfile?.reviews || 0,
+        role: 'pet_sitter' as const,
+        // Add additional fields that SitterProfilePopup expects
+        bio: detailedProfile?.bio || 'No bio available',
+        hourlyRate: detailedProfile?.hourly_rate || 25,
+        experience: detailedProfile?.experience || 'Not specified',
+        petTypes: detailedProfile?.pet_types || detailedProfile?.selected_pet_types || ['dogs', 'cats'],
+        selectedBreeds: detailedProfile?.selected_breeds || detailedProfile?.pet_breeds || [],
+        specialties: detailedProfile?.specialties || ['General Pet Care'],
+        images: detailedProfile?.images || (detailedProfile?.profile_image ? [detailedProfile.profile_image] : []),
+        imageSource: conversation.other_user.profile_image || detailedProfile?.profile_image_url || detailedProfile?.profile_image,
+        isOnline: detailedProfile?.is_online !== undefined ? detailedProfile.is_online : true,
+        lastSeen: detailedProfile?.last_seen ? new Date(detailedProfile.last_seen) : new Date(),
+        isVerified: detailedProfile?.is_verified || detailedProfile?.verification_status === 'approved' || false,
+        verificationStatus: detailedProfile?.verification_status || 'pending',
+        certificates: detailedProfile?.certificates || [],
+      };
+      
+      console.log('🔍 Setting sitter data:', sitterData);
+      setSelectedSitter(sitterData);
       setProfilePopupVisible(true);
       console.log('🔍 Profile popup should now be visible');
     } catch (error) {
@@ -143,7 +196,7 @@ const PetOwnerMessagesScreen = () => {
   // Close profile popup
   const handleCloseProfile = () => {
     setProfilePopupVisible(false);
-    setSelectedProfile(null);
+    setSelectedSitter(null);
   };
   
 
@@ -776,12 +829,11 @@ const PetOwnerMessagesScreen = () => {
           />
         )}
 
-        {/* Profile Popup Modal */}
-        <ProfilePopupModal
+        {/* Simple Sitter Profile Popup */}
+        <SimpleSitterProfilePopup
+          sitter={selectedSitter}
           visible={profilePopupVisible}
           onClose={handleCloseProfile}
-          profileData={selectedProfile}
-          userRole="pet_owner"
         />
       </SafeAreaView>
     );
@@ -851,25 +903,6 @@ const PetOwnerMessagesScreen = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={[styles.searchButton, { backgroundColor: '#8B5CF6', marginRight: 10 }]} 
-            onPress={() => {
-              console.log('🔍 Test button clicked');
-              const testProfile = {
-                id: '1',
-                name: 'Test Sitter',
-                profile_image: null,
-                phone: '+639123456789',
-                address: 'Manila, Philippines',
-                rating: 4.5,
-                role: 'pet_sitter' as const,
-              };
-              setSelectedProfile(testProfile);
-              setProfilePopupVisible(true);
-            }}
-          >
-            <Text style={{ color: '#fff', fontSize: 12 }}>Test</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.searchButton} onPress={toggleSearch}>
             <Ionicons name={isSearchVisible ? "close" : "search"} size={24} color="#333" />
           </TouchableOpacity>

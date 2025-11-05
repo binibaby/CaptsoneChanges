@@ -526,6 +526,24 @@ const PetSitterProfileScreen = () => {
     }
   };
 
+  const handleDeleteCertificate = async (certificateId: string) => {
+    try {
+      const updatedCertificates = certificates.filter(cert => cert.id !== certificateId);
+      setCertificates(updatedCertificates);
+      
+      // Save to API
+      await saveCertificatesToAPI(updatedCertificates);
+      
+      Alert.alert('Success', 'Certificate deleted successfully!');
+    } catch (error) {
+      // Silently handle errors
+      // console.error('Error deleting certificate:', error);
+      Alert.alert('Error', 'Failed to delete certificate. Please try again.');
+      // Revert the change on error
+      // The certificates state will be restored from the API on next refresh
+    }
+  };
+
   const saveCertificatesToAPI = async (certificatesToSave: any[]) => {
     try {
       const { makeApiCall } = await import('../../services/networkService');
@@ -578,63 +596,74 @@ const PetSitterProfileScreen = () => {
         }
       }
       
-      // Debug: Log the data being sent
-      console.log('📋 Sending certificates to API:', {
-        certificates: certificatesToSave,
-        count: certificatesToSave.length,
-        data: certificatesToSave
-      });
-
       // Ensure we always send a valid array, even if empty
       const certificatesArray = Array.isArray(certificatesToSave) ? certificatesToSave : [];
-      const requestBody = { certificates: certificatesArray };
-      console.log('📋 Request body:', JSON.stringify(requestBody, null, 2));
+      
+      // Always ensure certificates is an array, even if empty
+      const requestBody = { 
+        certificates: certificatesArray
+      };
+      
+      // Silently log for debugging
+      // console.log('📋 Sending certificates to API:', {
+      //   certificatesCount: certificatesArray.length,
+      //   certificates: certificatesArray,
+      //   requestBody: requestBody
+      // });
+      // console.log('📋 Request body JSON:', JSON.stringify(requestBody, null, 2));
 
       const response = await makeApiCall('/api/profile/save-certificates', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${currentUser.token}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📋 API Response status:', response.status, response.statusText);
+      // console.log('📋 API Response status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error Response:', errorText);
+        // Silently handle API errors
+        // console.error('API Error Response:', errorText);
         
         if (response.status === 401) {
-          console.error('Authentication failed - token may be invalid or expired');
+          // Silently handle authentication errors
+          // console.error('Authentication failed - token may be invalid or expired');
           // Try to refresh the user session
           try {
             const { default: authService } = await import('../../services/authService');
             if (!authService) {
-              console.error('AuthService not found in retry import');
+              // console.error('AuthService not found in retry import');
               return;
             }
             const refreshedUser = await authService.getCurrentUser();
             if (refreshedUser?.token && refreshedUser.token !== currentUser.token) {
-              console.log('Token refreshed, retrying save certificates API call');
-              // Retry with refreshed token
+              // console.log('Token refreshed, retrying save certificates API call');
+              // Retry with refreshed token - ensure proper request body format
+              const certificatesArray = Array.isArray(certificatesToSave) ? certificatesToSave : [];
+              const retryRequestBody = { certificates: certificatesArray };
               const retryResponse = await makeApiCall('/api/profile/save-certificates', {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${refreshedUser.token}`,
                   'Content-Type': 'application/json',
+                  'Accept': 'application/json',
                 },
-                body: JSON.stringify({ certificates: certificatesToSave }),
+                body: JSON.stringify(retryRequestBody),
               });
               
               if (retryResponse.ok) {
                 const retryResult = await retryResponse.json();
-                console.log('Certificates saved successfully after token refresh:', retryResult);
+                // console.log('Certificates saved successfully after token refresh:', retryResult);
                 return;
               }
             }
           } catch (refreshError) {
-            console.error('Error refreshing user token:', refreshError);
+            // Silently handle refresh errors
+            // console.error('Error refreshing user token:', refreshError);
           }
           throw new Error('Authentication failed. Please log in again.');
         }
@@ -643,9 +672,11 @@ const PetSitterProfileScreen = () => {
       }
 
       const result = await response.json();
-      console.log('Certificates saved successfully:', result);
+      // Silently handle success
+      // console.log('Certificates saved successfully:', result);
     } catch (error) {
-      console.error('Error saving certificates to API:', error);
+      // Silently handle errors
+      // console.error('Error saving certificates to API:', error);
       throw error;
     }
   };
@@ -1544,6 +1575,7 @@ const PetSitterProfileScreen = () => {
         onClose={() => setCertificateAlbumVisible(false)}
         certificates={certificates}
         onAddCertificate={handleAddCertificate}
+        onDeleteCertificate={handleDeleteCertificate}
       />
     </SafeAreaView>
   );

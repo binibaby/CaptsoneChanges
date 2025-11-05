@@ -327,46 +327,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateUserProfile = async (profileData: Partial<User>) => {
     try {
-      console.log('AuthContext: updateUserProfile called with:', profileData);
-      console.log('AuthContext: Current user state:', user);
-      console.log('AuthContext: Profile image in update data:', profileData.profileImage);
-      console.log('AuthContext: Name fields in profileData:', {
-        firstName: profileData.firstName,
-        lastName: profileData.lastName,
-        name: profileData.name
-      });
+      // Silently update profile
+      // console.log('AuthContext: updateUserProfile called with:', profileData);
+      // console.log('AuthContext: Current user state:', user);
+      // console.log('AuthContext: Profile image in update data:', profileData.profileImage);
+      // console.log('AuthContext: Name fields in profileData:', {
+      //   firstName: profileData.firstName,
+      //   lastName: profileData.lastName,
+      //   name: profileData.name
+      // });
       
       // Validate profileData before processing
       if (!profileData) {
-        console.error('AuthContext: profileData is null or undefined');
+        // console.error('AuthContext: profileData is null or undefined');
         throw new Error('Profile data is required');
       }
       
       const updatedUser = await authService.updateUserProfile(profileData);
       // Update the local user state with the updated user data from authService
       setUser(updatedUser);
-      console.log('AuthContext: User state updated successfully');
-      console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
-      console.log('AuthContext: Updated user name:', updatedUser.name);
+      // Silently update state
+      // console.log('AuthContext: User state updated successfully');
+      // console.log('AuthContext: Updated user profileImage:', updatedUser.profileImage);
+      // console.log('AuthContext: Updated user name:', updatedUser.name);
       
       // Trigger global refresh for all components immediately
       setProfileUpdateTrigger(prev => prev + 1);
-      console.log('AuthContext: Triggered global profile update refresh');
+      // console.log('AuthContext: Triggered global profile update refresh');
       
       // Force a second trigger update after a short delay to ensure all async operations complete
       setTimeout(() => {
         setProfileUpdateTrigger(prev => prev + 1);
-        console.log('AuthContext: Triggered delayed profile update refresh');
+        // console.log('AuthContext: Triggered delayed profile update refresh');
       }, 100);
       
       // If this is a pet sitter and profile was updated, refresh location data
-      console.log('AuthContext: Checking user role for profile update:', updatedUser.role, 'is pet_sitter:', updatedUser.role === 'pet_sitter');
+      // console.log('AuthContext: Checking user role for profile update:', updatedUser.role, 'is pet_sitter:', updatedUser.role === 'pet_sitter');
       if (updatedUser.role === 'pet_sitter') {
-        console.log('AuthContext: Pet sitter profile updated, refreshing location data');
+        // console.log('AuthContext: Pet sitter profile updated, refreshing location data');
         try {
           // Clear sitter cache to force refresh in find sitter map
           realtimeLocationService.clearSitterCache();
-          console.log('AuthContext: Cleared sitter cache for profile update');
+          // console.log('AuthContext: Cleared sitter cache for profile update');
           
           // Update the sitter's data in real-time (including profile image)
           const updatedSitterData = {
@@ -385,9 +387,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Update sitter data in real-time
           try {
-            console.log('AuthContext: Updating sitter data in real-time service');
-            console.log('AuthContext: Updated sitter name:', updatedUser.name);
-            console.log('AuthContext: Updated sitter profile image:', updatedUser.profileImage);
+            // Silently update sitter data
+            // console.log('AuthContext: Updating sitter data in real-time service');
+            // console.log('AuthContext: Updated sitter name:', updatedUser.name);
+            // console.log('AuthContext: Updated sitter profile image:', updatedUser.profileImage);
             
             // Use the proper location data if available
             const sitterLocation = {
@@ -424,26 +427,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Try to update sitter data using the updateSitterData method
             if (realtimeLocationService && typeof realtimeLocationService.updateSitterData === 'function') {
               realtimeLocationService.updateSitterData(updatedUser.id, updatedSitterData);
-              console.log('AuthContext: Updated sitter data using updateSitterData method');
+              // console.log('AuthContext: Updated sitter data using updateSitterData method');
             }
             
             // Also update the sitter location to ensure the data is properly synced
             await realtimeLocationService.updateSitterLocation(completeSitterData);
-            console.log('AuthContext: Updated sitter location with complete data');
+            // console.log('AuthContext: Updated sitter location with complete data');
             
           } catch (error) {
-            console.error('AuthContext: Error updating sitter data in real-time:', error);
+            // Silently handle sitter data update error
+            // console.error('AuthContext: Error updating sitter data in real-time:', error);
           }
           
           // Trigger another refresh after realtime updates are complete
           setProfileUpdateTrigger(prev => prev + 1);
-          console.log('AuthContext: Triggered profile update refresh after realtime updates');
+          // console.log('AuthContext: Triggered profile update refresh after realtime updates');
         } catch (error) {
-          console.error('AuthContext: Error updating sitter location data:', error);
+          // Silently handle location update error
+          // console.error('AuthContext: Error updating sitter location data:', error);
         }
       }
     } catch (error) {
-      console.error('Error updating user profile:', error);
+      // Silently handle profile update error
+      // console.error('Error updating user profile:', error);
       
       // Check if this is a backend sync error
       if (error instanceof Error && error.message.includes('Backend update failed')) {
@@ -509,9 +515,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               followers: 0,
               following: 0,
             });
-            console.log('AuthContext: Pet sitter location data updated successfully');
+            // console.log('AuthContext: Pet sitter location data updated successfully');
           } catch (error) {
-            console.error('AuthContext: Error updating pet sitter location data on login:', error);
+            // Silently handle location update error on login
+            // console.error('AuthContext: Error updating pet sitter location data on login:', error);
           }
         }
       } else {

@@ -118,24 +118,27 @@ class RealtimeLocationService {
 
   // Add or update a sitter's location via backend API
   async updateSitterLocation(sitter: RealtimeSitter) {
-    console.log('📍 Updating sitter location via API:', {
-      id: sitter.id,
-      name: sitter.name,
-      location: sitter.location,
-      isOnline: sitter.isOnline
-    });
+    // Silently update sitter location
+    // console.log('📍 Updating sitter location via API:', {
+    //   id: sitter.id,
+    //   name: sitter.name,
+    //   location: sitter.location,
+    //   isOnline: sitter.isOnline
+    // });
 
     try {
       // Check if current user is a pet sitter before updating location
       const currentUser = await authService.getCurrentUser();
       if (currentUser && currentUser.role !== 'pet_sitter') {
-        console.warn('⚠️ Only pet sitters can share their location. Current user role:', currentUser.role);
+        // Silently handle non-sitter users
+        // console.warn('⚠️ Only pet sitters can share their location. Current user role:', currentUser.role);
         return;
       }
 
       const token = await this.getAuthToken();
       if (!token) {
-        console.warn('⚠️ No auth token available, updating local cache only');
+        // Silently handle missing token
+        // console.warn('⚠️ No auth token available, updating local cache only');
         // Update local cache without API call
         this.sitters.set(sitter.id, {
           ...sitter,
@@ -159,7 +162,8 @@ class RealtimeLocationService {
       const data = await response.json();
       
       if (data.success) {
-        console.log('✅ Sitter location updated successfully via API');
+        // Silently handle success
+        // console.log('✅ Sitter location updated successfully via API');
         // Also update local cache for immediate UI updates
         this.sitters.set(sitter.id, {
           ...sitter,
@@ -167,7 +171,8 @@ class RealtimeLocationService {
         });
         this.notifyListeners();
       } else {
-        console.error('❌ Failed to update sitter location:', data.message);
+        // Silently handle failure
+        // console.error('❌ Failed to update sitter location:', data.message);
         // Fallback to local storage
         this.sitters.set(sitter.id, {
           ...sitter,
@@ -176,7 +181,8 @@ class RealtimeLocationService {
         this.notifyListeners();
       }
     } catch (error) {
-      console.error('❌ Error updating sitter location via API:', error);
+      // Silently handle error
+      // console.error('❌ Error updating sitter location via API:', error);
       // Fallback to local storage
       this.sitters.set(sitter.id, {
         ...sitter,
@@ -501,7 +507,8 @@ class RealtimeLocationService {
         }
       }
     } catch (error) {
-      console.error('❌ Error updating sitter status via API:', error);
+      // Silently handle sitter status update error
+      // console.error('❌ Error updating sitter status via API:', error);
       // Fallback to local update
       if (isOnline) {
         const sitter = this.sitters.get(sitterId);

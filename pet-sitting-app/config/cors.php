@@ -21,9 +21,10 @@ return [
 
     'allowed_origins' => [
         '*', // Allow all origins for development
-        'http://172.20.10.2:8000',     // Mobile data IP (primary)
+        'http://192.168.100.204:8000', // Current WiFi IP (primary)
+        'http://172.20.10.2:8000',     // Mobile data IP (fallback)
         'http://172.20.10.1:8000',     // Mobile hotspot gateway
-        'http://192.168.100.197:8000', // WiFi IP (fallback)
+        'http://192.168.100.197:8000', // Previous WiFi IP (fallback)
         'http://localhost:8000',        // Local development
         'http://127.0.0.1:8000',       // Local development
     ],

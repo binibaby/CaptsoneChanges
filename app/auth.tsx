@@ -414,11 +414,13 @@ export default function Auth() {
         setSignupData({ ...signupData, userData: completeUser });
         setAuthStep('phone-verification');
       } else {
-        console.error('Failed to save user data to backend:', result);
+        // Silently handle backend save failure
+        // console.error('Failed to save user data to backend:', result);
         throw new Error(result.message || 'Failed to save user data');
       }
     } catch (error) {
-      console.error('Error saving user data to backend:', error);
+      // Silently handle error
+      // console.error('Error saving user data to backend:', error);
       Alert.alert('Error', `Failed to save user data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       // Continue with the flow even if backend save fails
       // Both pet sitters and pet owners need phone verification

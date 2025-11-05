@@ -159,10 +159,12 @@ class ReverbMessagingService extends EventEmitter {
   }
 
   public async connect() {
-    console.log('🔌 Attempting WebSocket connection to Laravel Reverb...');
+    // Silently attempt WebSocket connection
+    // console.log('🔌 Attempting WebSocket connection to Laravel Reverb...');
     
     if (this.isConnected || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
-      console.log('🔄 Already connected or connecting');
+      // Silently handle already connected
+      // console.log('🔄 Already connected or connecting');
       return;
     }
     
@@ -204,36 +206,40 @@ class ReverbMessagingService extends EventEmitter {
       
       // Check if we're in development mode and should skip Reverb connection
       if (__DEV__ && (host === 'localhost' || host === '127.0.0.1')) {
-        console.log('🔌 Development mode detected - skipping Reverb connection to prevent errors');
-        console.log('🔌 Real-time features will use fallback methods');
+        // Silently skip in dev mode
+        // console.log('🔌 Development mode detected - skipping Reverb connection to prevent errors');
+        // console.log('🔌 Real-time features will use fallback methods');
         return;
       }
       
       // Connect to Laravel Reverb on port 8080 (without authentication in URL)
       const reverbUrl = `${wsUrl}:8080/app/${process.env.EXPO_PUBLIC_REVERB_APP_KEY || 'iycawpww023mjumkvwsj'}`;
-      console.log('🔌 Connecting to Reverb:', reverbUrl);
-      console.log('🔌 Base URL used:', baseUrl);
-      console.log('🔌 Host extracted:', host);
+      // Silently connect
+      // console.log('🔌 Connecting to Reverb:', reverbUrl);
+      // console.log('🔌 Base URL used:', baseUrl);
+      // console.log('🔌 Host extracted:', host);
       
       this.ws = new WebSocket(reverbUrl);
       
       // Set up connection timeout
       const connectionTimeout = setTimeout(() => {
         if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
-          console.log('⏰ WebSocket connection timeout');
+          // Silently handle timeout
+          // console.log('⏰ WebSocket connection timeout');
           this.ws.close();
         }
       }, 10000); // 10 second timeout
       
       this.ws.onopen = () => {
         clearTimeout(connectionTimeout);
-        console.log('✅ Connected to Laravel Reverb');
+        // Silently handle connection
+        // console.log('✅ Connected to Laravel Reverb');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.emit('connected');
         
         // Don't subscribe to channels immediately - let the app decide when to subscribe
-        console.log('🔌 WebSocket connected - ready for channel subscriptions');
+        // console.log('🔌 WebSocket connected - ready for channel subscriptions');
       };
 
       this.ws.onmessage = (event) => {
@@ -247,8 +253,9 @@ class ReverbMessagingService extends EventEmitter {
 
       this.ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
-        console.log('🔌 Disconnected from Laravel Reverb');
-        console.log('🔌 Close code:', event.code, 'Reason:', event.reason);
+        // Silently handle disconnection
+        // console.log('🔌 Disconnected from Laravel Reverb');
+        // console.log('🔌 Close code:', event.code, 'Reason:', event.reason);
         this.isConnected = false;
         this.ws = null;
         this.emit('disconnected');
@@ -257,9 +264,10 @@ class ReverbMessagingService extends EventEmitter {
 
       this.ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        console.warn('⚠️ Reverb WebSocket connection failed - this is normal if Reverb server is not running');
-        console.warn('⚠️ WebSocket URL attempted:', reverbUrl);
-        console.warn('⚠️ This error can be safely ignored - real-time features will use fallback methods');
+        // Silently handle WebSocket errors
+        // console.warn('⚠️ Reverb WebSocket connection failed - this is normal if Reverb server is not running');
+        // console.warn('⚠️ WebSocket URL attempted:', reverbUrl);
+        // console.warn('⚠️ This error can be safely ignored - real-time features will use fallback methods');
         
         this.isConnected = false;
       };
@@ -364,7 +372,8 @@ class ReverbMessagingService extends EventEmitter {
 
   private scheduleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('❌ Max reconnection attempts reached');
+      // Silently handle max reconnection attempts
+      // console.log('❌ Max reconnection attempts reached');
       return;
     }
 
@@ -374,7 +383,8 @@ class ReverbMessagingService extends EventEmitter {
     const jitter = Math.random() * 1000; // Add up to 1 second of jitter
     const delay = baseDelay + jitter;
     
-    console.log(`🔄 Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
+    // Silently reconnect
+    // console.log(`🔄 Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
     
     this.reconnectInterval = setTimeout(() => {
       this.connect();

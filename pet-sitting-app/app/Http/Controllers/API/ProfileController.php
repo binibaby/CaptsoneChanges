@@ -378,12 +378,23 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
         
+        // Check if certificates field exists in request (even if empty array)
+        if (!$request->has('certificates')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => ['certificates' => ['The certificates field is required.']]
+            ], 422);
+        }
+        
+        // Accept certificates as array, allowing empty arrays (for when all certificates are deleted)
+        // Use 'present' instead of 'required' to allow empty arrays
         $validator = Validator::make($request->all(), [
-            'certificates' => 'required|array',
+            'certificates' => 'present|array',
         ]);
 
         // Only validate individual certificate fields if certificates array is not empty
-        if (!empty($request->certificates)) {
+        if (!empty($request->certificates) && is_array($request->certificates) && count($request->certificates) > 0) {
             $certificateValidator = Validator::make($request->all(), [
                 'certificates.*.name' => 'required|string|max:255',
                 'certificates.*.image' => 'required|string',
@@ -409,8 +420,10 @@ class ProfileController extends Controller
         }
 
         try {
-            // Update user certificates
-            $user->certificates = json_encode($request->certificates);
+            // Update user certificates - allow empty array (when all certificates are deleted)
+            // Ensure we always save as JSON, even if empty array
+            $certificatesData = is_array($request->certificates) ? $request->certificates : [];
+            $user->certificates = !empty($certificatesData) ? json_encode($certificatesData) : json_encode([]);
             $user->save();
 
             return response()->json([

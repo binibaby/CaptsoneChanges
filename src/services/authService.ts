@@ -799,22 +799,26 @@ class AuthService {
     
     // Update profile on backend (single attempt for speed)
     try {
-      console.log('AuthService: Updating profile on backend...');
+      // Silently update backend
+      // console.log('AuthService: Updating profile on backend...');
       await this.updateProfileOnBackend(updatedUser);
-      console.log('AuthService: Profile updated on backend successfully');
+      // console.log('AuthService: Profile updated on backend successfully');
     } catch (error) {
-      console.error('AuthService: Backend update failed:', error instanceof Error ? error.message : 'Unknown error');
-      console.warn('AuthService: Profile updated locally but backend sync failed - will retry on next app open');
+      // Silently handle backend update failure
+      // console.error('AuthService: Backend update failed:', error instanceof Error ? error.message : 'Unknown error');
+      // console.warn('AuthService: Profile updated locally but backend sync failed - will retry on next app open');
     }
     
     // Clear sitter cache to force refresh in find sitter map (regardless of backend success)
     try {
       const { default: realtimeLocationService } = await import('./realtimeLocationService');
       realtimeLocationService.clearSitterCache();
-      console.log('AuthService: Cleared sitter cache for profile update');
-    } catch (cacheError) {
-      console.error('AuthService: Error clearing sitter cache:', cacheError);
-    }
+      // Silently clear cache
+      // console.log('AuthService: Cleared sitter cache for profile update');
+      } catch (cacheError) {
+        // Silently handle cache error
+        // console.error('AuthService: Error clearing sitter cache:', cacheError);
+      }
     
     // Also save profile data persistently
     try {
@@ -835,29 +839,32 @@ class AuthService {
       };
       
       await AsyncStorage.setItem('user_profile_data', JSON.stringify(profileData));
-      console.log('AuthService: Profile data saved persistently');
+      // console.log('AuthService: Profile data saved persistently');
     } catch (error) {
-      console.error('Error saving profile data persistently:', error);
+      // Silently handle save error
+      // console.error('Error saving profile data persistently:', error);
     }
     
-    console.log('Updated user profile:', updatedUser);
-    console.log('AuthService: Final user profileImage after save:', updatedUser.profileImage);
+    // Silently log profile update
+    // console.log('Updated user profile:', updatedUser);
+    // console.log('AuthService: Final user profileImage after save:', updatedUser.profileImage);
     return updatedUser;
   }
 
   // Update profile on backend
   async updateProfileOnBackend(user: User): Promise<void> {
     try {
-      console.log('AuthService: Updating profile on backend for user:', user.id);
-      console.log('AuthService: User object details:', {
-        id: user.id,
-        name: user.name,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        userRole: user.userRole
-      });
+      // Silently update backend
+      // console.log('AuthService: Updating profile on backend for user:', user.id);
+      // console.log('AuthService: User object details:', {
+      //   id: user.id,
+      //   name: user.name,
+      //   firstName: user.firstName,
+      //   lastName: user.lastName,
+      //   email: user.email,
+      //   role: user.role,
+      //   userRole: user.userRole
+      // });
       
       // Validate required fields
       if (!user.id) {
@@ -942,17 +949,19 @@ class AuthService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Backend profile update failed:', response.status, errorText);
-        console.error('Response URL:', response.url);
-        console.error('Response headers:', response.headers);
-        console.error('Request body sent:', JSON.stringify(updateData, null, 2));
+        // Silently handle backend update failure
+        // console.error('Backend profile update failed:', response.status, errorText);
+        // console.error('Response URL:', response.url);
+        // console.error('Response headers:', response.headers);
+        // console.error('Request body sent:', JSON.stringify(updateData, null, 2));
         throw new Error(`Backend update failed: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('Backend profile update successful:', result);
+      // console.log('Backend profile update successful:', result);
     } catch (error) {
-      console.error('Error updating profile on backend:', error);
+      // Silently handle error
+      // console.error('Error updating profile on backend:', error);
       throw error;
     }
   }

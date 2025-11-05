@@ -5,7 +5,7 @@
  */
 
 // Configuration
-$baseUrl = 'http://172.20.10.2:8000';
+$baseUrl = 'http://192.168.100.204:8000';
 $testUserToken = '64|dTO5Gio05Om1Buxtkta02gVpvQnetCTMrofsLjeudda0034b'; // Test sitter token
 
 echo "🧪 Real-time Availability Detection Test\n";

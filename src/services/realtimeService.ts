@@ -72,23 +72,26 @@ class RealtimeService {
       
       // Connect to Laravel Reverb on port 8080
       const reverbUrl = `${wsUrl}:8080/app/${process.env.EXPO_PUBLIC_REVERB_APP_KEY || 'iycawpww023mjumkvwsj'}`;
-      console.log('🔌 RealtimeService: Connecting to Reverb:', reverbUrl);
-      console.log('🔌 RealtimeService: Base URL used:', baseUrl);
-      console.log('🔌 RealtimeService: Host extracted:', host);
+      // Silently connect
+      // console.log('🔌 RealtimeService: Connecting to Reverb:', reverbUrl);
+      // console.log('🔌 RealtimeService: Base URL used:', baseUrl);
+      // console.log('🔌 RealtimeService: Host extracted:', host);
       
       this.ws = new WebSocket(reverbUrl);
       
       // Set up connection timeout
       const connectionTimeout = setTimeout(() => {
         if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
-          console.log('⏰ RealtimeService: WebSocket connection timeout');
+          // Silently handle timeout
+          // console.log('⏰ RealtimeService: WebSocket connection timeout');
           this.ws.close();
         }
       }, 10000); // 10 second timeout
 
       this.ws.onopen = () => {
         clearTimeout(connectionTimeout);
-        console.log('🔌 RealtimeService: Connected to Laravel Reverb');
+        // Silently handle connection
+        // console.log('🔌 RealtimeService: Connected to Laravel Reverb');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.subscribeToUserChannel();
@@ -105,8 +108,9 @@ class RealtimeService {
 
       this.ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
-        console.log('🔌 RealtimeService: Connection closed');
-        console.log('🔌 RealtimeService: Close code:', event.code, 'Reason:', event.reason);
+        // Silently handle connection close
+        // console.log('🔌 RealtimeService: Connection closed');
+        // console.log('🔌 RealtimeService: Close code:', event.code, 'Reason:', event.reason);
         this.isConnected = false;
         this.ws = null;
         this.handleReconnect();
@@ -114,9 +118,10 @@ class RealtimeService {
 
       this.ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        console.warn('⚠️ RealtimeService: WebSocket connection failed - this is normal if Reverb server is not running');
-        console.warn('⚠️ RealtimeService: WebSocket URL attempted:', reverbUrl);
-        console.warn('⚠️ This error can be safely ignored - real-time features will use fallback methods');
+        // Silently handle WebSocket errors
+        // console.warn('⚠️ RealtimeService: WebSocket connection failed - this is normal if Reverb server is not running');
+        // console.warn('⚠️ RealtimeService: WebSocket URL attempted:', reverbUrl);
+        // console.warn('⚠️ This error can be safely ignored - real-time features will use fallback methods');
         this.isConnected = false;
         
         // Don't schedule reconnect immediately on error - let onclose handle it
@@ -378,7 +383,8 @@ class RealtimeService {
    */
   private handleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('🔌 RealtimeService: Max reconnection attempts reached');
+      // Silently handle max reconnection attempts
+      // console.error('🔌 RealtimeService: Max reconnection attempts reached');
       return;
     }
 
@@ -388,7 +394,8 @@ class RealtimeService {
     const jitter = Math.random() * 1000; // Add up to 1 second of jitter
     const delay = baseDelay + jitter;
     
-    console.log(`🔌 RealtimeService: Attempting to reconnect in ${Math.round(delay)}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    // Silently reconnect
+    // console.log(`🔌 RealtimeService: Attempting to reconnect in ${Math.round(delay)}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
     setTimeout(() => {
       if (this.userId) {

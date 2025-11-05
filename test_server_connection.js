@@ -2,7 +2,8 @@
 // Run this with: node test_server_connection.js
 
 const ipsToTest = [
-  '172.20.10.2',      // Current mobile data IP
+  '192.168.100.204',  // Current WiFi IP (primary)
+  '172.20.10.2',      // Mobile data IP (fallback)
   '192.168.100.179',  // Previous WiFi IP
   'localhost',         // Localhost
   '127.0.0.1',        // Localhost IP

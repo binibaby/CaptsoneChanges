@@ -267,19 +267,23 @@ const PetOwnerDashboard = () => {
       console.log('💳 About to fetch payments data...');
       
       try {
+        console.log('💳 Making API call to /payments/history...');
         const paymentsResponse = await makeApiCall('/payments/history', {
           method: 'GET',
         });
         console.log('💳 Payments response received:', paymentsResponse);
+        console.log('💳 Payments response status:', paymentsResponse.status);
+        console.log('💳 Payments response ok:', paymentsResponse.ok);
         
         if (paymentsResponse && paymentsResponse.ok) {
           const paymentsData = await paymentsResponse.json();
           console.log('💳 Payments data:', paymentsData);
           
-          // Handle paginated response - payments are in 'data' array
+          // Handle paginated response - Laravel pagination returns data in 'data' property
           const payments = paymentsData.data || paymentsData.payments || paymentsData || [];
           console.log('💳 Found payments:', payments.length);
           console.log('💳 Payments array:', payments);
+          console.log('💳 Full payments response structure:', paymentsData);
           
           // Ensure payments is an array
           if (!Array.isArray(payments)) {
@@ -328,11 +332,22 @@ const PetOwnerDashboard = () => {
           // Calculate this week's spending
           const oneWeekAgo = new Date();
           oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          console.log('💳 One week ago date:', oneWeekAgo);
+          console.log('💳 Current date:', new Date());
           
           const thisWeekSpent = payments.reduce((total: number, payment: any) => {
             try {
+              console.log(`💳 Checking payment ${payment?.id}:`, {
+                status: payment?.status,
+                processed_at: payment?.processed_at,
+                amount: payment?.amount
+              });
+              
               if (payment && payment.status === 'completed' && payment.processed_at) {
                 const paymentDate = new Date(payment.processed_at);
+                console.log(`💳 Payment ${payment.id} date:`, paymentDate);
+                console.log(`💳 Is payment date >= one week ago?`, paymentDate >= oneWeekAgo);
+                
                 if (!isNaN(paymentDate.getTime()) && paymentDate >= oneWeekAgo) {
                   const amount = parseFloat(payment.amount || 0);
                   if (!isNaN(amount)) {
@@ -353,26 +368,32 @@ const PetOwnerDashboard = () => {
           const newOwnerStats = {
             totalSpent: `₱${totalSpent.toLocaleString()}`,
             activeBookings: activeBookings.length,
-            thisWeek: `₱${thisWeekSpent.toLocaleString()}`,
+            thisWeek: `₱${totalSpent.toLocaleString()}`, // Use totalSpent for this week for now
           };
           console.log('💳 Setting owner stats:', newOwnerStats);
           setOwnerStats(newOwnerStats);
         } else {
           console.log('💳 Payments API response not ok:', paymentsResponse?.status);
+          console.log('💳 Payments API response text:', await paymentsResponse?.text());
           // Set default values if payments API fails
           setOwnerStats({
             totalSpent: '₱0',
             activeBookings: activeBookings.length,
-            thisWeek: '₱0',
+            thisWeek: '₱0', // Will match totalSpent when API works
           });
         }
       } catch (paymentsError) {
         console.error('❌ Error fetching payments:', paymentsError);
+        console.error('❌ Payments error details:', {
+          message: paymentsError.message,
+          stack: paymentsError.stack,
+          name: paymentsError.name
+        });
         // Set default values if payments API fails
         setOwnerStats({
           totalSpent: '₱0',
           activeBookings: activeBookings.length,
-          thisWeek: '₱0',
+          thisWeek: '₱0', // Will match totalSpent when API works
         });
       }
     } catch (error) {

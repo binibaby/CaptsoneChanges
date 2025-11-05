@@ -60,7 +60,7 @@ if ($verification) {
     echo "   Selfie: " . asset('storage/' . $verification->selfie_image) . "\n";
     echo "   Document: " . asset('storage/' . $verification->document_image) . "\n\n";
     
-    echo "🎯 Admin Panel URL: http://172.20.10.2:8000/admin/verifications/105\n";
+    echo "🎯 Admin Panel URL: http://192.168.100.204:8000/admin/verifications/105\n";
     echo "   Should display: All 4 images + location data + accuracy info\n";
     
 } else {

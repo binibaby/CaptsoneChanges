@@ -44,12 +44,12 @@ if ($admin->role !== 'admin') {
 }
 
 echo "\n=== Admin Panel URLs ===\n";
-echo "Login: http://172.20.10.2:8000/admin/login\n";
+echo "Login: http://192.168.100.204:8000/admin/login\n";
 echo "Email: admin@petsitconnect.com\n";
 echo "Password: admin123\n";
-echo "Verifications: http://172.20.10.2:8000/admin/verifications\n";
-echo "Verification 105: http://172.20.10.2:8000/admin/verifications/105\n";
-echo "Enhanced View: http://172.20.10.2:8000/admin/verifications/105/enhanced\n";
+echo "Verifications: http://192.168.100.204:8000/admin/verifications\n";
+echo "Verification 105: http://192.168.100.204:8000/admin/verifications/105\n";
+echo "Enhanced View: http://192.168.100.204:8000/admin/verifications/105/enhanced\n";
 
 echo "\n=== Test Complete ===\n";
 ?>

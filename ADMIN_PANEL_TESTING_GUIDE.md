@@ -7,14 +7,14 @@ The admin panel verification view is now fully set up with clickable and zoomabl
 ## **Admin Panel URLs**
 
 ### **Main Admin Panel**
-- **Login**: http://172.20.10.2:8000/admin/login
+- **Login**: http://192.168.100.204:8000/admin/login
 - **Email**: admin@petsitconnect.com
 - **Password**: admin123
 
 ### **Verification Views**
-- **Verifications List**: http://172.20.10.2:8000/admin/verifications
-- **Enhanced View**: http://172.20.10.2:8000/admin/verifications/{id}/enhanced
-- **Example with Images**: http://172.20.10.2:8000/admin/verifications/105/enhanced
+- **Verifications List**: http://192.168.100.204:8000/admin/verifications
+- **Enhanced View**: http://192.168.100.204:8000/admin/verifications/{id}/enhanced
+- **Example with Images**: http://192.168.100.204:8000/admin/verifications/105/enhanced
 
 ## **What You'll See When Testing**
 
@@ -43,7 +43,7 @@ The admin panel verification view is now fully set up with clickable and zoomabl
 ## **Testing Steps**
 
 ### **Step 1: Access Admin Panel**
-1. Go to: http://172.20.10.2:8000/admin/login
+1. Go to: http://192.168.100.204:8000/admin/login
 2. Login with:
    - Email: admin@petsitconnect.com
    - Password: admin123

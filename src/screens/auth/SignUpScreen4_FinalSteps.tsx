@@ -522,21 +522,31 @@ const SignUpScreen4_FinalSteps: React.FC<SignUpScreen4_FinalStepsProps> = ({
                   
                   <View style={styles.requirementsContainer}>
                     <Text style={styles.requirementsTitle}>Password Requirements:</Text>
-                    <Text style={[styles.requirementText, password.length >= 8 && styles.requirementMet]}>
-                      • At least 8 characters {password.length >= 8 ? '✓' : ''}
-                    </Text>
-                    <Text style={[styles.requirementText, /[a-z]/.test(password) && styles.requirementMet]}>
-                      • Lowercase letter {/[a-z]/.test(password) ? '✓' : ''}
-                    </Text>
-                    <Text style={[styles.requirementText, /[A-Z]/.test(password) && styles.requirementMet]}>
-                      • Uppercase letter {/[A-Z]/.test(password) ? '✓' : ''}
-                    </Text>
-                    <Text style={[styles.requirementText, /[0-9]/.test(password) && styles.requirementMet]}>
-                      • Number {/[0-9]/.test(password) ? '✓' : ''}
-                    </Text>
-                    <Text style={[styles.requirementText, /[^A-Za-z0-9]/.test(password) && styles.requirementMet]}>
-                      • Special character {/[^A-Za-z0-9]/.test(password) ? '✓' : ''}
-                    </Text>
+                    {password.length < 8 && (
+                      <Text style={styles.requirementText}>
+                        • At least 8 characters
+                      </Text>
+                    )}
+                    {!/[a-z]/.test(password) && (
+                      <Text style={styles.requirementText}>
+                        • Lowercase letter
+                      </Text>
+                    )}
+                    {!/[A-Z]/.test(password) && (
+                      <Text style={styles.requirementText}>
+                        • Uppercase letter
+                      </Text>
+                    )}
+                    {!/[0-9]/.test(password) && (
+                      <Text style={styles.requirementText}>
+                        • Number
+                      </Text>
+                    )}
+                    {!/[^A-Za-z0-9]/.test(password) && (
+                      <Text style={styles.requirementText}>
+                        • Special character
+                      </Text>
+                    )}
                   </View>
                 </View>
               )}

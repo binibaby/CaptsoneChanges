@@ -7,7 +7,7 @@ echo "🧪 Testing API Response for Full Dates\n";
 echo "=====================================\n\n";
 
 // Test configuration
-$baseUrl = 'http://172.20.10.2:8000'; // Use the IP from your logs
+$baseUrl = 'http://192.168.100.204:8000'; // Use the current WiFi IP
 $testSitterId = '8'; // Use sitter ID from logs
 $testDate = '2025-10-23'; // Use date from logs
 $testOwnerToken = 'your_test_owner_token_here'; // Replace with actual token

@@ -127,7 +127,7 @@ const ProfileScreen = () => {
         console.error('❌ ProfileScreen: Error getting image URL:', error);
         // Fallback to hardcoded URL if network service fails
         const storagePath = uri.startsWith('/storage/') ? uri : `/storage/${uri}`;
-        const fallbackUrl = `http://172.20.10.2:8000${storagePath}`;
+        const fallbackUrl = `http://192.168.100.215:8000${storagePath}`;
         console.log('🔗 ProfileScreen: Using fallback URL:', fallbackUrl);
         return fallbackUrl;
       }
@@ -535,7 +535,7 @@ const ProfileScreen = () => {
         setJustUploadedImage(true); // Flag to prevent useEffect from overriding
         
         // Also try with a hardcoded URL to test
-        const testUrl = `http://172.20.10.2:8000/storage/${result.profile_image}`;
+        const testUrl = `http://192.168.100.215:8000/storage/${result.profile_image}`;
         console.log('ProfileScreen: TEST URL:', testUrl);
         setTimeout(() => {
           console.log('ProfileScreen: Trying test URL after 500ms');
@@ -861,7 +861,7 @@ const ProfileScreen = () => {
             <TouchableOpacity 
               style={[styles.testButton, { backgroundColor: '#FF6B6B', marginTop: 10 }]} 
               onPress={() => {
-                const testUrl = `http://172.20.10.2:8000/storage/profile_images/h0SuQ7rQBRwmpycUgSBgtmsm8CXFTSeTVc7tHJyr.jpg`;
+                const testUrl = `http://192.168.100.215:8000/storage/profile_images/h0SuQ7rQBRwmpycUgSBgtmsm8CXFTSeTVc7tHJyr.jpg`;
                 console.log('🧪 FORCE TEST: Setting hardcoded URL:', testUrl);
                 setProfileImage(testUrl);
                 setImageError(false);

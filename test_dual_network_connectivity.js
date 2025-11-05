@@ -12,13 +12,15 @@ const http = require('http');
 // Network configuration (matches frontend config)
 const NETWORK_CONFIG = {
   PRIMARY_IPS: [
-    '192.168.100.192',  // Current WiFi IP (primary)
+    '192.168.100.204',  // Current WiFi IP (primary)
+    '192.168.100.192',  // Previous WiFi IP (fallback)
     '172.20.10.2',      // Mobile data IP (fallback)
     '172.20.10.1',      // Mobile hotspot gateway
   ],
   
   FALLBACK_IPS: [
-    '192.168.100.192',  // Current WiFi IP (primary)
+    '192.168.100.204',  // Current WiFi IP (primary)
+    '192.168.100.192',  // Previous WiFi IP (fallback)
     '172.20.10.2',      // Mobile data IP (fallback)
     '172.20.10.1',      // Common mobile hotspot gateway
     '192.168.100.184',  // Previous WiFi IP

@@ -43,36 +43,41 @@ export class NetworkService {
       // Also accept redirects (3xx) as they indicate server is running
       const isWorking = response.status < 500;
       
-      if (isWorking) {
-        console.log(`✅ IP ${ip}:8000 is reachable (status: ${response.status})`);
-      } else {
-        console.log(`❌ IP ${ip}:8000 returned error status: ${response.status}`);
-      }
+      // Silently test connection
+      // if (isWorking) {
+      //   console.log(`✅ IP ${ip}:8000 is reachable (status: ${response.status})`);
+      // } else {
+      //   console.log(`❌ IP ${ip}:8000 returned error status: ${response.status}`);
+      // }
       
       return isWorking;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.log(`❌ IP ${ip}:8000 connection failed:`, errorMessage);
+      // Silently handle connection failure
+      // const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // console.log(`❌ IP ${ip}:8000 connection failed:`, errorMessage);
       return false;
     }
   }
 
   // Detect which IP address is currently working (optimized for WiFi connection)
   public async detectWorkingIP(): Promise<string> {
-    console.log('🔍 Detecting working IP address for WiFi connection...');
+    // Silently detect working IP
+    // console.log('🔍 Detecting working IP address for WiFi connection...');
 
-    // Try the most likely IPs first (prioritize mobile data)
+    // Try the most likely IPs first (prioritize current WiFi)
     const priorityIPs = [
-      '172.20.10.2',      // Mobile data IP (primary)
+      '192.168.100.215',  // Current WiFi IP (primary)
+      '172.20.10.2',      // Mobile data IP (fallback)
       '172.20.10.1',      // Mobile hotspot gateway
-      '192.168.100.197',  // WiFi IP (fallback)
+      '192.168.100.197',  // Previous WiFi IP (fallback)
       '127.0.0.1',        // Local development
       'localhost',         // Local development
     ];
 
     // Try priority IPs first with parallel testing for faster detection
     const priorityPromises = priorityIPs.map(async (ip) => {
-      console.log(`🌐 Testing priority IP: ${ip}:8000`);
+      // Silently test IPs
+      // console.log(`🌐 Testing priority IP: ${ip}:8000`);
       const isWorking = await this.testIPConnection(ip);
       return { ip, isWorking };
     });
@@ -84,7 +89,8 @@ export class NetworkService {
     if (workingIP) {
       this.currentBaseUrl = `http://${workingIP.ip}:8000`;
       this.isConnected = true;
-      console.log(`✅ Connected to: ${this.currentBaseUrl} (${this.getNetworkType(workingIP.ip)})`);
+      // Silently connect
+      // console.log(`✅ Connected to: ${this.currentBaseUrl} (${this.getNetworkType(workingIP.ip)})`);
       return this.currentBaseUrl;
     }
 
@@ -97,26 +103,31 @@ export class NetworkService {
     // Remove duplicates and priority IPs
     const uniqueIPs = Array.from(new Set(allIPs)).filter(ip => !priorityIPs.includes(ip));
     
-    console.log(`🔄 Trying ${uniqueIPs.length} additional IPs...`);
+    // Silently try additional IPs
+    // console.log(`🔄 Trying ${uniqueIPs.length} additional IPs...`);
     
     for (const ip of uniqueIPs) {
-      console.log(`🌐 Testing IP: ${ip}:8000`);
+      // Silently test IPs
+      // console.log(`🌐 Testing IP: ${ip}:8000`);
       const isWorking = await this.testIPConnection(ip);
       if (isWorking) {
         this.currentBaseUrl = `http://${ip}:8000`;
         this.isConnected = true;
-        console.log(`✅ Connected to: ${this.currentBaseUrl} (${this.getNetworkType(ip)})`);
+        // Silently connect
+        // console.log(`✅ Connected to: ${this.currentBaseUrl} (${this.getNetworkType(ip)})`);
         return this.currentBaseUrl;
       } else {
-        console.log(`❌ Failed to connect to: ${ip}:8000`);
+        // Silently fail
+        // console.log(`❌ Failed to connect to: ${ip}:8000`);
       }
     }
 
-    // If all fail, use the mobile data IP as default but mark as disconnected
-    this.currentBaseUrl = `http://172.20.10.2:8000`;
+    // If all fail, use the current WiFi IP as default but mark as disconnected
+    this.currentBaseUrl = `http://192.168.100.215:8000`;
     this.isConnected = false;
-    console.log(`⚠️ All IPs failed. Using mobile data IP as default: ${this.currentBaseUrl}`);
-    console.log(`⚠️ Please ensure your server is running and accessible on both WiFi and mobile data`);
+    // Silently use default
+    // console.log(`⚠️ All IPs failed. Using current WiFi IP as default: ${this.currentBaseUrl}`);
+    // console.log(`⚠️ Please ensure your server is running and accessible on both WiFi and mobile data`);
     return this.currentBaseUrl;
   }
 
@@ -181,7 +192,8 @@ export class NetworkService {
 
   // Force network re-detection (useful when switching networks)
   public async forceReconnect(): Promise<string> {
-    console.log('🔄 Forcing network re-detection...');
+    // Silently force reconnect
+    // console.log('🔄 Forcing network re-detection...');
     this.isConnected = false;
     return await this.detectWorkingIP();
   }
@@ -207,7 +219,8 @@ export const makeApiCall = async (
 ): Promise<Response> => {
   try {
     const url = await getApiUrl(endpoint);
-    console.log(`🌐 Making API call to: ${url}`);
+    // Silently make API call
+    // console.log(`🌐 Making API call to: ${url}`);
     
     // Get user token if no Authorization header is provided
     let headers: Record<string, string> = {
@@ -220,17 +233,19 @@ export const makeApiCall = async (
       try {
         const { default: authService } = await import('./authService');
         const user = await authService.getCurrentUser();
-        console.log('🔍 makeApiCall - User from authService:', user);
-        console.log('🔍 makeApiCall - User ID:', user?.id);
-        console.log('🔍 makeApiCall - User token available:', !!user?.token);
+        // Silently get user token
+        // console.log('🔍 makeApiCall - User from authService:', user);
+        // console.log('🔍 makeApiCall - User ID:', user?.id);
+        // console.log('🔍 makeApiCall - User token available:', !!user?.token);
         if (user?.token) {
           headers['Authorization'] = `Bearer ${user.token}`;
-          console.log(`🔑 Added auth token for user: ${user.id}`);
+          // console.log(`🔑 Added auth token for user: ${user.id}`);
         } else {
-          console.log('⚠️ No user token available for API call');
+          // console.log('⚠️ No user token available for API call');
         }
       } catch (error) {
-        console.log('⚠️ Could not get user token:', error);
+        // Silently handle token error
+        // console.log('⚠️ Could not get user token:', error);
       }
     }
     
@@ -239,7 +254,8 @@ export const makeApiCall = async (
       headers,
     });
 
-    console.log(`📡 API response status: ${response.status} for ${url}`);
+    // Silently check response
+    // console.log(`📡 API response status: ${response.status} for ${url}`);
 
     // Handle 401 Unauthorized - try to refresh token and retry
     if (response.status === 401 && !hasTriedTokenRefresh) {
@@ -283,16 +299,18 @@ export const makeApiCall = async (
 
     return response;
   } catch (error) {
-    console.error(`❌ Network error for ${endpoint}:`, error);
+    // Silently handle network errors
+    // console.error(`❌ Network error for ${endpoint}:`, error);
     
     if (retryCount < 1) {
-      console.log(`⚠️ Network error, retrying with fresh IP detection... (${retryCount + 1}/1)`);
+      // Silently retry without logging
       // Force network re-detection on error
       await networkService.forceReconnect();
       return makeApiCall(endpoint, options, retryCount + 1, hasTriedTokenRefresh);
     }
     
-    console.error(`❌ All retries failed for ${endpoint}. Network service status:`, networkService.getNetworkStatus());
+    // Silently fail after retries
+    // console.error(`❌ All retries failed for ${endpoint}. Network service status:`, networkService.getNetworkStatus());
     throw error;
   }
 };
@@ -333,10 +351,11 @@ export const submitProfileUpdateRequest = async (data: {
       body: JSON.stringify(requestBody),
     });
 
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('Error submitting profile update request:', error);
-    throw error;
-  }
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      // Silently handle error
+      // console.error('Error submitting profile update request:', error);
+      throw error;
+    }
 };

@@ -64,7 +64,7 @@ const PetSitterMessagesScreen = () => {
   
   // Profile popup state
   const [profilePopupVisible, setProfilePopupVisible] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState<any>(null);
+  const [selectedSitter, setSelectedSitter] = useState<any>(null);
 
   // Filter conversations based on search query
   const filteredConversations = conversations.filter(conversation =>
@@ -111,7 +111,7 @@ const PetSitterMessagesScreen = () => {
       };
       
       console.log('🔍 Setting profile data:', profileData);
-      setSelectedProfile(profileData);
+      setSelectedSitter(profileData);
       setProfilePopupVisible(true);
       console.log('🔍 Profile popup should now be visible');
     } catch (error) {
@@ -123,7 +123,7 @@ const PetSitterMessagesScreen = () => {
   // Close profile popup
   const handleCloseProfile = () => {
     setProfilePopupVisible(false);
-    setSelectedProfile(null);
+    setSelectedSitter(null);
   };
 
   // Load conversations
@@ -526,10 +526,6 @@ const PetSitterMessagesScreen = () => {
                 )}
               </View>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.moreButton}>
-              <Ionicons name="ellipsis-vertical" size={24} color="#333" />
-            </TouchableOpacity>
           </View>
 
           {/* Chat Messages */}
@@ -692,7 +688,7 @@ const PetSitterMessagesScreen = () => {
       <ProfilePopupModal
         visible={profilePopupVisible}
         onClose={handleCloseProfile}
-        profileData={selectedProfile}
+        profileData={selectedSitter}
         userRole="pet_sitter"
       />
     </SafeAreaView>
