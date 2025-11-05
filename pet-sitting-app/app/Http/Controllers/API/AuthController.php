@@ -78,13 +78,25 @@ class AuthController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role' => $request->role,
-                'status' => $request->role === 'pet_sitter' ? 'pending_verification' : 'pending',
-                'phone' => $formattedPhone,
-                'phone_verification_code' => $phoneVerificationCode,
                 'email_verified_at' => now(),
-                'phone_verified_at' => null,
             ];
+            
+            // Only add fields if the columns exist in the database
+            if (Schema::hasColumn('users', 'role')) {
+                $userData['role'] = $request->role;
+            }
+            if (Schema::hasColumn('users', 'status')) {
+                $userData['status'] = $request->role === 'pet_sitter' ? 'pending_verification' : 'pending';
+            }
+            if (Schema::hasColumn('users', 'phone')) {
+                $userData['phone'] = $formattedPhone;
+            }
+            if (Schema::hasColumn('users', 'phone_verification_code')) {
+                $userData['phone_verification_code'] = $phoneVerificationCode;
+            }
+            if (Schema::hasColumn('users', 'phone_verified_at')) {
+                $userData['phone_verified_at'] = null;
+            }
             
             // Only add fields if the columns exist in the database
             if (Schema::hasColumn('users', 'first_name')) {
