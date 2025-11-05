@@ -217,27 +217,13 @@ class AuthController extends Controller
                 }
             }
             
-            try {
-                \Log::error('❌ Database error during registration:', [
-                    'message' => $errorMessage,
-                ]);
-            } catch (\Exception $logError) {
-                // Ignore logging errors
-            }
-            
+            // Don't log - just return error response
             return response()->json([
                 'success' => false,
                 'message' => $userMessage,
             ], 400);
         } catch (\Exception $e) {
-            try {
-                \Log::error('❌ Registration error:', [
-                    'message' => $e->getMessage(),
-                ]);
-            } catch (\Exception $logError) {
-                // Ignore logging errors
-            }
-            
+            // Don't log - just return error response
             return response()->json([
                 'success' => false,
                 'message' => 'Registration failed. Please try again.',
