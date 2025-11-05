@@ -796,18 +796,14 @@ class AuthController extends Controller
             }
         } catch (\Exception $e) {
             // Fallback to simulation mode if Semaphore fails
-            return $this->simulateSMS($phone, $verificationCode, $timestamp);
-            } catch (\Exception $logError) {
-                // If logging fails, still try to return simulation mode response
-                try {
-                    return $this->simulateSMS($phone, $verificationCode, $timestamp);
-                } catch (\Exception $simError) {
-                    // If everything fails, return error response
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'An error occurred while sending verification code. Please try again.',
-                    ], 500);
-                }
+            try {
+                return $this->simulateSMS($phone, $verificationCode, $timestamp);
+            } catch (\Exception $simError) {
+                // If everything fails, return error response
+                return response()->json([
+                    'success' => false,
+                    'message' => 'An error occurred while sending verification code. Please try again.',
+                ], 500);
             }
         }
     }
