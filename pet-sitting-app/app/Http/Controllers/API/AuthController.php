@@ -238,12 +238,10 @@ class AuthController extends Controller
                 $response['warning'] = 'Authentication token will be available after login. Please log in to get your access token.';
             }
             
-            $response = array_merge($response, [
-                'verification_required' => [
-                    'email' => false, // Email is auto-verified
-                    'phone' => !empty($user->phone),
-                    'id_verification' => $request->role === 'pet_sitter',
-                ]
+            $response['verification_required'] = [
+                'email' => false, // Email is auto-verified
+                'phone' => !empty($user->phone),
+                'id_verification' => $request->role === 'pet_sitter',
             ];
 
             \Log::info('✅ Registration response prepared:', $response);
