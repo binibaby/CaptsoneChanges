@@ -62,8 +62,9 @@ mkdir -p /var/www/html/storage/framework/cache\n\
 mkdir -p /var/www/html/storage/framework/sessions\n\
 mkdir -p /var/www/html/storage/framework/views\n\
 chown -R www-data:www-data /var/www/html/storage\n\
-chmod -R 775 /var/www/html/storage\n\
+chmod -R 777 /var/www/html/storage\n\
 chmod -R 777 /var/www/html/storage/logs\n\
+chmod -R 777 /var/www/html/bootstrap/cache\n\
 # Run migrations automatically on startup (show output for debugging)\n\
 echo "Running database migrations..."\n\
 php artisan migrate --force 2>&1 | tee /tmp/migration.log\n\

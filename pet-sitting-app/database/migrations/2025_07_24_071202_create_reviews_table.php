@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('bookings')) {
+            throw new \Exception('bookings table must exist before creating reviews table');
+        }
+
         Schema::create('reviews', function (Blueprint $table) {
             $table->id();
             $table->foreignId('booking_id')->constrained()->onDelete('cascade');
@@ -37,3 +41,4 @@ return new class extends Migration
         Schema::dropIfExists('reviews');
     }
 };
+

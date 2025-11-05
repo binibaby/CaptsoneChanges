@@ -18,11 +18,15 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        // Add debugging
-        \Log::info('🔔 USER REGISTRATION REQUEST RECEIVED');
-        \Log::info('📝 Request data:', ['data' => $request->all()]);
-        \Log::info('🌐 Request IP:', ['ip' => $request->ip()]);
-        \Log::info('👤 User Agent:', ['user_agent' => $request->userAgent()]);
+            // Add debugging (safe logging - don't fail if logging fails)
+            try {
+                \Log::info('🔔 USER REGISTRATION REQUEST RECEIVED');
+                \Log::info('📝 Request data:', ['data' => $request->all()]);
+                \Log::info('🌐 Request IP:', ['ip' => $request->ip()]);
+                \Log::info('👤 User Agent:', ['user_agent' => $request->userAgent()]);
+            } catch (\Exception $logError) {
+                // Ignore logging errors
+            }
 
         try {
             $request->validate([
@@ -250,26 +254,53 @@ class AuthController extends Controller
             return response()->json($response, 201);
 
         } catch (ValidationException $e) {
-            \Log::error('❌ Validation failed:', $e->errors());
+            try {
+                \Log::error('❌ Validation failed:', $e->errors());
+            } catch (\Exception $logError) {
+                // Ignore logging errors
+            }
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
                 'errors' => $e->errors()
             ], 422);
-        } catch (\Exception $e) {
-            \Log::error('❌ Registration error:', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            // Return detailed error for debugging (remove in production after fixing)
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle duplicate email or other database errors
+            $errorMessage = $e->getMessage();
+            $userMessage = 'Registration failed. Please try again.';
+            
+            if (strpos($errorMessage, 'duplicate key') !== false || strpos($errorMessage, 'unique constraint') !== false) {
+                if (strpos($errorMessage, 'email') !== false) {
+                    $userMessage = 'This email is already registered. Please use a different email or try logging in.';
+                } elseif (strpos($errorMessage, 'phone') !== false) {
+                    $userMessage = 'This phone number is already registered. Please use a different phone number.';
+                }
+            }
+            
+            try {
+                \Log::error('❌ Database error during registration:', [
+                    'message' => $errorMessage,
+                ]);
+            } catch (\Exception $logError) {
+                // Ignore logging errors
+            }
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Registration failed: ' . $e->getMessage(),
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
+                'message' => $userMessage,
+            ], 400);
+        } catch (\Exception $e) {
+            try {
+                \Log::error('❌ Registration error:', [
+                    'message' => $e->getMessage(),
+                ]);
+            } catch (\Exception $logError) {
+                // Ignore logging errors
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed. Please try again.',
             ], 500);
         }
     }
@@ -709,20 +740,21 @@ class AuthController extends Controller
 
     public function sendPhoneVerificationCode(Request $request)
     {
-        // Add CORS headers
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-        header('Access-Control-Allow-Credentials: true');
-        
-        // Handle preflight OPTIONS request
-        if ($request->isMethod('OPTIONS')) {
-            return response()->json(['success' => true], 200);
-        }
-        
-        $request->validate([
-            'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
-        ]);
+        try {
+            // Add CORS headers
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+            header('Access-Control-Allow-Credentials: true');
+            
+            // Handle preflight OPTIONS request
+            if ($request->isMethod('OPTIONS')) {
+                return response()->json(['success' => true], 200);
+            }
+            
+            $request->validate([
+                'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
+            ]);
 
         $phone = $this->formatPhoneNumber($request->phone);
         
@@ -1173,38 +1205,67 @@ class AuthController extends Controller
      */
     public function refreshToken(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
+        try {
+            $request->validate([
+                'email' => 'required|email',
+            ]);
 
-        $user = User::where('email', $request->email)->first();
+            $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
+            // Check if user account is active
+            if ($user->status === 'banned') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your account has been suspended. Please contact support.',
+                ], 403);
+            }
+
+            // Check if personal_access_tokens table exists
+            if (!Schema::hasTable('personal_access_tokens')) {
+                \Log::warning('personal_access_tokens table does not exist');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Token system not available. Please run migrations.',
+                ], 503);
+            }
+
+            // Revoke all existing tokens for this user
+            try {
+                $user->tokens()->delete();
+            } catch (\Exception $e) {
+                \Log::warning('Could not delete existing tokens: ' . $e->getMessage());
+            }
+
+            // Create a new token
+            try {
+                $token = $user->createToken('mobile-app')->plainTextToken;
+            } catch (\Exception $e) {
+                \Log::error('Could not create token: ' . $e->getMessage());
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to generate token. Please try again.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Token refreshed successfully!',
+                'token' => $token,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('refreshToken error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'User not found.',
-            ], 404);
+                'message' => 'An error occurred. Please try again.',
+            ], 500);
         }
-
-        // Check if user account is active
-        if ($user->status === 'banned') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your account has been suspended. Please contact support.',
-            ], 403);
-        }
-
-        // Revoke all existing tokens for this user
-        $user->tokens()->delete();
-
-        // Create a new token
-        $token = $user->createToken('mobile-app')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Token refreshed successfully!',
-            'token' => $token,
-        ]);
     }
 
     /**
@@ -1212,37 +1273,66 @@ class AuthController extends Controller
      */
     public function generateToken(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
+        try {
+            $request->validate([
+                'email' => 'required|email',
+            ]);
 
-        $user = User::where('email', $request->email)->first();
+            $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
+            // Check if user account is active
+            if ($user->status === 'banned') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your account has been suspended. Please contact support.',
+                ], 403);
+            }
+
+            // Check if personal_access_tokens table exists
+            if (!Schema::hasTable('personal_access_tokens')) {
+                \Log::warning('personal_access_tokens table does not exist');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Token system not available. Please run migrations.',
+                ], 503);
+            }
+
+            // Revoke all existing tokens for this user
+            try {
+                $user->tokens()->delete();
+            } catch (\Exception $e) {
+                \Log::warning('Could not delete existing tokens: ' . $e->getMessage());
+            }
+
+            // Create a new token
+            try {
+                $token = $user->createToken('mobile-app')->plainTextToken;
+            } catch (\Exception $e) {
+                \Log::error('Could not create token: ' . $e->getMessage());
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to generate token. Please try again.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'New token generated successfully!',
+                'token' => $token,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('generateToken error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'User not found.',
-            ], 404);
+                'message' => 'An error occurred. Please try again.',
+            ], 500);
         }
-
-        // Check if user account is active
-        if ($user->status === 'banned') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your account has been suspended. Please contact support.',
-            ], 403);
-        }
-
-        // Revoke all existing tokens for this user
-        $user->tokens()->delete();
-
-        // Create a new token
-        $token = $user->createToken('mobile-app')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'New token generated successfully!',
-            'token' => $token,
-        ]);
     }
 } 
