@@ -246,10 +246,10 @@ class UserController extends Controller
     {
         $request->validate([
             'reason' => 'required|string|max:500',
-            'duration' => 'required|in:1_day,3_days,1_week,1_month,indefinite',
         ]);
 
-        $suspensionEnd = $this->calculateSuspensionEnd($request->duration);
+        // Fixed 72 hours suspension
+        $suspensionEnd = now()->addHours(72);
 
         $user->update([
             'status' => 'suspended',
@@ -259,10 +259,16 @@ class UserController extends Controller
             'suspension_ends_at' => $suspensionEnd,
         ]);
 
+        // Cancel all active bookings
+        $user->bookings()->where('bookings.status', 'active')->update([
+            'status' => 'cancelled',
+            'cancellation_reason' => 'User suspended by admin',
+        ]);
+
         // Send suspension notification
         $this->sendSuspensionNotification($user, $request->reason, $suspensionEnd);
 
-        return redirect()->back()->with('success', 'User suspended successfully.');
+        return redirect()->back()->with('success', 'User suspended successfully for 72 hours.');
     }
 
     public function ban(Request $request, User $user)
@@ -480,20 +486,22 @@ class UserController extends Controller
 
     private function sendSuspensionNotification(User $user, $reason, $endDate)
     {
+        $adminEmail = 'petsitconnectph@gmail.com';
         $endDateText = $endDate ? $endDate->format('M d, Y H:i') : 'indefinitely';
         
         Notification::create([
             'user_id' => $user->id,
             'title' => 'Account Suspended',
-            'message' => "Your account has been suspended until {$endDateText}. Reason: {$reason}",
+            'message' => "You have been suspended for 72 hours by the admin. Please email the admin at {$adminEmail} for assistance. Reason: {$reason}",
             'type' => 'admin',
-            'data' => ['action' => 'suspended', 'reason' => $reason, 'ends_at' => $endDate],
+            'data' => ['action' => 'suspended', 'reason' => $reason, 'ends_at' => $endDate, 'admin_email' => $adminEmail],
         ]);
 
         Mail::send('emails.user.suspended', [
             'user' => $user, 
             'reason' => $reason, 
-            'endDate' => $endDateText
+            'endDate' => $endDateText,
+            'adminEmail' => $adminEmail
         ], function ($message) use ($user) {
             $message->to($user->email)
                     ->subject('Account Suspended - PetSitConnect');
@@ -502,15 +510,21 @@ class UserController extends Controller
 
     private function sendBanNotification(User $user, $reason)
     {
+        $adminEmail = 'petsitconnectph@gmail.com';
+        
         Notification::create([
             'user_id' => $user->id,
             'title' => 'Account Banned',
-            'message' => "Your account has been permanently banned. Reason: {$reason}",
+            'message' => "Your account has been permanently banned. You will not be able to use the platform anymore. Reason: {$reason}",
             'type' => 'admin',
-            'data' => ['action' => 'banned', 'reason' => $reason],
+            'data' => ['action' => 'banned', 'reason' => $reason, 'admin_email' => $adminEmail],
         ]);
 
-        Mail::send('emails.user.banned', ['user' => $user, 'reason' => $reason], function ($message) use ($user) {
+        Mail::send('emails.user.banned', [
+            'user' => $user, 
+            'reason' => $reason,
+            'adminEmail' => $adminEmail
+        ], function ($message) use ($user) {
             $message->to($user->email)
                     ->subject('Account Banned - PetSitConnect');
         });

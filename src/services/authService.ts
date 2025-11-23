@@ -22,6 +22,7 @@ export interface User {
   selectedBreeds?: string[];
   profileImage?: string;
   token?: string;
+  status?: 'active' | 'suspended' | 'banned' | 'pending' | 'denied';
 }
 
 export interface AuthState {
@@ -100,6 +101,27 @@ class AuthService {
 
       const result = await response.json();
       console.log('✅ Login API response:', result);
+      
+      // Check if user is banned or suspended
+      if (result.status === 'banned') {
+        const { Alert } = require('react-native');
+        Alert.alert(
+          'Account Banned',
+          result.message || "Your account has been permanently banned. You will not be able to use the platform anymore. Please contact the admin at petsitconnectph@gmail.com if you have any questions.",
+          [{ text: 'OK' }]
+        );
+        throw new Error(result.message || 'Account banned');
+      }
+      
+      if (result.status === 'suspended') {
+        const { Alert } = require('react-native');
+        Alert.alert(
+          'Account Suspended',
+          result.message || "You have been suspended for 72 hours by the admin. Please email the admin at petsitconnectph@gmail.com for assistance.",
+          [{ text: 'OK' }]
+        );
+        throw new Error(result.message || 'Account suspended');
+      }
           
       if (result.success) {
         console.log('✅ Login successful, user data from backend:', result.user);
@@ -139,6 +161,7 @@ class AuthService {
           selectedBreeds: result.user.pet_breeds || [],
           profileImage: result.user.profile_image_url || result.user.profile_image || undefined,
           token: result.token || undefined,
+          status: result.user.status || 'active',
         };
 
         this.currentUser = user;
@@ -287,6 +310,7 @@ class AuthService {
           selectedBreeds: result.user.pet_breeds || [],
           profileImage: result.user.profile_image_url || result.user.profile_image || undefined,
           token: result.token || undefined,
+          status: result.user.status || 'active',
         };
 
         this.currentUser = user;
@@ -518,6 +542,7 @@ class AuthService {
       // Use direct fetch to avoid circular dependency with makeApiCall
       const { getApiUrl } = await import('./networkService');
       const url = await getApiUrl('/api/refresh-token');
+      console.log('🔄 Refresh token URL:', url);
       
       const response = await fetch(url, {
         method: 'POST',
@@ -576,6 +601,7 @@ class AuthService {
       // Use direct fetch to avoid circular dependency with makeApiCall
       const { getApiUrl } = await import('./networkService');
       const url = await getApiUrl('/api/generate-token');
+      console.log('🔄 Generate token URL:', url);
       
       // Call the backend to generate a new token
       const response = await fetch(url, {

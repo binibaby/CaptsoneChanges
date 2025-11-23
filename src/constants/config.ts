@@ -2,17 +2,17 @@
 const getNetworkIP = () => {
   if (__DEV__) {
     // Use current WiFi IP for development
-    return '192.168.100.215';
+    return '192.168.100.226';
   }
-  // Production: Use your Render backend URL
-  return 'https://pet-sitting-backend.onrender.com';
+  // Production: Use localhost for local development
+  return 'localhost';
 };
 
 // Network fallback configuration for dual connectivity
 export const NETWORK_FALLBACK = {
   // Primary IPs to try in order - WiFi first for current connection
   PRIMARY_IPS: [
-    '192.168.100.215',  // Current WiFi IP (primary)
+    '192.168.100.226',  // Current WiFi IP (primary)
     '172.20.10.2',      // Mobile data IP (fallback)
     '172.20.10.1',      // Mobile hotspot gateway
     '192.168.100.197',  // Previous WiFi IP (fallback)
@@ -21,7 +21,7 @@ export const NETWORK_FALLBACK = {
   
   // Fallback IPs for different network scenarios
   FALLBACK_IPS: [
-    '192.168.100.215',  // Current WiFi IP (primary)
+    '192.168.100.226',  // Current WiFi IP (primary)
     '172.20.10.2',      // Mobile data IP (fallback)
     '172.20.10.1',      // Mobile hotspot gateway
     '172.20.10.3',      // Additional mobile data IP
@@ -31,6 +31,7 @@ export const NETWORK_FALLBACK = {
     '192.168.100.192',  // Previous WiFi IP
     '192.168.100.184',  // Previous WiFi IP
     '192.168.100.179',  // Previous WiFi IP
+    '192.168.100.215',  // Previous WiFi IP
     '192.168.1.100',    // Common home WiFi
     '192.168.0.100',    // Common home WiFi
     '192.168.100.1',    // WiFi gateway (if server is on gateway)
@@ -58,7 +59,7 @@ export const NETWORK_FALLBACK = {
 // In production, use Render URL (no port needed as Render handles it)
 export const API_BASE_URL = __DEV__ 
   ? `http://${getNetworkIP()}:8000`
-  : 'https://pet-sitting-backend.onrender.com';
+  : 'http://localhost:8000';
 
 export const API_CONFIG = {
   // Dynamic IP detection for both WiFi and mobile data

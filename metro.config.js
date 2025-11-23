@@ -1,6 +1,9 @@
 const { getDefaultConfig } = require('expo/metro-config');
 
-const config = getDefaultConfig(__dirname);
+const config = getDefaultConfig(__dirname, {
+  // Enable CSS support
+  isCSSEnabled: true,
+});
 
 // Enable better support for multiple devices
 config.server = {

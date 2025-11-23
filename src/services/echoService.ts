@@ -33,16 +33,16 @@ class EchoService implements EchoServiceInterface {
       const baseUrl = networkService.getBaseUrl();
       
       // Extract host from base URL
-      let host = 'pet-sitting-backend.onrender.com'; // Default to Render host
+      let host = 'localhost'; // Default to localhost
       try {
         const url = new URL(baseUrl);
         host = url.hostname;
       } catch (error) {
-        // If baseUrl is not a full URL, use Render host for production
+        // If baseUrl is not a full URL, use localhost
         if (!__DEV__) {
-          host = 'pet-sitting-backend.onrender.com';
+          host = 'localhost';
         } else {
-          host = '192.168.100.215'; // Development fallback
+          host = '192.168.100.226'; // Development fallback
         }
         console.warn('Could not parse base URL, using default host:', error);
       }

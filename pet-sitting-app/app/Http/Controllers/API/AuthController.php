@@ -108,7 +108,7 @@ class AuthController extends Controller
             if (Schema::hasColumn('users', 'bio')) {
                 $userData['bio'] = $request->bio;
             }
-            
+
             $user = User::create($userData);
 
             // Handle ID verification for pet sitters
@@ -520,12 +520,43 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Check if user account is active
+        // Check if user account is banned
         if ($user->status === 'banned') {
+            $adminEmail = 'petsitconnectph@gmail.com';
             return response()->json([
                 'success' => false,
-                'message' => 'Your account has been suspended. Please contact support.',
+                'message' => "Your account has been permanently banned. You will not be able to use the platform anymore. Please contact the admin at {$adminEmail} if you have any questions.",
+                'status' => 'banned',
+                'admin_email' => $adminEmail,
             ], 403);
+        }
+
+        // Check if user account is suspended
+        if ($user->status === 'suspended') {
+            $adminEmail = 'petsitconnectph@gmail.com';
+            $suspensionEnd = $user->suspension_ends_at;
+            $message = "You have been suspended for 72 hours by the admin. Please email the admin at {$adminEmail} for assistance.";
+            
+            if ($suspensionEnd && now()->lt($suspensionEnd)) {
+                $hoursRemaining = now()->diffInHours($suspensionEnd);
+                $message .= " Your suspension will end in approximately {$hoursRemaining} hours.";
+            } elseif ($suspensionEnd && now()->gte($suspensionEnd)) {
+                // Suspension period has ended, reactivate user
+                $user->update([
+                    'status' => 'active',
+                    'suspended_at' => null,
+                    'suspended_by' => null,
+                    'suspension_reason' => null,
+                    'suspension_ends_at' => null,
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                    'status' => 'suspended',
+                    'admin_email' => $adminEmail,
+                ], 403);
+            }
         }
 
         $token = $user->createToken('mobile-app')->plainTextToken;
@@ -667,90 +698,90 @@ class AuthController extends Controller
     public function sendPhoneVerificationCode(Request $request)
     {
         try {
-            // Add CORS headers
-            header('Access-Control-Allow-Origin: *');
-            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-            header('Access-Control-Allow-Credentials: true');
-            
-            // Handle preflight OPTIONS request
-            if ($request->isMethod('OPTIONS')) {
-                return response()->json(['success' => true], 200);
-            }
-            
-            $request->validate([
-                'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
-            ]);
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
+        $request->validate([
+            'phone' => ['required', 'string', 'max:20', 'regex:/^(\+63|63|0)?[0-9]{10}$/'],
+        ]);
 
-            $phone = $this->formatPhoneNumber($request->phone);
-            
-            // Verify the phone number matches the user's registered phone
-            $user = $request->user();
-            if ($user && $user->phone !== $phone) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Phone number does not match your registered phone number.',
-                ], 400);
-            }
-            
-            // If no authenticated user, find the most recent user with this phone (for registration flow)
-            if (!$user) {
+        $phone = $this->formatPhoneNumber($request->phone);
+        
+        // Verify the phone number matches the user's registered phone
+        $user = $request->user();
+        if ($user && $user->phone !== $phone) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Phone number does not match your registered phone number.',
+            ], 400);
+        }
+        
+        // If no authenticated user, find the most recent user with this phone (for registration flow)
+        if (!$user) {
                 // Check if phone column exists before querying
                 if (Schema::hasColumn('users', 'phone')) {
                     try {
-                        $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
+            $user = User::where('phone', $phone)->orderBy('created_at', 'desc')->first();
                     } catch (\Exception $e) {
                         $user = null;
                     }
                 } else {
                     // Phone column doesn't exist yet - migration hasn't run
                     $user = null;
-                }
+        }
             }
             
-            $timestamp = now()->format('Y-m-d H:i:s');
+        $timestamp = now()->format('Y-m-d H:i:s');
 
-            // Generate a 6-digit verification code
-            $verificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            
-            // Create cache key with original phone number
-            $cacheKey = "phone_verification_{$phone}";
-            
-            // Store the code in cache for verification (expires in 10 minutes)
-            \Cache::put($cacheKey, $verificationCode, 600);
+        // Generate a 6-digit verification code
+        $verificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        
+        // Create cache key with original phone number
+        $cacheKey = "phone_verification_{$phone}";
+        
+        // Store the code in cache for verification (expires in 10 minutes)
+        \Cache::put($cacheKey, $verificationCode, 600);
 
-            // Format phone number for display
-            $formattedPhone = $this->formatPhoneForSMS($phone);
+        // Format phone number for display
+        $formattedPhone = $this->formatPhoneForSMS($phone);
+        
+        // Check if simulation mode is enabled
+        $simulationMode = $this->isSimulationMode();
+        
+        if ($simulationMode) {
+            return $this->simulateSMS($phone, $verificationCode, $timestamp);
+        }
+
+        // Send SMS using Semaphore service
+        try {
+            $semaphoreService = new SemaphoreService();
+            $message = $verificationCode; // Send only the 6-digit code
             
-            // Check if simulation mode is enabled
-            $simulationMode = $this->isSimulationMode();
+            $smsResult = $semaphoreService->sendSMS($phone, $message);
             
-            if ($simulationMode) {
+            if ($smsResult['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Verification code sent successfully via SMS!',
+                    'provider' => 'semaphore',
+                    'timestamp' => $timestamp,
+                ]);
+            } else {
+                // Fallback to simulation mode if Semaphore fails
                 return $this->simulateSMS($phone, $verificationCode, $timestamp);
             }
-
-            // Send SMS using Semaphore service
-            try {
-                $semaphoreService = new SemaphoreService();
-                $message = $verificationCode; // Send only the 6-digit code
-                
-                $smsResult = $semaphoreService->sendSMS($phone, $message);
-                
-                if ($smsResult['success']) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Verification code sent successfully via SMS!',
-                        'provider' => 'semaphore',
-                        'timestamp' => $timestamp,
-                    ]);
-                } else {
-                    // Fallback to simulation mode if Semaphore fails
-                    return $this->simulateSMS($phone, $verificationCode, $timestamp);
-                }
-            } catch (\Exception $e) {
-                // Fallback to simulation mode if Semaphore fails
+        } catch (\Exception $e) {
+            // Fallback to simulation mode if Semaphore fails
                 try {
-                    return $this->simulateSMS($phone, $verificationCode, $timestamp);
+            return $this->simulateSMS($phone, $verificationCode, $timestamp);
                 } catch (\Exception $simError) {
                     // If everything fails, return error response
                     return response()->json([
@@ -1108,27 +1139,38 @@ class AuthController extends Controller
      */
     public function refreshToken(Request $request)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
         try {
-            $request->validate([
-                'email' => 'required|email',
-            ]);
+        $request->validate([
+            'email' => 'required|email',
+        ]);
 
-            $user = User::where('email', $request->email)->first();
+        $user = User::where('email', $request->email)->first();
 
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found.',
-                ], 404);
-            }
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
 
-            // Check if user account is active
-            if ($user->status === 'banned') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Your account has been suspended. Please contact support.',
-                ], 403);
-            }
+        // Check if user account is active
+        if ($user->status === 'banned') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account has been suspended. Please contact support.',
+            ], 403);
+        }
 
             // Check if personal_access_tokens table exists
             if (!Schema::hasTable('personal_access_tokens')) {
@@ -1139,16 +1181,16 @@ class AuthController extends Controller
                 ], 503);
             }
 
-            // Revoke all existing tokens for this user
+        // Revoke all existing tokens for this user
             try {
-                $user->tokens()->delete();
+        $user->tokens()->delete();
             } catch (\Exception $e) {
                 \Log::warning('Could not delete existing tokens: ' . $e->getMessage());
             }
 
-            // Create a new token
+        // Create a new token
             try {
-                $token = $user->createToken('mobile-app')->plainTextToken;
+        $token = $user->createToken('mobile-app')->plainTextToken;
             } catch (\Exception $e) {
                 \Log::error('Could not create token: ' . $e->getMessage());
                 return response()->json([
@@ -1157,11 +1199,11 @@ class AuthController extends Controller
                 ], 500);
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Token refreshed successfully!',
-                'token' => $token,
-            ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Token refreshed successfully!',
+            'token' => $token,
+        ]);
         } catch (\Exception $e) {
             \Log::error('refreshToken error: ' . $e->getMessage());
             return response()->json([
@@ -1176,27 +1218,38 @@ class AuthController extends Controller
      */
     public function generateToken(Request $request)
     {
+        // Add CORS headers
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+        
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json(['success' => true], 200);
+        }
+        
         try {
-            $request->validate([
-                'email' => 'required|email',
-            ]);
+        $request->validate([
+            'email' => 'required|email',
+        ]);
 
-            $user = User::where('email', $request->email)->first();
+        $user = User::where('email', $request->email)->first();
 
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found.',
-                ], 404);
-            }
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
 
-            // Check if user account is active
-            if ($user->status === 'banned') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Your account has been suspended. Please contact support.',
-                ], 403);
-            }
+        // Check if user account is active
+        if ($user->status === 'banned') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account has been suspended. Please contact support.',
+            ], 403);
+        }
 
             // Check if personal_access_tokens table exists
             if (!Schema::hasTable('personal_access_tokens')) {
@@ -1207,16 +1260,16 @@ class AuthController extends Controller
                 ], 503);
             }
 
-            // Revoke all existing tokens for this user
+        // Revoke all existing tokens for this user
             try {
-                $user->tokens()->delete();
+        $user->tokens()->delete();
             } catch (\Exception $e) {
                 \Log::warning('Could not delete existing tokens: ' . $e->getMessage());
             }
 
-            // Create a new token
+        // Create a new token
             try {
-                $token = $user->createToken('mobile-app')->plainTextToken;
+        $token = $user->createToken('mobile-app')->plainTextToken;
             } catch (\Exception $e) {
                 \Log::error('Could not create token: ' . $e->getMessage());
                 return response()->json([
@@ -1225,11 +1278,11 @@ class AuthController extends Controller
                 ], 500);
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'New token generated successfully!',
-                'token' => $token,
-            ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'New token generated successfully!',
+            'token' => $token,
+        ]);
         } catch (\Exception $e) {
             \Log::error('generateToken error: ' . $e->getMessage());
             return response()->json([

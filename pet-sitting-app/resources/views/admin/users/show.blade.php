@@ -231,7 +231,7 @@
                     <div class="text-sm text-green-600">Completed Bookings</div>
                 </div>
                 <div class="bg-purple-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-purple-600">${{ number_format($stats['total_spent'], 2) }}</div>
+                    <div class="text-2xl font-bold text-purple-600">₱{{ number_format($stats['total_spent'], 2) }}</div>
                     <div class="text-sm text-purple-600">Total Spent</div>
                 </div>
                 <div class="bg-yellow-50 p-4 rounded-lg">
@@ -418,9 +418,6 @@
                     </button>
                 @endif
                 
-                <button onclick="deleteUser({{ $user->id }})" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                    Delete User
-                </button>
             </div>
         </div>
     </div>
@@ -429,10 +426,28 @@
 
 <script>
 function suspendUser(userId) {
-    if (confirm('Are you sure you want to suspend this user?')) {
+    if (confirm('Are you sure you want to suspend this user for 72 hours?')) {
         const reason = prompt('Please provide a reason for suspension:');
         if (reason) {
-            window.location.href = `/admin/users/${userId}/suspend?reason=${encodeURIComponent(reason)}`;
+            // Create a form to submit POST request
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/admin/users/${userId}/suspend`;
+            
+            const reasonInput = document.createElement('input');
+            reasonInput.type = 'hidden';
+            reasonInput.name = 'reason';
+            reasonInput.value = reason;
+            
+            const tokenInput = document.createElement('input');
+            tokenInput.type = 'hidden';
+            tokenInput.name = '_token';
+            tokenInput.value = '{{ csrf_token() }}';
+            
+            form.appendChild(reasonInput);
+            form.appendChild(tokenInput);
+            document.body.appendChild(form);
+            form.submit();
         }
     }
 }
@@ -447,14 +462,26 @@ function banUser(userId) {
     if (confirm('Are you sure you want to ban this user? This action cannot be undone.')) {
         const reason = prompt('Please provide a reason for the ban:');
         if (reason) {
-            window.location.href = `/admin/users/${userId}/ban?reason=${encodeURIComponent(reason)}`;
+            // Create a form to submit POST request
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/admin/users/${userId}/ban`;
+            
+            const reasonInput = document.createElement('input');
+            reasonInput.type = 'hidden';
+            reasonInput.name = 'reason';
+            reasonInput.value = reason;
+            
+            const tokenInput = document.createElement('input');
+            tokenInput.type = 'hidden';
+            tokenInput.name = '_token';
+            tokenInput.value = '{{ csrf_token() }}';
+            
+            form.appendChild(reasonInput);
+            form.appendChild(tokenInput);
+            document.body.appendChild(form);
+            form.submit();
         }
-    }
-}
-
-function deleteUser(userId) {
-    if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-        window.location.href = `/admin/users/${userId}/delete`;
     }
 }
 </script>

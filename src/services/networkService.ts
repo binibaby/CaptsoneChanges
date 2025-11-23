@@ -13,7 +13,9 @@ export class NetworkService {
       this.isConnected = true;
       return;
     }
-    // Only detect local IPs in development mode
+    // Set default base URL immediately (will be updated by network detection)
+    this.currentBaseUrl = API_BASE_URL;
+    // Only detect local IPs in development mode (async, but we have a default)
     this.initializeNetwork();
   }
 
@@ -79,7 +81,7 @@ export class NetworkService {
 
     // Try the most likely IPs first (prioritize current WiFi)
     const priorityIPs = [
-      '192.168.100.215',  // Current WiFi IP (primary)
+      '192.168.100.226',  // Current WiFi IP (primary)
       '172.20.10.2',      // Mobile data IP (fallback)
       '172.20.10.1',      // Mobile hotspot gateway
       '192.168.100.197',  // Previous WiFi IP (fallback)
@@ -136,7 +138,7 @@ export class NetworkService {
     }
 
     // If all fail, use the current WiFi IP as default but mark as disconnected
-    this.currentBaseUrl = `http://192.168.100.215:8000`;
+    this.currentBaseUrl = `http://192.168.100.226:8000`;
     this.isConnected = false;
     // Silently use default
     // console.log(`⚠️ All IPs failed. Using current WiFi IP as default: ${this.currentBaseUrl}`);
@@ -163,6 +165,10 @@ export class NetworkService {
     // In production, always return Render URL
     if (!__DEV__) {
       return API_BASE_URL;
+    }
+    // If currentBaseUrl is empty, use the default from config (192.168.100.226)
+    if (!this.currentBaseUrl) {
+      this.currentBaseUrl = 'http://192.168.100.226:8000';
     }
     return this.currentBaseUrl;
   }

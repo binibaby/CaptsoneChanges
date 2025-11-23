@@ -54,9 +54,9 @@ async function makeRequest(url, options = {}) {
     });
 
     req.on('error', reject);
-    req.setTimeout(30000, () => {
+    req.setTimeout(60000, () => {
       req.destroy();
-      reject(new Error('Request timeout'));
+      reject(new Error('Request timeout (60s) - backend may be sleeping'));
     });
 
     if (options.body) {

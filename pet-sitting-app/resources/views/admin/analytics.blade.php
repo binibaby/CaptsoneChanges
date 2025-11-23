@@ -80,7 +80,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">Total Revenue</p>
-                    <p class="text-3xl font-bold text-gray-900" id="totalRevenue">$0</p>
+                    <p class="text-3xl font-bold text-gray-900" id="totalRevenue">₱0</p>
                     <p class="text-sm text-green-600" id="revenueGrowthRate">+0%</p>
                 </div>
             </div>
@@ -91,7 +91,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">App Earnings</p>
-                    <p class="text-3xl font-bold text-gray-900" id="appEarnings">$0</p>
+                    <p class="text-3xl font-bold text-gray-900" id="appEarnings">₱0</p>
                     <p class="text-sm text-blue-600">Platform Share</p>
                 </div>
             </div>
@@ -440,8 +440,8 @@ function updateSummaryCards(data) {
     console.log('Growth rates:', growthRates);
     
     document.getElementById('totalUsers').textContent = (totals.users || 0).toLocaleString();
-    document.getElementById('totalRevenue').textContent = '$' + (totals.revenue || 0).toLocaleString();
-    document.getElementById('appEarnings').textContent = '$' + (totals.app_earnings || 0).toLocaleString();
+    document.getElementById('totalRevenue').textContent = '₱' + (totals.revenue || 0).toLocaleString();
+    document.getElementById('appEarnings').textContent = '₱' + (totals.app_earnings || 0).toLocaleString();
     document.getElementById('totalBookings').textContent = (totals.bookings || 0).toLocaleString();
     
     document.getElementById('userGrowthRate').textContent = '+' + (growthRates.users || 0) + '%';

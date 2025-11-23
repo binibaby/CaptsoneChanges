@@ -65,7 +65,7 @@ Route::get('/location/nearby-sitters-test', function (Request $request) {
 // Auth routes
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+Route::post('/logout', [AuthController::class, 'logout'])->middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class]);
 
 // Token management routes (no auth required for token refresh/generation)
 Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
@@ -83,7 +83,7 @@ Route::post('/password-reset/verify-otp', [PasswordResetController::class, 'veri
 Route::post('/password-reset/reset', [PasswordResetController::class, 'resetPassword']);
 
 // Profile routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::post('/profile/update', [ProfileController::class, 'update']);
     Route::post('/profile/update-bio', [ProfileController::class, 'updateBio']);
@@ -99,7 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Location routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::post('/location/update', [LocationController::class, 'updateLocation']);
     Route::get('/location/sitters', [LocationController::class, 'getNearbySitters']);
     Route::get('/location/nearby-sitters', [LocationController::class, 'getNearbySitters']); // Alias for compatibility
@@ -119,7 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Booking routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::get('/bookings/{id}', [BookingController::class, 'show']);
@@ -135,7 +135,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Review routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::post('/reviews', [App\Http\Controllers\API\ReviewController::class, 'store']);
     Route::get('/sitters/{id}/reviews', [App\Http\Controllers\API\ReviewController::class, 'getSitterReviews']);
     Route::get('/reviews/owner', [App\Http\Controllers\API\ReviewController::class, 'getOwnerReviews']);
@@ -169,7 +169,7 @@ Route::get('/messages/test-auth', function (Request $request) {
 });
 
 // Test endpoint with auth:sanctum middleware
-Route::middleware('auth:sanctum')->get('/messages/test-auth-middleware', function (Request $request) {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->get('/messages/test-auth-middleware', function (Request $request) {
     $authHeader = $request->header('Authorization');
     $bearerToken = $request->bearerToken();
     $user = Auth::user();
@@ -188,7 +188,7 @@ Route::middleware('auth:sanctum')->get('/messages/test-auth-middleware', functio
 });
 
 // Messaging routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::get('/messages/conversations', [MessageController::class, 'getConversations']);
     Route::get('/messages/conversations/{conversationId}', [MessageController::class, 'getMessages']);
     Route::post('/messages/send', [MessageController::class, 'sendMessage']);
@@ -198,7 +198,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Pet routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::get('/pets', [PetController::class, 'index']);
     Route::post('/pets', [PetController::class, 'store']);
     Route::get('/pets/{id}', [PetController::class, 'show']);
@@ -208,7 +208,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Verification routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     // Enhanced ID verification with real-time updates
     Route::post('/verification/submit-enhanced', [VerificationController::class, 'submitEnhancedVerification']);
     Route::get('/verification/status', [VerificationController::class, 'getVerificationStatus']);
@@ -243,7 +243,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 });
 
 // Payment routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::post('/payments/create-invoice', [PaymentController::class, 'createInvoice']);
     Route::get('/payments/{id}/status', [PaymentController::class, 'getPaymentStatus']);
     Route::get('/payments/history', [PaymentController::class, 'getPaymentHistory']);
@@ -251,7 +251,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Wallet routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckUserStatus::class])->group(function () {
     Route::get('/wallet', [WalletController::class, 'getWallet']);
     Route::get('/wallet/transactions', [WalletController::class, 'getTransactionHistory']);
     Route::post('/wallet/cash-out', [WalletController::class, 'cashOut']);

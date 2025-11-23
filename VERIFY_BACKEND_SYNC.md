@@ -139,3 +139,4 @@ The migrations should automatically:
 
 **Note**: Your iPhone works because it's likely using a local backend or a backend where migrations have already run. Testers get errors because Render's database might not have all the columns yet. Forcing a redeploy will ensure migrations run and add all missing columns.
 
+
