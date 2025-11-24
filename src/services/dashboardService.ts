@@ -250,13 +250,25 @@ class DashboardService {
         makeApiCall('/wallet', { method: 'GET' }),
       ]);
 
+      // Check for banned/suspended status in responses
+      // networkService.ts already handles 403 responses and shows popup, so we just need to return empty metrics
       if (!bookingsResponse || !bookingsResponse.ok) {
-        console.error('❌ Bookings API call failed:', bookingsResponse);
+        // If it's a 403, networkService already handled it and showed popup
+        if (bookingsResponse && bookingsResponse.status === 403) {
+          console.log('🚫 getSitterMetrics - 403 response (networkService handled popup)');
+          return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
+        }
+        console.error('❌ Bookings API call failed:', bookingsResponse?.status);
         return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
       }
 
       if (!walletResponse || !walletResponse.ok) {
-        console.error('❌ Wallet API call failed:', walletResponse);
+        // If it's a 403, networkService already handled it and showed popup
+        if (walletResponse && walletResponse.status === 403) {
+          console.log('🚫 getSitterMetrics - 403 response (networkService handled popup)');
+          return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
+        }
+        console.error('❌ Wallet API call failed:', walletResponse?.status);
         return { activeBookings: 0, upcomingBookings: 0, totalSpent: 0, thisWeekSpent: 0 };
       }
 

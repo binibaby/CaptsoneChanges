@@ -883,6 +883,14 @@ class ReverbMessagingService extends EventEmitter {
   // API Methods
   public async getConversations(): Promise<ReverbConversation[]> {
     try {
+      // Check if user is logged out before making API call
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      const loggedOut = await AsyncStorage.getItem('user_logged_out');
+      if (loggedOut === 'true') {
+        console.log('🚫 getConversations - User is logged out, returning empty array');
+        return [];
+      }
+
       const { makeApiCall } = require('./networkService');
 
       console.log('🔍 GET CONVERSATIONS DEBUG:');
@@ -895,6 +903,21 @@ class ReverbMessagingService extends EventEmitter {
       console.log('📡 GET CONVERSATIONS Response status:', response.status);
 
       if (!response.ok) {
+        // Check if it's a 403 with banned/suspended status (handled by networkService)
+        if (response.status === 403) {
+          try {
+            const errorText = await response.text();
+            const errorData = JSON.parse(errorText);
+            if (errorData && (errorData.status === 'banned' || errorData.status === 'suspended')) {
+              // networkService already showed popup and logged out, just return empty array
+              console.log('🚫 getConversations - User is banned/suspended, returning empty array');
+              return [];
+            }
+          } catch (e) {
+            // If we can't parse, continue with normal error handling
+          }
+        }
+        
         const errorText = await response.text();
         console.error('❌ GET CONVERSATIONS API Error Response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
@@ -910,6 +933,18 @@ class ReverbMessagingService extends EventEmitter {
         throw new Error(data.message || 'Failed to load conversations');
       }
     } catch (error) {
+      // Don't log errors if user is logged out (expected behavior)
+      if (error instanceof Error && error.message.includes('logged out')) {
+        console.log('🚫 getConversations - User is logged out');
+        return [];
+      }
+      
+      // Don't log errors if user is banned/suspended (popup already shown by networkService)
+      if (error instanceof Error && (error.message.includes('banned') || error.message.includes('suspended') || error.message.includes('Account suspended') || error.message.includes('Account banned'))) {
+        console.log('🚫 getConversations - User is banned/suspended, returning empty array');
+        return [];
+      }
+      
       console.error('❌ Error loading conversations via API:', error);
       
       // Return empty array instead of test data
@@ -931,6 +966,21 @@ class ReverbMessagingService extends EventEmitter {
       });
 
       if (!response.ok) {
+        // Check if it's a 403 with banned/suspended status (handled by networkService)
+        if (response.status === 403) {
+          try {
+            const errorText = await response.text();
+            const errorData = JSON.parse(errorText);
+            if (errorData && (errorData.status === 'banned' || errorData.status === 'suspended')) {
+              // networkService already showed popup and logged out, just return empty array
+              console.log('🚫 getMessages - User is banned/suspended, returning empty array');
+              return [];
+            }
+          } catch (e) {
+            // If we can't parse, continue with normal error handling
+          }
+        }
+        
         const errorText = await response.text();
         console.error('❌ GET MESSAGES API Error:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -945,6 +995,18 @@ class ReverbMessagingService extends EventEmitter {
         throw new Error(data.message || 'Failed to load messages');
       }
     } catch (error) {
+      // Don't log errors if user is logged out (expected behavior)
+      if (error instanceof Error && error.message.includes('logged out')) {
+        console.log('🚫 getMessages - User is logged out');
+        return [];
+      }
+      
+      // Don't log errors if user is banned/suspended (popup already shown by networkService)
+      if (error instanceof Error && (error.message.includes('banned') || error.message.includes('suspended') || error.message.includes('Account suspended') || error.message.includes('Account banned'))) {
+        console.log('🚫 getMessages - User is banned/suspended, returning empty array');
+        return [];
+      }
+      
       console.error('❌ Error loading messages via API:', error);
       
       // Return empty array instead of test data
@@ -975,6 +1037,20 @@ class ReverbMessagingService extends EventEmitter {
       console.log('📡 SEND MESSAGE Response status:', response.status);
 
       if (!response.ok) {
+        // Check if it's a 403 with banned/suspended status (handled by networkService)
+        if (response.status === 403) {
+          try {
+            const errorText = await response.text();
+            const errorData = JSON.parse(errorText);
+            if (errorData && (errorData.status === 'banned' || errorData.status === 'suspended')) {
+              // networkService already showed popup and logged out, just throw a silent error
+              throw new Error('Account suspended or banned');
+            }
+          } catch (e) {
+            // If we can't parse, continue with normal error handling
+          }
+        }
+        
         const errorText = await response.text();
         console.error(`❌ Send Message API Error ${response.status}:`, errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
@@ -989,6 +1065,16 @@ class ReverbMessagingService extends EventEmitter {
         throw new Error(data.message || 'Failed to send message');
       }
     } catch (error) {
+      // Don't log errors if user is logged out (expected behavior)
+      if (error instanceof Error && error.message.includes('logged out')) {
+        throw error;
+      }
+      
+      // Don't log errors if user is banned/suspended (popup already shown by networkService)
+      if (error instanceof Error && (error.message.includes('banned') || error.message.includes('suspended') || error.message.includes('Account suspended') || error.message.includes('Account banned'))) {
+        throw error; // Re-throw silently, popup already shown
+      }
+      
       console.error('❌ Error sending message via API:', error);
       
       // Return empty message instead of mock data
@@ -1015,6 +1101,20 @@ class ReverbMessagingService extends EventEmitter {
       });
 
       if (!response.ok) {
+        // Check if it's a 403 with banned/suspended status (handled by networkService)
+        if (response.status === 403) {
+          try {
+            const errorText = await response.text();
+            const errorData = JSON.parse(errorText);
+            if (errorData && (errorData.status === 'banned' || errorData.status === 'suspended')) {
+              // networkService already showed popup and logged out, just throw a silent error
+              throw new Error('Account suspended or banned');
+            }
+          } catch (e) {
+            // If we can't parse, continue with normal error handling
+          }
+        }
+        
         const errorText = await response.text();
         console.error(`❌ Start Conversation API Error ${response.status}:`, errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
@@ -1032,6 +1132,16 @@ class ReverbMessagingService extends EventEmitter {
         throw new Error(data.message || 'Failed to start conversation');
       }
     } catch (error) {
+      // Don't log errors if user is logged out (expected behavior)
+      if (error instanceof Error && error.message.includes('logged out')) {
+        throw error;
+      }
+      
+      // Don't log errors if user is banned/suspended (popup already shown by networkService)
+      if (error instanceof Error && (error.message.includes('banned') || error.message.includes('suspended') || error.message.includes('Account suspended') || error.message.includes('Account banned'))) {
+        throw error; // Re-throw silently, popup already shown
+      }
+      
       console.error('❌ Error starting conversation via API:', error);
       
       // Temporary fallback - create conversation locally for testing

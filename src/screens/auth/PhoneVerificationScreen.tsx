@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { getAuthHeaders } from '../../constants/config';
 import { useAuth } from '../../contexts/AuthContext';
-import { networkService } from '../../services/networkService';
+import { networkService, makeApiCall } from '../../services/networkService';
 
 interface PhoneVerificationScreenProps {
   userData?: any;
@@ -45,8 +45,6 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     }
 
     setIsLoading(true);
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let controller: AbortController | null = null;
     
     try {
       console.log('LOG PhoneVerificationScreen - Sending code to:', phoneNumber);
@@ -57,64 +55,19 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
         console.log('Network service not initialized, detecting working IP...');
         baseUrl = await networkService.detectWorkingIP();
       }
-      const apiUrl = `${baseUrl}/api/send-verification-code`;
-      console.log('Using API URL:', apiUrl);
-      console.log('Network check - testing connection...');
+      console.log('Using base URL:', baseUrl);
       
-      // Test network connectivity first
-      const isNetworkConnected = await checkNetworkStatus();
-      console.log('Network status check result:', isNetworkConnected);
-      
-      if (!isNetworkConnected) {
-        throw new Error('No internet connection detected');
-      }
-      
-      // Test server connectivity
-      console.log('Testing server connectivity...');
-      try {
-        const pingController = new AbortController();
-        const pingTimeout = setTimeout(() => pingController.abort(), 15000);
-        const pingResponse = await fetch(apiUrl.replace('/api/send-verification-code', '/'), {
-          method: 'HEAD',
-          mode: 'cors',
-          signal: pingController.signal
-        });
-        clearTimeout(pingTimeout);
-        console.log('Server ping successful:', pingResponse.status);
-      } catch (pingError) {
-        console.log('Server ping failed:', pingError);
-        // Don't fail completely on ping - let the actual API call determine success
-        console.log('Continuing with API call despite ping failure...');
-      }
-      
-      // Create AbortController and set a longer timeout (30 seconds)
-      controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        if (controller) {
-          console.log('Request timeout - aborting after 30 seconds');
-          controller.abort();
-        }
-      }, 30000); // Increased to 30 seconds
-      
-      console.log('Making fetch request to:', apiUrl);
+      console.log('Making API call to send verification code');
       console.log('Request payload:', { phone: phoneNumber });
       
-      const response = await fetch(apiUrl, {
+      // Use makeApiCall which has built-in timeout handling (30 seconds) and automatic retry
+      const response = await makeApiCall('/api/send-verification-code', {
         method: 'POST',
         headers: getAuthHeaders(user?.token),
-        mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal,
         body: JSON.stringify({
           phone: phoneNumber,
         }),
       });
-      
-      // Clear timeout if request completes successfully
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
 
       console.log('API Response Status:', response.status);
       console.log('API Response Headers:', response.headers);
@@ -162,11 +115,6 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       setLastError(errorMessage);
       setRetryCount(prev => prev + 1);
     } finally {
-      // Clean up timeout and controller
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      controller = null;
       setIsLoading(false);
     }
   };
@@ -178,8 +126,6 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
     }
 
     setIsLoading(true);
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let controller: AbortController | null = null;
     
     try {
       console.log('LOG PhoneVerificationScreen - Verifying code:', verificationCode);
@@ -190,35 +136,17 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
         console.log('Network service not initialized, detecting working IP...');
         baseUrl = await networkService.detectWorkingIP();
       }
-      const apiUrl = `${baseUrl}/api/verify-phone-code`;
-      console.log('Using API URL:', apiUrl);
+      console.log('Using base URL:', baseUrl);
       
-      // Create AbortController and set timeout (30 seconds)
-      controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        if (controller) {
-          console.log('Verify request timeout - aborting after 30 seconds');
-          controller.abort();
-        }
-      }, 30000);
-      
-      const response = await fetch(apiUrl, {
+      // Use makeApiCall which has built-in timeout handling (30 seconds) and automatic retry
+      const response = await makeApiCall('/api/verify-phone-code', {
         method: 'POST',
         headers: getAuthHeaders(user?.token),
-        mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal,
         body: JSON.stringify({
           phone: phoneNumber,
           code: verificationCode,
         }),
       });
-
-      // Clear timeout if request completes successfully
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
 
       console.log('Verify API Response Status:', response.status);
       const data = await response.json();
@@ -286,11 +214,6 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ userD
       
       Alert.alert('Error', errorMessage);
     } finally {
-      // Clean up timeout and controller
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      controller = null;
       setIsLoading(false);
     }
   };

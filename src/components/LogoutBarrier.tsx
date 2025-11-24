@@ -1,7 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
-import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 
 interface LogoutBarrierProps {
   children: React.ReactNode;
@@ -20,7 +18,7 @@ export default function LogoutBarrier({ children }: LogoutBarrierProps) {
         if (wasLoggedOut !== isLoggedOut) {
           setIsLoggedOut(wasLoggedOut);
           if (wasLoggedOut) {
-            console.log('🚫 LogoutBarrier: USER LOGGED OUT - BLOCKING ALL NAVIGATION');
+            console.log('🚫 LogoutBarrier: USER LOGGED OUT - Allowing normal navigation to onboarding');
           } else {
             console.log('✅ LogoutBarrier: User logged in - Navigation allowed');
           }
@@ -37,44 +35,14 @@ export default function LogoutBarrier({ children }: LogoutBarrierProps) {
     // Initial check
     checkLogoutStatus();
 
-    // Continuous monitoring every 300ms for immediate response
-    const interval = setInterval(checkLogoutStatus, 300);
+    // Continuous monitoring every 1000ms (reduced frequency)
+    const interval = setInterval(checkLogoutStatus, 1000);
 
     return () => clearInterval(interval);
   }, [isLoggedOut, isChecking]);
 
-  // Show loading while checking
-  if (isChecking) {
-    return (
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      </View>
-    );
-  }
-
-  // If logged out, show ONLY the welcome screen with NO navigation
-  if (isLoggedOut) {
-    console.log('🚫 LogoutBarrier: Rendering LOCKED welcome screen');
-    return (
-      <View style={styles.lockedContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <WelcomeScreen onGetStarted={() => {}} />
-      </View>
-    );
-  }
-
-  // If not logged out, render children (normal app with navigation)
+  // Always render children - let the app's normal navigation handle onboarding/auth screens
+  // The LogoutBarrier just monitors logout status but doesn't block navigation
   return <>{children}</>;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  lockedContainer: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    // Disable any touch interactions outside the welcome screen
-  },
-});

@@ -70,7 +70,35 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onRegister, o
       const user = await login(email, password);
       onLoginSuccess?.(user);
     } catch (error) {
-      Alert.alert('Login Failed', 'Please check your credentials and try again');
+      // Get error message
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      
+      // Don't show alert if it's already shown (for suspended/banned users)
+      if (errorMessage.includes('Account banned') || errorMessage.includes('Account suspended')) {
+        // Alert already shown in authService
+        return;
+      }
+      
+      // Show specific error message based on error type
+      if (errorMessage.includes('Invalid') || errorMessage.includes('credentials') || errorMessage.includes('email') || errorMessage.includes('password')) {
+        Alert.alert(
+          'Login Failed',
+          'Invalid email or password. Please check your credentials and try again.',
+          [{ text: 'OK' }]
+        );
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('Network')) {
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Login Failed',
+          errorMessage,
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setIsLoading(false);
     }

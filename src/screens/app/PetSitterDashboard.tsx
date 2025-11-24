@@ -15,12 +15,14 @@ import {
   View,
 } from 'react-native';
 import SitterLocationSharing from '../../components/SitterLocationSharing';
+import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
 import { Booking, bookingService } from '../../services/bookingService';
 import { DashboardMetrics, dashboardService } from '../../services/dashboardService';
 import { notificationService } from '../../services/notificationService';
 import { realtimeService } from '../../services/realtimeService';
 import { reverbMessagingService } from '../../services/reverbMessagingService';
+import { handleSuspendedOrBannedStatus } from '../../utils/userStatusHelper';
 
 const upcomingJobColors = ['#A7F3D0', '#DDD6FE', '#FDE68A', '#BAE6FD'];
 
@@ -46,6 +48,7 @@ const reflectionColors = {
 
 const PetSitterDashboard = () => {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [earningsData, setEarningsData] = useState<EarningsData>({
     thisWeek: '₱0',
@@ -65,6 +68,9 @@ const PetSitterDashboard = () => {
   const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics>({});
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  
+  // Check if user is suspended or banned
+  const isSuspendedOrBanned = user?.status === 'suspended' || user?.status === 'banned';
 
   // Check if user is logged out and redirect to onboarding
   useEffect(() => {
@@ -146,12 +152,22 @@ const PetSitterDashboard = () => {
       loadDashboardData();
     });
 
+    // Listen for user suspension/ban events
+    const unsubscribeSuspended = realtimeService.subscribe('user.suspended', async (data) => {
+      console.log('🚫 Real-time suspension notification received:', data);
+      // Show popup and logout
+      await handleSuspendedOrBannedStatus(data, async () => {
+        await logout();
+      });
+    });
+
     return () => {
       unsubscribeWallet();
       unsubscribeDashboard();
       unsubscribePayment();
+      unsubscribeSuspended();
     };
-  }, [currentUserId]);
+  }, [currentUserId, logout]);
 
   // Initialize real-time service
   const initializeRealtimeService = async () => {
@@ -661,27 +677,39 @@ const PetSitterDashboard = () => {
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsRow}>
-          {quickActions.map((action) => (
-            <TouchableOpacity key={action.title} style={styles.quickAction} onPress={() => {
-              // Clear NEW indicator and reset count when My Schedule is clicked
-              if (action.title === 'My Schedule') {
-                setHasNewBookings(false);
-                setNewBookingsCount(0);
-              }
-              router.push(action.route as any);
-            }}>
-              <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}> 
+          {quickActions.map((action) => {
+            // Disable buttons for suspended/banned users
+            const isDisabled = isSuspendedOrBanned;
+            
+            return (
+            <TouchableOpacity 
+              key={action.title} 
+              style={[styles.quickAction, isDisabled && styles.quickActionDisabled]} 
+              onPress={() => {
+                if (isDisabled) {
+                  return; // Don't navigate if suspended/banned
+                }
+                // Clear NEW indicator and reset count when My Schedule is clicked
+                if (action.title === 'My Schedule') {
+                  setHasNewBookings(false);
+                  setNewBookingsCount(0);
+                }
+                router.push(action.route as any);
+              }}
+              disabled={isDisabled}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: isDisabled ? '#D1D5DB' : action.color }]}> 
                 {typeof action.icon === 'string' ? (
                   <Ionicons name={action.icon as any} size={24} color="#fff" />
                 ) : (
                   <Image 
                     source={action.icon} 
-                    style={styles.quickActionImage}
+                    style={[styles.quickActionImage, isDisabled && { opacity: 0.5 }]}
                     resizeMode="contain"
                   />
                 )}
                 {/* Show message count badge for Messages action */}
-                {action.title === 'Messages' && messageCount > 0 && (
+                {action.title === 'Messages' && messageCount > 0 && !isDisabled && (
                   <View style={styles.messageBadge}>
                     <Text style={styles.messageBadgeText}>
                       {messageCount > 99 ? '99+' : messageCount}
@@ -689,17 +717,23 @@ const PetSitterDashboard = () => {
                   </View>
                 )}
               </View>
-              <Text style={styles.quickActionLabel}>{action.title}</Text>
+              <Text style={[styles.quickActionLabel, isDisabled && styles.quickActionLabelDisabled]}>{action.title}</Text>
               {/* Show booking count badge for My Schedule action */}
-              {action.title === 'My Schedule' && newBookingsCount > 0 && (
+              {action.title === 'My Schedule' && newBookingsCount > 0 && !isDisabled && (
                 <View style={styles.bookingCountBadge}>
                   <Text style={styles.bookingCountBadgeText}>
                     {newBookingsCount > 99 ? '99+' : newBookingsCount}
                   </Text>
                 </View>
               )}
+              {isDisabled && (
+                <View style={styles.disabledOverlay}>
+                  <Ionicons name="lock-closed" size={16} color="#6B7280" />
+                </View>
+              )}
             </TouchableOpacity>
-          ))}
+            );
+          })}
         </View>
 
 
@@ -861,6 +895,20 @@ const styles = StyleSheet.create({
     color: '#222',
     fontWeight: '600',
     textAlign: 'center',
+  },
+  quickActionDisabled: {
+    opacity: 0.5,
+  },
+  quickActionLabelDisabled: {
+    color: '#9CA3AF',
+  },
+  disabledOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 8,
+    padding: 4,
   },
   statsRow: {
     flexDirection: 'row',

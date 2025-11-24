@@ -34,6 +34,7 @@ export interface AuthState {
 class AuthService {
   private static instance: AuthService;
   private currentUser: User | null = null;
+  private isLoggingOut: boolean = false; // Flag to prevent multiple simultaneous logout calls
 
   static getInstance(): AuthService {
     if (!AuthService.instance) {
@@ -82,33 +83,76 @@ class AuthService {
         }),
       });
 
+      // Parse response even if not ok to get error messages
+      let result: any;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (e) {
+          const errorText = await response.text();
+          console.error('❌ Failed to parse JSON response:', errorText);
+          throw new Error('Invalid response from server');
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Non-JSON response:', errorText);
+        throw new Error('Server returned invalid response');
+      }
+
       // Check if response is ok
       if (!response.ok) {
         console.error('❌ Login API error response:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('Error response body:', errorText);
-        throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+        console.error('Error response body:', result);
+        
+        // Handle specific error cases
+        if (response.status === 401) {
+          // Invalid credentials
+          const errorMessage = result.message || 'Invalid email or password. Please check your credentials and try again.';
+          throw new Error(errorMessage);
+        } else if (response.status === 403) {
+          // Check if user is banned or suspended
+          if (result.status === 'banned') {
+            const { Alert } = require('react-native');
+            Alert.alert(
+              'Account Banned',
+              result.message || "Your account has been permanently banned. You will not be able to use the platform anymore. Please contact the admin at petsitconnectph@gmail.com if you have any questions.",
+              [{ text: 'OK' }],
+              { cancelable: false }
+            );
+            throw new Error(result.message || 'Account banned');
+          }
+          
+          if (result.status === 'suspended') {
+            const { Alert } = require('react-native');
+            Alert.alert(
+              'Account Suspended',
+              result.message || "You have been suspended for 72 hours by the admin. Please email the admin at petsitconnectph@gmail.com for assistance.",
+              [{ text: 'OK' }],
+              { cancelable: false }
+            );
+            throw new Error(result.message || 'Account suspended');
+          }
+          
+          // Other 403 errors
+          throw new Error(result.message || 'Access denied');
+        } else {
+          // Other errors
+          throw new Error(result.message || `Login failed: ${response.status} ${response.statusText}`);
+        }
       }
 
-      // Check content type
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error('❌ Invalid content type:', contentType);
-        const responseText = await response.text();
-        console.error('Non-JSON response:', responseText);
-        throw new Error('Server returned non-JSON response');
-      }
-
-      const result = await response.json();
       console.log('✅ Login API response:', result);
       
-      // Check if user is banned or suspended
+      // Double-check for banned or suspended status (in case backend returns success but with status)
       if (result.status === 'banned') {
         const { Alert } = require('react-native');
         Alert.alert(
           'Account Banned',
           result.message || "Your account has been permanently banned. You will not be able to use the platform anymore. Please contact the admin at petsitconnectph@gmail.com if you have any questions.",
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
+          { cancelable: false }
         );
         throw new Error(result.message || 'Account banned');
       }
@@ -118,7 +162,8 @@ class AuthService {
         Alert.alert(
           'Account Suspended',
           result.message || "You have been suspended for 72 hours by the admin. Please email the admin at petsitconnectph@gmail.com for assistance.",
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
+          { cancelable: false }
         );
         throw new Error(result.message || 'Account suspended');
       }
@@ -348,12 +393,20 @@ class AuthService {
     }
   }
 
-  async logout(): Promise<void> {
+  async logout(skipApiCalls: boolean = false): Promise<void> {
+    // Prevent multiple simultaneous logout calls
+    if (this.isLoggingOut) {
+      console.log('AuthService: Logout already in progress, skipping duplicate call');
+      return;
+    }
+    
+    this.isLoggingOut = true;
     console.log('AuthService: Logging out user');
     
     try {
       // If user is a pet sitter, set them as offline on backend
-      if (this.currentUser && this.currentUser.role === 'pet_sitter') {
+      // Skip this if skipApiCalls is true (e.g., when user is suspended and API calls will fail)
+      if (!skipApiCalls && this.currentUser && this.currentUser.role === 'pet_sitter') {
         console.log('AuthService: Setting pet sitter as offline on backend');
         try {
           const { makeApiCall } = await import('./networkService');
@@ -376,6 +429,8 @@ class AuthService {
         } catch (error) {
           console.error('AuthService: Error setting sitter offline on backend:', error);
         }
+      } else if (skipApiCalls) {
+        console.log('AuthService: Skipping API calls during logout (user suspended/banned)');
       }
       
       // Save profile data before clearing user data
@@ -437,6 +492,11 @@ class AuthService {
     } catch (error) {
       console.error('Error during logout:', error);
       // Continue with logout even if clearing data fails
+    } finally {
+      // Reset logout flag after a delay to allow cleanup
+      setTimeout(() => {
+        this.isLoggingOut = false;
+      }, 1000);
     }
   }
 

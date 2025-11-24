@@ -406,7 +406,7 @@
                     <button onclick="suspendUser({{ $user->id }})" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                         Suspend User
                     </button>
-                @elseif($user->status === 'suspended')
+                @elseif($user->status === 'suspended' || $user->status === 'banned')
                     <button onclick="reactivateUser({{ $user->id }})" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
                         Reactivate User
                     </button>
@@ -453,8 +453,20 @@ function suspendUser(userId) {
 }
 
 function reactivateUser(userId) {
-    if (confirm('Are you sure you want to reactivate this user?')) {
-        window.location.href = `/admin/users/${userId}/reactivate`;
+    if (confirm('Are you sure you want to reactivate this user? They will be able to use the platform again.')) {
+        // Create a form to submit POST request (updated to use POST instead of GET)
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `{{ url('/admin/users') }}/${userId}/reactivate`;
+        
+        const tokenInput = document.createElement('input');
+        tokenInput.type = 'hidden';
+        tokenInput.name = '_token';
+        tokenInput.value = '{{ csrf_token() }}';
+        
+        form.appendChild(tokenInput);
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 

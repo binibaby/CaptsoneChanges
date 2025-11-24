@@ -2,7 +2,7 @@
 const getNetworkIP = () => {
   if (__DEV__) {
     // Use current WiFi IP for development
-    return '192.168.100.226';
+    return '192.168.100.225';
   }
   // Production: Use localhost for local development
   return 'localhost';
@@ -12,7 +12,8 @@ const getNetworkIP = () => {
 export const NETWORK_FALLBACK = {
   // Primary IPs to try in order - WiFi first for current connection
   PRIMARY_IPS: [
-    '192.168.100.226',  // Current WiFi IP (primary)
+    '192.168.100.225',  // Current WiFi IP (primary)
+    '192.168.100.226',  // Previous WiFi IP (fallback)
     '172.20.10.2',      // Mobile data IP (fallback)
     '172.20.10.1',      // Mobile hotspot gateway
     '192.168.100.197',  // Previous WiFi IP (fallback)
@@ -21,7 +22,8 @@ export const NETWORK_FALLBACK = {
   
   // Fallback IPs for different network scenarios
   FALLBACK_IPS: [
-    '192.168.100.226',  // Current WiFi IP (primary)
+    '192.168.100.225',  // Current WiFi IP (primary)
+    '192.168.100.226',  // Previous WiFi IP
     '172.20.10.2',      // Mobile data IP (fallback)
     '172.20.10.1',      // Mobile hotspot gateway
     '172.20.10.3',      // Additional mobile data IP

@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Notification;
+use App\Events\UserSuspended;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -28,7 +29,7 @@ class UserController extends Controller
      */
     private function getAuthId(): ?int
     {
-        return $this->getAuthId();
+        return Auth::id();
     }
 
     /**
@@ -262,8 +263,16 @@ class UserController extends Controller
         // Cancel all active bookings
         $user->bookings()->where('bookings.status', 'active')->update([
             'status' => 'cancelled',
-            'cancellation_reason' => 'User suspended by admin',
         ]);
+
+        // Broadcast suspension event for real-time notification
+        try {
+            event(new UserSuspended($user, $request->reason, $suspensionEnd, $this->getAuthId()));
+            Log::info('✅ UserSuspended event broadcasted successfully for user: ' . $user->id);
+        } catch (\Exception $e) {
+            Log::error('❌ Failed to broadcast UserSuspended event: ' . $e->getMessage());
+            // Don't fail the suspension if broadcasting fails
+        }
 
         // Send suspension notification
         $this->sendSuspensionNotification($user, $request->reason, $suspensionEnd);
@@ -287,7 +296,6 @@ class UserController extends Controller
         // Cancel all active bookings
         $user->bookings()->where('bookings.status', 'active')->update([
             'status' => 'cancelled',
-            'cancellation_reason' => 'User banned by admin',
         ]);
 
         // Send ban notification
@@ -298,6 +306,7 @@ class UserController extends Controller
 
     public function reactivate(User $user)
     {
+        // Update user status to active and clear all suspension/ban fields
         $user->update([
             'status' => 'active',
             'suspended_at' => null,
@@ -309,10 +318,21 @@ class UserController extends Controller
             'ban_reason' => null,
         ]);
 
+        // Refresh the user model to ensure changes are reflected
+        $user->refresh();
+
+        // Log the reactivation for debugging
+        Log::info('User reactivated', [
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'new_status' => $user->status,
+            'reactivated_by' => $this->getAuthId(),
+        ]);
+
         // Send reactivation notification
         $this->sendReactivationNotification($user);
 
-        return redirect()->back()->with('success', 'User reactivated successfully.');
+        return redirect()->back()->with('success', 'User reactivated successfully. They can now log in again.');
     }
 
     public function delete(User $user)
@@ -461,11 +481,15 @@ class UserController extends Controller
             'data' => ['action' => 'approved'],
         ]);
 
-        // Send email notification
-        Mail::send('emails.user.approved', ['user' => $user], function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Account Approved - PetSitConnect');
-        });
+        // Send email notification (optional - don't fail if email view doesn't exist)
+        try {
+            Mail::send('emails.user.approved', ['user' => $user], function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Account Approved - PetSitConnect');
+            });
+        } catch (\Exception $e) {
+            Log::warning('Failed to send approval email to user ' . $user->id . ': ' . $e->getMessage());
+        }
     }
 
     private function sendDenialNotification(User $user, $reason)
@@ -478,10 +502,15 @@ class UserController extends Controller
             'data' => ['action' => 'denied', 'reason' => $reason],
         ]);
 
-        Mail::send('emails.user.denied', ['user' => $user, 'reason' => $reason], function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Account Denied - PetSitConnect');
-        });
+        // Send email notification (optional - don't fail if email view doesn't exist)
+        try {
+            Mail::send('emails.user.denied', ['user' => $user, 'reason' => $reason], function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Account Denied - PetSitConnect');
+            });
+        } catch (\Exception $e) {
+            Log::warning('Failed to send denial email to user ' . $user->id . ': ' . $e->getMessage());
+        }
     }
 
     private function sendSuspensionNotification(User $user, $reason, $endDate)
@@ -494,18 +523,28 @@ class UserController extends Controller
             'title' => 'Account Suspended',
             'message' => "You have been suspended for 72 hours by the admin. Please email the admin at {$adminEmail} for assistance. Reason: {$reason}",
             'type' => 'admin',
-            'data' => ['action' => 'suspended', 'reason' => $reason, 'ends_at' => $endDate, 'admin_email' => $adminEmail],
+            'data' => [
+                'action' => 'suspended', 
+                'reason' => $reason, 
+                'ends_at' => $endDate ? $endDate->toIso8601String() : null, 
+                'admin_email' => $adminEmail
+            ],
         ]);
 
-        Mail::send('emails.user.suspended', [
-            'user' => $user, 
-            'reason' => $reason, 
-            'endDate' => $endDateText,
-            'adminEmail' => $adminEmail
-        ], function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Account Suspended - PetSitConnect');
-        });
+        // Send email notification (optional - don't fail if email view doesn't exist)
+        try {
+            Mail::send('emails.user.suspended', [
+                'user' => $user, 
+                'reason' => $reason, 
+                'endDate' => $endDateText,
+                'adminEmail' => $adminEmail
+            ], function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Account Suspended - PetSitConnect');
+            });
+        } catch (\Exception $e) {
+            Log::warning('Failed to send suspension email to user ' . $user->id . ': ' . $e->getMessage());
+        }
     }
 
     private function sendBanNotification(User $user, $reason)
@@ -520,14 +559,19 @@ class UserController extends Controller
             'data' => ['action' => 'banned', 'reason' => $reason, 'admin_email' => $adminEmail],
         ]);
 
-        Mail::send('emails.user.banned', [
-            'user' => $user, 
-            'reason' => $reason,
-            'adminEmail' => $adminEmail
-        ], function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Account Banned - PetSitConnect');
-        });
+        // Send email notification (optional - don't fail if email view doesn't exist)
+        try {
+            Mail::send('emails.user.banned', [
+                'user' => $user, 
+                'reason' => $reason,
+                'adminEmail' => $adminEmail
+            ], function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Account Banned - PetSitConnect');
+            });
+        } catch (\Exception $e) {
+            Log::warning('Failed to send ban email to user ' . $user->id . ': ' . $e->getMessage());
+        }
     }
 
     private function sendReactivationNotification(User $user)
@@ -540,10 +584,16 @@ class UserController extends Controller
             'data' => ['action' => 'reactivated'],
         ]);
 
-        Mail::send('emails.user.reactivated', ['user' => $user], function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Account Reactivated - PetSitConnect');
-        });
+        // Send reactivation email (optional - don't fail if email view doesn't exist)
+        try {
+            Mail::send('emails.user.reactivated', ['user' => $user], function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Account Reactivated - PetSitConnect');
+            });
+        } catch (\Exception $e) {
+            // Log error but don't fail the reactivation
+            Log::warning('Failed to send reactivation email to user ' . $user->id . ': ' . $e->getMessage());
+        }
     }
 
     /**

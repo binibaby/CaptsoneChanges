@@ -199,6 +199,9 @@ class RealtimeService {
       case 'review.created':
         this.handleReviewCreated(data);
         break;
+      case 'user.suspended':
+        this.handleUserSuspended(data);
+        break;
       default:
         // Notify generic listeners
         this.notifyListeners(eventName, data);
@@ -323,6 +326,16 @@ class RealtimeService {
     
     // Notify listeners
     this.notifyListeners('review.created', data);
+  }
+
+  /**
+   * Handle user suspended event
+   */
+  private handleUserSuspended(data: any): void {
+    console.log('🚫 RealtimeService: User suspended:', data);
+    
+    // Notify listeners - the dashboard will handle showing the popup
+    this.notifyListeners('user.suspended', data);
   }
 
   /**

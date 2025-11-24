@@ -292,8 +292,14 @@ class RealtimeLocationService {
           return mappedSitter;
         });
         
-        // Filter out offline sitters and deduplicate
+        // Filter out offline sitters, suspended/banned sitters, and deduplicate
         const onlineSitters = apiSitters.filter((sitter: RealtimeSitter) => {
+          // Skip suspended or banned sitters
+          if ((sitter as any).status === 'suspended' || (sitter as any).status === 'banned') {
+            console.log(`🚫 Sitter ${sitter.name} (${sitter.id}): Filtered out - status is ${(sitter as any).status}`);
+            return false;
+          }
+          
           // Only show sitters who are online and have recent activity (within last 5 minutes)
           const lastSeen = new Date(sitter.lastSeen);
           const now = new Date();

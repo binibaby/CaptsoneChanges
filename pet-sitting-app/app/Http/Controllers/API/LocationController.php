@@ -173,10 +173,16 @@ class LocationController extends Controller
                 // Get latest user data from database to ensure we have the most up-to-date profile
                 $user = User::find($sitterData['user_id']);
                 
+                // Skip suspended or banned users - they should not appear in find sitter map
+                if ($user && ($user->status === 'suspended' || $user->status === 'banned')) {
+                    continue;
+                }
+                
                 // Debug logging for user lookup
                 \Log::info('🔍 LocationController - User lookup debug:', [
                     'sitter_user_id' => $sitterData['user_id'],
                     'user_found' => $user ? 'YES' : 'NO',
+                    'user_status' => $user ? $user->status : 'N/A',
                     'user_profile_image' => $user ? $user->profile_image : 'N/A',
                     'user_name' => $user ? $user->name : 'N/A'
                 ]);

@@ -1,5 +1,8 @@
 import { NETWORK_FALLBACK, API_BASE_URL } from '../constants/config';
 
+// Module-level flag to prevent multiple suspension popups
+let isHandlingSuspension: boolean = false;
+
 // Network detection and fallback service
 export class NetworkService {
   private static instance: NetworkService;
@@ -81,7 +84,8 @@ export class NetworkService {
 
     // Try the most likely IPs first (prioritize current WiFi)
     const priorityIPs = [
-      '192.168.100.226',  // Current WiFi IP (primary)
+      '192.168.100.225',  // Current WiFi IP (primary)
+      '192.168.100.226',  // Previous WiFi IP (fallback)
       '172.20.10.2',      // Mobile data IP (fallback)
       '172.20.10.1',      // Mobile hotspot gateway
       '192.168.100.197',  // Previous WiFi IP (fallback)
@@ -138,7 +142,7 @@ export class NetworkService {
     }
 
     // If all fail, use the current WiFi IP as default but mark as disconnected
-    this.currentBaseUrl = `http://192.168.100.226:8000`;
+    this.currentBaseUrl = `http://192.168.100.225:8000`;
     this.isConnected = false;
     // Silently use default
     // console.log(`⚠️ All IPs failed. Using current WiFi IP as default: ${this.currentBaseUrl}`);
@@ -166,9 +170,9 @@ export class NetworkService {
     if (!__DEV__) {
       return API_BASE_URL;
     }
-    // If currentBaseUrl is empty, use the default from config (192.168.100.226)
+    // If currentBaseUrl is empty, use the default from config (192.168.100.225)
     if (!this.currentBaseUrl) {
-      this.currentBaseUrl = 'http://192.168.100.226:8000';
+      this.currentBaseUrl = 'http://192.168.100.225:8000';
     }
     return this.currentBaseUrl;
   }
@@ -246,6 +250,52 @@ export const makeApiCall = async (
   retryCount: number = 0,
   hasTriedTokenRefresh: boolean = false
 ): Promise<Response> => {
+  // Check if user is logged out BEFORE making API calls
+  // BUT allow login/register API calls to proceed (users need to log in to clear the flag)
+  // This check must happen FIRST, before any other processing
+  const normalizedEndpoint = endpoint.toLowerCase();
+  const isAuthEndpoint = 
+    normalizedEndpoint.includes('/api/login') || 
+    normalizedEndpoint.includes('/api/register') || 
+    normalizedEndpoint.includes('/api/forgot-password') || 
+    normalizedEndpoint.includes('/api/reset-password') ||
+    normalizedEndpoint.includes('/api/verify-phone') ||
+    normalizedEndpoint.includes('/api/verify-email');
+  
+  // Debug logging for auth endpoints
+  if (isAuthEndpoint) {
+    console.log('✅ makeApiCall - Auth endpoint detected, allowing despite logout flag:', endpoint);
+  }
+  
+          if (!isAuthEndpoint) {
+            try {
+              const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+              const loggedOut = await AsyncStorage.getItem('user_logged_out');
+              if (loggedOut === 'true') {
+                console.log('🚫 makeApiCall - User is logged out, skipping API call to:', endpoint);
+                // Return a mock 403 response instead of throwing error
+                return new Response(
+                  JSON.stringify({ success: false, message: 'User is logged out' }),
+                  { status: 403, statusText: 'Forbidden', headers: { 'Content-Type': 'application/json' } }
+                );
+              }
+            } catch (error) {
+              // If we can't check logout status, continue (might be first load)
+              // Don't throw, just continue
+            }
+          }
+
+  // Create AbortController for timeout handling
+  const controller = new AbortController();
+  // Use 30 seconds timeout for API calls (longer for login/registration)
+  const timeoutMs = 30000;
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  // Extract signal from options before processing
+  const { signal: existingSignal, ...optionsWithoutSignal } = options;
+
   try {
     const url = await getApiUrl(endpoint);
     // Silently make API call
@@ -255,14 +305,14 @@ export const makeApiCall = async (
     // IMPORTANT: Preserve Authorization header from options.headers if provided
     // Convert headers to plain object if it's a Headers object or undefined
     let providedHeaders: Record<string, string> = {};
-    if (options.headers) {
-      if (options.headers instanceof Headers) {
+    if (optionsWithoutSignal.headers) {
+      if (optionsWithoutSignal.headers instanceof Headers) {
         // Convert Headers object to plain object
-        options.headers.forEach((value, key) => {
+        optionsWithoutSignal.headers.forEach((value, key) => {
           providedHeaders[key] = value;
         });
-      } else if (typeof options.headers === 'object') {
-        providedHeaders = options.headers as Record<string, string>;
+      } else if (typeof optionsWithoutSignal.headers === 'object') {
+        providedHeaders = optionsWithoutSignal.headers as Record<string, string>;
       }
     }
     
@@ -273,7 +323,10 @@ export const makeApiCall = async (
     };
     
     // Only add token from authService if Authorization header is not already provided
-    if (!headers['Authorization'] && !headers['authorization']) {
+
+    // Only add token for non-auth endpoints
+    // Auth endpoints (login/register) don't need a token - that's the whole point
+    if (!headers['Authorization'] && !headers['authorization'] && !isAuthEndpoint) {
       try {
         const { default: authService } = await import('./authService');
         const user = await authService.getCurrentUser();
@@ -282,10 +335,18 @@ export const makeApiCall = async (
           console.log(`🔑 makeApiCall - Added auth token for user: ${user.id}`);
         } else {
           console.log('⚠️ makeApiCall - No user token available for API call');
+          throw new Error('No user token available');
         }
       } catch (error) {
         console.log('⚠️ makeApiCall - Could not get user token:', error);
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Could not get user token');
       }
+    } else if (isAuthEndpoint && !headers['Authorization'] && !headers['authorization']) {
+      // Auth endpoints don't need a token - that's the whole point of logging in
+      console.log('✅ makeApiCall - Auth endpoint, proceeding without token');
     } else {
       // Log that Authorization header was already provided
       const authHeader = headers['Authorization'] || headers['authorization'];
@@ -293,16 +354,127 @@ export const makeApiCall = async (
     }
     
     // Create new options without headers to avoid conflicts
-    const { headers: _, ...optionsWithoutHeaders } = options;
+    const { headers: _, ...optionsWithoutHeaders } = optionsWithoutSignal;
+    
+    // If user provided a signal, abort our timeout controller when theirs aborts
+    if (existingSignal) {
+      existingSignal.addEventListener('abort', () => {
+        if (!controller.signal.aborted) {
+          controller.abort();
+        }
+      });
+    }
     
     const response = await fetch(url, {
       ...optionsWithoutHeaders,
       headers,
+      signal: controller.signal, // Use our controller's signal (will abort on timeout or user signal)
     });
+
+    // Clear timeout if request completes successfully
+    clearTimeout(timeoutId);
 
     // Check response and handle authentication errors
     const responseStatus = response.status;
     console.log(`📡 makeApiCall - Response status: ${responseStatus} for ${endpoint}`);
+
+    // Handle 403 Forbidden - check for suspended/banned status
+    // IMPORTANT: Read response body BEFORE it's consumed by caller
+    if (responseStatus === 403) {
+      try {
+        // Read the response body immediately - clone it first so caller can still read it
+        const clonedResponse = response.clone();
+        let responseData: any = null;
+        let responseText = '';
+        
+        try {
+          responseText = await clonedResponse.text();
+          console.log('🚫 makeApiCall - 403 Response text:', responseText);
+          
+          if (responseText && responseText.trim()) {
+            try {
+              responseData = JSON.parse(responseText);
+              console.log('🚫 makeApiCall - 403 Response data:', responseData);
+              console.log('🚫 makeApiCall - 403 Response data parsed:', responseData);
+              console.log('🚫 makeApiCall - 403 Response data (stringified):', JSON.stringify(responseData));
+            } catch (parseError) {
+              console.log('⚠️ makeApiCall - Could not parse 403 response as JSON:', parseError);
+              console.log('⚠️ makeApiCall - Response text was:', responseText);
+            }
+          } else {
+            console.log('⚠️ makeApiCall - 403 Response body is empty');
+          }
+        } catch (readError) {
+          console.log('⚠️ makeApiCall - Could not read 403 response body:', readError);
+        }
+        
+        // Check if user is banned or suspended
+        // CRITICAL: This MUST happen to show popup and logout
+        console.log('🔍 makeApiCall - Checking responseData. Exists?', !!responseData);
+        if (responseData) {
+          console.log('🔍 makeApiCall - responseData:', JSON.stringify(responseData));
+          const status = responseData.status;
+          console.log('🔍 makeApiCall - Status value:', status);
+          
+          // Direct check - if status is suspended or banned, show popup
+          if (status === 'suspended' || status === 'banned') {
+            console.log('🚫🚫🚫 makeApiCall - FOUND SUSPENDED/BANNED STATUS - SHOWING POPUP!');
+            
+            // Prevent multiple simultaneous suspension handlers
+            if (isHandlingSuspension) {
+              console.log('🚫 makeApiCall - Suspension already being handled, skipping duplicate handler');
+              // Return the response instead of throwing error
+              return response;
+            }
+            
+            // Set flag immediately to prevent duplicate popups
+            isHandlingSuspension = true;
+            console.log('🚫🚫🚫 makeApiCall - DETECTED SUSPENDED/BANNED - Showing popup NOW!');
+            console.log('🚫 makeApiCall - Status:', responseData.status);
+            console.log('🚫 makeApiCall - Message:', responseData.message);
+            
+            // Import and handle suspended/banned status - do this synchronously to ensure popup shows
+            try {
+              const { handleSuspendedOrBannedStatus } = await import('../utils/userStatusHelper');
+              const { default: authService } = await import('./authService');
+              
+              // Show popup immediately - Alert.alert is synchronous
+              console.log('🚫 makeApiCall - About to call handleSuspendedOrBannedStatus...');
+              // Call handleSuspendedOrBannedStatus - it will show the Alert popup
+              handleSuspendedOrBannedStatus(responseData, async () => {
+                console.log('🚫 makeApiCall - Logout callback triggered - logging out now!');
+                await authService.logout(true); // Pass true to skip API calls
+                console.log('🚫 makeApiCall - Logout completed');
+              });
+              console.log('🚫 makeApiCall - handleSuspendedOrBannedStatus called - popup should be visible!');
+            } catch (importError) {
+              console.error('❌ makeApiCall - Error importing or calling handleSuspendedOrBannedStatus:', importError);
+              // Reset flag on error
+              isHandlingSuspension = false;
+            }
+            
+            // Reset flag after a delay to allow logout to complete
+            setTimeout(() => {
+              isHandlingSuspension = false;
+            }, 5000);
+            
+            // Return the response instead of throwing error - this prevents error logs
+            return response;
+          } else {
+            console.log('⚠️ makeApiCall - 403 response but status is not banned/suspended. Status:', status);
+          }
+        } else {
+          console.log('⚠️ makeApiCall - 403 response but responseData is null/undefined');
+        }
+      } catch (e) {
+        // If it's our suspension error, re-throw it
+        if (e instanceof Error && (e.message.includes('suspended') || e.message.includes('banned'))) {
+          throw e;
+        }
+        // Otherwise, continue with normal error handling
+        console.log('⚠️ makeApiCall - Error handling 403:', e);
+      }
+    }
 
     // Handle 401 Unauthorized or 500 with "Unauthenticated" - try to refresh token and retry
     let isAuthError = false;
@@ -325,9 +497,30 @@ export const makeApiCall = async (
     }
 
     if (isAuthError && !hasTriedTokenRefresh) {
+      // Check if user is logged out before trying to refresh token
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const loggedOut = await AsyncStorage.getItem('user_logged_out');
+        if (loggedOut === 'true') {
+          console.log('🚫 makeApiCall - User is logged out, skipping token refresh');
+          throw new Error('User is logged out');
+        }
+      } catch (error) {
+        // If logged out, don't try to refresh token
+        throw new Error('User is logged out');
+      }
+
       console.log('🔄 Authentication error detected - attempting token refresh');
       try {
         const { default: authService } = await import('./authService');
+        const currentUser = await authService.getCurrentUser();
+        
+        // Don't try to refresh if there's no user
+        if (!currentUser) {
+          console.log('❌ Cannot refresh token: No current user');
+          throw new Error('No current user');
+        }
+        
         await authService.refreshUserToken();
         
         // Get updated user data with new token
@@ -351,6 +544,10 @@ export const makeApiCall = async (
           throw new Error('Authentication failed: Token refresh unsuccessful');
         }
       } catch (refreshError) {
+        // Don't log errors if user is logged out (expected behavior)
+        if (refreshError instanceof Error && refreshError.message.includes('logged out')) {
+          throw refreshError;
+        }
         console.error('❌ Token refresh failed:', refreshError);
         throw new Error('Authentication failed: Please log in again');
       }
@@ -369,6 +566,17 @@ export const makeApiCall = async (
 
     return response;
   } catch (error) {
+    // Clear timeout in case of error
+    clearTimeout(timeoutId);
+    
+    // Handle timeout/abort errors specifically
+    if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+      // Check if it was our timeout (controller aborted) and not a user-provided signal
+      if (controller.signal.aborted && (!existingSignal || !existingSignal.aborted)) {
+        throw new Error('Network request timed out. Please check your internet connection and try again.');
+      }
+    }
+    
     // Silently handle network errors
     // console.error(`❌ Network error for ${endpoint}:`, error);
     
