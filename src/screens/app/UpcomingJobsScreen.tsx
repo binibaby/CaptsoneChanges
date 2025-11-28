@@ -191,8 +191,8 @@ const UpcomingJobsScreen = () => {
     // Sort jobs within each date by time
     Object.keys(grouped).forEach(dateKey => {
       grouped[dateKey].sort((a, b) => {
-        const timeA = a.startTime || a.time || '00:00';
-        const timeB = b.startTime || b.time || '00:00';
+        const timeA = a.startTime || '00:00';
+        const timeB = b.startTime || '00:00';
         return timeA.localeCompare(timeB);
       });
     });

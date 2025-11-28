@@ -41,6 +41,7 @@ const VerificationResubmissionScreen: React.FC = () => {
     latitude: number;
     longitude: number;
     address: string;
+    accuracy?: number;
   } | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string>('');
 
@@ -163,29 +164,21 @@ const VerificationResubmissionScreen: React.FC = () => {
     try {
       setLoading(true);
       
-      const formData = new FormData();
-      formData.append('document_type', selectedDocumentType);
-      formData.append('front_id_image', {
-        uri: images.frontId,
-        type: 'image/jpeg',
-        name: 'front_id.jpg',
-      } as any);
-      formData.append('back_id_image', {
-        uri: images.backId,
-        type: 'image/jpeg',
-        name: 'back_id.jpg',
-      } as any);
-      formData.append('selfie_image', {
-        uri: images.selfie,
-        type: 'image/jpeg',
-        name: 'selfie.jpg',
-      } as any);
-      formData.append('latitude', location.latitude.toString());
-      formData.append('longitude', location.longitude.toString());
-      formData.append('address', location.address);
-      formData.append('is_resubmission', 'true');
+      const verificationData = {
+        front_id_image: images.frontId,
+        back_id_image: images.backId,
+        selfie_image: images.selfie,
+        location: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: location.address,
+          accuracy: location.accuracy || 0,
+        },
+        document_type: selectedDocumentType,
+        is_resubmission: true,
+      };
 
-      const response = await verificationService.submitEnhancedVerification(formData);
+      const response = await verificationService.submitEnhancedVerification(verificationData);
       
       if (response.success) {
         Alert.alert(
@@ -544,7 +537,7 @@ const VerificationResubmissionScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles.headerBackButton}
           onPress={() => router.back()}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -587,7 +580,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  backButton: {
+  headerBackButton: {
     padding: 8,
   },
   headerTitle: {

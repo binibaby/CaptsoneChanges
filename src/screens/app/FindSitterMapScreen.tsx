@@ -821,7 +821,6 @@ const FindSitterMapScreen = () => {
         onMessage={handleMessage}
         onViewBadges={handleViewBadges}
         onViewCertificates={handleViewCertificates}
-        simplified={true}
       />
     </SafeAreaView>
   );

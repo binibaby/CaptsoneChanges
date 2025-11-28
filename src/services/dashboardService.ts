@@ -98,12 +98,11 @@ class DashboardService {
       
       console.log('🔍 Owner metrics - Total bookings:', bookings.length);
       console.log('🔍 Owner metrics - User bookings for user', userId, ':', userBookings.length);
-      console.log('🔍 Owner metrics - User bookings details:', userBookings.map(b => ({
+      console.log('🔍 Owner metrics - User bookings details:', userBookings.map((b: any) => ({
         id: b.id,
         status: b.status,
         date: b.date,
-        pet_owner_id: b.pet_owner_id,
-        petOwnerId: b.petOwnerId
+        petOwnerId: b.petOwnerId || b.pet_owner_id
       })));
 
       // Calculate metrics - include all successfully paid bookings (both completed and active)
@@ -457,7 +456,7 @@ class DashboardService {
       // Debug: Show all bookings and their statuses
       console.log('📋 All sitter bookings status check:');
       bookings.forEach(booking => {
-        console.log(`  - Booking ${booking.id}: status=${booking.status}, date=${booking.date}, start_time=${booking.start_time || booking.time}`);
+        console.log(`  - Booking ${booking.id}: status=${booking.status}, date=${booking.date}, startTime=${(booking as any).startTime || (booking as any).start_time || 'N/A'}`);
       });
       
       const completedJobs = completedBookings.length;

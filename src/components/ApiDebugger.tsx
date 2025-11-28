@@ -68,20 +68,6 @@ const ApiDebugger: React.FC = () => {
     }
   };
 
-  const testAuth = async () => {
-    setIsRunning(true);
-    addLog('🔐 Testing authentication...');
-    
-    try {
-      await reverbMessagingService.debugAuthStatus();
-      addLog('✅ Auth test completed');
-    } catch (error) {
-      addLog(`❌ Auth test error: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setIsRunning(false);
-    }
-  };
-
   const testConnection = async () => {
     setIsRunning(true);
     addLog('🔌 Testing connection...');

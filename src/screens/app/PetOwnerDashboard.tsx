@@ -384,10 +384,11 @@ const PetOwnerDashboard = () => {
         }
       } catch (paymentsError) {
         console.error('❌ Error fetching payments:', paymentsError);
+        const error = paymentsError instanceof Error ? paymentsError : new Error(String(paymentsError));
         console.error('❌ Payments error details:', {
-          message: paymentsError.message,
-          stack: paymentsError.stack,
-          name: paymentsError.name
+          message: error.message,
+          stack: error.stack,
+          name: error.name
         });
         // Set default values if payments API fails
         setOwnerStats({

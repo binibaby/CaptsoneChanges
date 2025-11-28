@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
 import {
@@ -48,6 +49,7 @@ interface VerificationScreenNavigationProp {
 
 const VerificationScreen = () => {
   const navigation = useNavigation<VerificationScreenNavigationProp>();
+  const router = useRouter();
   const { user } = useAuth();
   const [verification, setVerification] = useState<VerificationData | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -112,7 +114,7 @@ const VerificationScreen = () => {
 
     setIsLoading(true);
     try {
-      const response = await verificationService.getVerificationStatus();
+      const response = await verificationService.getVerificationStatusFromAPI();
       
       if (response.success) {
         // Set email and phone verification status from user data
@@ -267,7 +269,7 @@ const VerificationScreen = () => {
                   setPhoneCode('');
                   
                   // Navigate to dashboard
-                  navigation.navigate('PetOwnerDashboard' as never);
+                  router.push('/pet-owner-dashboard');
                 }
               }
             ]

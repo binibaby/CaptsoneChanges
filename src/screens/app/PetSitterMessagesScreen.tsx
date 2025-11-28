@@ -89,12 +89,17 @@ const PetSitterMessagesScreen = () => {
       let detailedProfile = null;
       
       try {
-        const { default: networkService } = await import('../../services/networkService');
+        const { makeApiCall } = await import('../../services/networkService');
         
         // Fetch user profile
-        const profileResponse = await networkService.get(`/api/profile`);
-        detailedProfile = profileResponse.data.user;
-        console.log('🔍 Fetched detailed profile:', detailedProfile);
+        const profileResponse = await makeApiCall(`/api/profile`, {
+          method: 'GET',
+        });
+        if (profileResponse?.ok) {
+          const profileData = await profileResponse.json();
+          detailedProfile = profileData?.data?.user || profileData?.user || null;
+          console.log('🔍 Fetched detailed profile:', detailedProfile);
+        }
       } catch (apiError) {
         console.log('⚠️ Could not fetch detailed profile from API, using conversation data');
       }
@@ -104,9 +109,9 @@ const PetSitterMessagesScreen = () => {
         id: conversation.other_user.id,
         name: conversation.other_user.name,
         profile_image: conversation.other_user.profile_image,
-        phone: detailedProfile?.phone || conversation.other_user.phone || 'Not provided',
-        address: detailedProfile?.address || conversation.other_user.address || 'Not provided',
-        rating: detailedProfile?.rating || conversation.other_user.rating || 0,
+        phone: detailedProfile?.phone || 'Not provided',
+        address: detailedProfile?.address || 'Not provided',
+        rating: detailedProfile?.rating || 0,
         role: 'pet_owner' as const,
       };
       

@@ -512,12 +512,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555',
   },
-  tipsText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-    textAlign: 'left',
-  },
 });
 
 export default PhoneVerificationScreen; 

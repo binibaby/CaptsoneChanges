@@ -5,7 +5,7 @@ import EchoService from './echoService';
 import { notificationService } from './notificationService';
 
 export interface RealtimeNotificationData {
-  type: 'profile_change_approved' | 'profile_change_rejected' | 'id_verification_approved' | 'id_verification_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'booking_updated' | 'session_started' | 'booking_completed' | 'new_review';
+  type: 'profile_change_approved' | 'profile_change_rejected' | 'id_verification_approved' | 'id_verification_rejected' | 'id_verification_updated' | 'booking_confirmed' | 'booking_cancelled' | 'booking_updated' | 'session_started' | 'booking_completed' | 'new_review' | 'payment_received' | 'payment_success' | 'wallet_updated' | 'dashboard_updated';
   message: string;
   title: string;
   data?: any;
@@ -15,7 +15,7 @@ export interface RealtimeNotificationData {
 
 class RealtimeNotificationService {
   private static instance: RealtimeNotificationService;
-  private echoService: EchoService;
+  private echoService: typeof EchoService | null;
   private isInitialized = false;
   private listeners: ((notification: RealtimeNotificationData) => void)[] = [];
 

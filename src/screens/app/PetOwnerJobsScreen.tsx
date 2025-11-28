@@ -377,7 +377,7 @@ const PetOwnerJobsScreen = () => {
               status: item.status,
               avatar: { uri: 'https://via.placeholder.com/50x50/cccccc/666666?text=U' },
               petImage: { uri: 'https://via.placeholder.com/50x50/cccccc/666666?text=P' },
-              location: item.location || 'Location not set',
+              location: 'Location not set',
               // Store the actual hourly rate for easy access
               actualHourlyRate: item.hourlyRate
             } : item;

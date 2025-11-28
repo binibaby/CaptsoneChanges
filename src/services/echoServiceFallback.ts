@@ -22,7 +22,7 @@ interface VerificationUpdateData {
 class EchoServiceFallback implements EchoServiceInterface {
   private authToken: string | null = null;
   private isConnected: boolean = false;
-  private pollingInterval: NodeJS.Timeout | null = null;
+  private pollingInterval: ReturnType<typeof setInterval> | null = null;
   private verificationCallbacks: Map<string, (data: VerificationUpdateData) => void> = new Map();
   private consecutiveFailures: number = 0;
   private readonly MAX_FAILURES = 5; // Stop polling after 5 consecutive failures
@@ -211,10 +211,11 @@ class EchoServiceFallback implements EchoServiceInterface {
         
         // Only log errors if we have active callbacks and it's not a timeout
         if (this.verificationCallbacks.size > 0) {
-          if (error.message === 'Request timeout') {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          if (errorMsg === 'Request timeout') {
             console.warn('Echo Service Fallback: Request timeout - server may be slow');
           } else {
-            console.warn('Echo Service Fallback: Error polling verification status:', error.message || error);
+            console.warn('Echo Service Fallback: Error polling verification status:', errorMsg);
           }
         }
       }

@@ -99,24 +99,27 @@ const PetOwnerMessagesScreen = () => {
       let locationData = null;
       
       try {
-        const { default: networkService } = await import('../../services/networkService');
         const { makeApiCall } = await import('../../services/networkService');
         
-        // Fetch sitter profile and rating if it's a sitter
-        if (conversation.other_user.role === 'pet_sitter') {
-          try {
-            // Fetch sitter reviews to get rating
-            const ratingResponse = await makeApiCall(`/api/sitters/${conversation.other_user.id}/reviews`, {
-              method: 'GET',
-            });
-            sitterRating = ratingResponse.data?.sitter?.average_rating || 0;
-            detailedProfile = ratingResponse.data?.sitter || {};
-            console.log('🔍 Fetched sitter rating and profile:', { sitterRating, detailedProfile });
-          } catch (ratingError) {
-            console.log('⚠️ Could not fetch sitter profile, using conversation data');
+        // Try to fetch sitter profile and rating (will work if it's a sitter)
+        try {
+          // Fetch sitter reviews to get rating
+          const ratingResponse = await makeApiCall(`/api/sitters/${conversation.other_user.id}/reviews`, {
+            method: 'GET',
+          });
+          if (ratingResponse?.ok) {
+            const ratingData = await ratingResponse.json();
+            if (ratingData?.data?.sitter) {
+              sitterRating = ratingData.data.sitter.average_rating || 0;
+              detailedProfile = ratingData.data.sitter || {};
+              console.log('🔍 Fetched sitter rating and profile:', { sitterRating, detailedProfile });
+            }
           }
+        } catch (ratingError) {
+          console.log('⚠️ Could not fetch sitter profile, using conversation data');
+        }
 
-          // Try to get location data from nearby sitters endpoint or cache
+        // Try to get location data from nearby sitters endpoint or cache
           try {
             const { default: realtimeLocationService } = await import('../../services/realtimeLocationService');
             
@@ -137,7 +140,6 @@ const PetOwnerMessagesScreen = () => {
           } catch (locationError) {
             console.log('⚠️ Could not fetch location data');
           }
-        }
       } catch (apiError) {
         console.log('⚠️ Could not fetch detailed profile from API, using conversation data');
       }
@@ -145,7 +147,6 @@ const PetOwnerMessagesScreen = () => {
       // Get address from various sources
       const address = detailedProfile?.address || 
                      locationData?.address || 
-                     conversation.other_user.address || 
                      'Location not available';
       
       // Structure location object with fallbacks
@@ -160,11 +161,11 @@ const PetOwnerMessagesScreen = () => {
         id: conversation.other_user.id,
         userId: conversation.other_user.id,
         name: conversation.other_user.name,
-        email: detailedProfile?.email || conversation.other_user.email || '',
+        email: detailedProfile?.email || '',
         location: location,
         profileImage: conversation.other_user.profile_image || detailedProfile?.profile_image || detailedProfile?.profile_image_url,
-        phone: detailedProfile?.phone || conversation.other_user.phone || 'Not provided',
-        rating: sitterRating || detailedProfile?.rating || conversation.other_user.rating || 0,
+        phone: detailedProfile?.phone || 'Not provided',
+        rating: sitterRating || detailedProfile?.rating || 0,
         reviews: detailedProfile?.reviews_count || detailedProfile?.reviews || 0,
         role: 'pet_sitter' as const,
         // Add additional fields that SitterProfilePopup expects

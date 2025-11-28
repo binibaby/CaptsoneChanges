@@ -161,7 +161,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#E0E0E0',
     marginHorizontal: 4,
-    transition: 'all 0.3s ease',
   },
   paginationDotActive: {
     backgroundColor: '#F59E0B',
