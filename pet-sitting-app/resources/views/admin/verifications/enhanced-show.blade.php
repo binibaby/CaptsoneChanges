@@ -954,22 +954,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             <option value="no">No</option>
                         </select>
                     </div>
-                    <div class="flex items-center justify-between">
-                        <label class="text-sm font-medium text-gray-700">Confidence Level:</label>
-                        <select id="confidence_level" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
-                            <option value="high">High</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <label class="text-sm font-medium text-gray-700">Verification Method:</label>
-                        <select id="verification_method" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
-                            <option value="manual">Manual</option>
-                            <option value="automated">Automated</option>
-                            <option value="hybrid">Hybrid</option>
-                        </select>
-                    </div>
                 </div>
             </div>
             <div class="items-center px-4 py-3">
@@ -1004,8 +988,6 @@ function approveVerification() {
     const documentsClear = document.getElementById('documents_clear').value;
     const faceMatchVerified = document.getElementById('face_match_verified').value;
     const addressMatchVerified = document.getElementById('address_match_verified').value;
-    const confidenceLevel = document.getElementById('confidence_level').value;
-    const verificationMethod = document.getElementById('verification_method').value;
     
     // Validate that all criteria are set to "Yes"
     if (documentsClear !== 'yes' || faceMatchVerified !== 'yes' || addressMatchVerified !== 'yes') {
@@ -1026,15 +1008,11 @@ function approveVerification() {
         formData.append('documents_clear', documentsClear);
         formData.append('face_match_verified', faceMatchVerified);
         formData.append('address_match_verified', addressMatchVerified);
-        formData.append('confidence_level', confidenceLevel);
-        formData.append('verification_method', verificationMethod);
         
         console.log('Sending approval request with data:', {
             documents_clear: documentsClear,
             face_match_verified: faceMatchVerified,
-            address_match_verified: addressMatchVerified,
-            confidence_level: confidenceLevel,
-            verification_method: verificationMethod
+            address_match_verified: addressMatchVerified
         });
         
         // Send AJAX request using XMLHttpRequest for better control

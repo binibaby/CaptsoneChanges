@@ -355,9 +355,7 @@ class VerificationController extends Controller
         $request->validate([
             'documents_clear' => 'nullable|in:1,0,yes,no',
             'face_match_verified' => 'nullable|in:1,0,yes,no',
-            'address_match_verified' => 'nullable|in:1,0,yes,no',
-            'confidence_level' => 'nullable|in:high,medium,low',
-            'verification_method' => 'nullable|in:manual,automated,hybrid'
+            'address_match_verified' => 'nullable|in:1,0,yes,no'
         ]);
 
         DB::beginTransaction();
@@ -503,7 +501,7 @@ class VerificationController extends Controller
                 'reason' => $request->admin_notes ?? 'ID verification approved',
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
-                'confidence_level' => $request->confidence_level
+                'confidence_level' => 'high'
             ]);
 
             // Broadcast real-time update to user (with error handling)
