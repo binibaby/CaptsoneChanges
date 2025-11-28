@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -126,7 +127,7 @@ const EnhancedVerificationScreen = () => {
 
       if (connected) {
         // Listen for verification updates
-        const channel = echoService.listenToVerificationUpdates(user.id, (data) => {
+        const channel = echoService.listenToVerificationUpdates(user.id, async (data) => {
           console.log('📡 Real-time verification update received:', data);
           setLastUpdate(new Date());
           
@@ -135,19 +136,60 @@ const EnhancedVerificationScreen = () => {
             setVerification(data.verification);
           }
           
-          // Show success/error message
-          if (data.status === 'approved') {
-            Alert.alert(
-              '🎉 Verification Approved!',
-              data.message || 'Your ID verification has been approved!',
-              [{ text: 'OK' }]
-            );
-          } else if (data.status === 'rejected') {
-            Alert.alert(
-              '❌ Verification Rejected',
-              data.message || 'Your ID verification was rejected. Please check the reason and resubmit.',
-              [{ text: 'OK' }]
-            );
+          // Show success/error message only once per verification update
+          if (data.status === 'approved' || data.status === 'rejected') {
+            const verificationId = data.verification_id || data.verification?.id;
+            
+            if (!verificationId) {
+              console.warn('⚠️ No verification ID in update data, skipping alert tracking');
+              return;
+            }
+            
+            try {
+              // Create a unique key for this verification status change
+              const alertKey = `verification_${verificationId}_${data.status}`;
+              
+              // Check if we've already shown this alert for this verification
+              const lastShownAlert = await AsyncStorage.getItem(`last_verification_alert_${user.id}`);
+              
+              // Only show alert if this is a different verification or status change
+              if (lastShownAlert !== alertKey) {
+                // Save that we've shown this alert
+                await AsyncStorage.setItem(`last_verification_alert_${user.id}`, alertKey);
+                
+                if (data.status === 'approved') {
+                  Alert.alert(
+                    '🎉 Verification Approved!',
+                    data.message || 'Your ID verification has been approved!',
+                    [{ text: 'OK' }]
+                  );
+                } else if (data.status === 'rejected') {
+                  Alert.alert(
+                    '❌ Verification Rejected',
+                    data.message || 'Your ID verification was rejected. Please check the reason and resubmit.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              } else {
+                console.log('⏭️ Skipping alert - already shown for verification', verificationId, 'status', data.status);
+              }
+            } catch (error) {
+              console.error('Error checking alert history:', error);
+              // If error checking, show the alert anyway (better to show than miss)
+              if (data.status === 'approved') {
+                Alert.alert(
+                  '🎉 Verification Approved!',
+                  data.message || 'Your ID verification has been approved!',
+                  [{ text: 'OK' }]
+                );
+              } else if (data.status === 'rejected') {
+                Alert.alert(
+                  '❌ Verification Rejected',
+                  data.message || 'Your ID verification was rejected. Please check the reason and resubmit.',
+                  [{ text: 'OK' }]
+                );
+              }
+            }
           }
         });
 

@@ -120,6 +120,11 @@ const PetSitterDashboard = () => {
       if (metrics.walletBalance !== undefined) {
         setWalletBalance(metrics.walletBalance);
       }
+      // Sync upcoming bookings count with dashboard metrics
+      if (typeof metrics.upcomingBookings === 'number') {
+        setNewBookingsCount(metrics.upcomingBookings);
+        setHasNewBookings(metrics.upcomingBookings > 0);
+      }
     });
 
     return unsubscribe;
@@ -139,7 +144,16 @@ const PetSitterDashboard = () => {
     const unsubscribeDashboard = realtimeService.subscribe('dashboard.updated', (data) => {
       console.log('📊 Real-time dashboard update received:', data);
       // Update metrics immediately
-      setDashboardMetrics(prev => ({ ...prev, ...data }));
+      setDashboardMetrics(prev => {
+        const updated = { ...prev, ...data };
+        // Sync upcoming bookings count with real-time updates
+        if (typeof data.upcoming_bookings === 'number' || typeof data.upcomingBookings === 'number') {
+          const upcomingCount = data.upcoming_bookings ?? data.upcomingBookings ?? 0;
+          setNewBookingsCount(upcomingCount);
+          setHasNewBookings(upcomingCount > 0);
+        }
+        return updated;
+      });
       if (data.wallet_balance !== undefined) {
         setWalletBalance(data.wallet_balance);
       }
@@ -391,10 +405,11 @@ const PetSitterDashboard = () => {
       });
       setUpcomingBookings(upcoming);
       
-      // Check for new bookings - count only non-completed bookings
-      const newBookings = upcoming.filter(booking => booking.status !== 'completed');
-      setHasNewBookings(newBookings.length > 0);
-      setNewBookingsCount(newBookings.length);
+      // Set count of upcoming jobs - all upcoming bookings are already confirmed and non-completed
+      const upcomingCount = upcoming.length;
+      console.log('📊 Upcoming jobs count:', upcomingCount);
+      setHasNewBookings(upcomingCount > 0);
+      setNewBookingsCount(upcomingCount);
 
       // Load active bookings
       const active = await bookingService.getActiveSitterBookings(currentUserId);
@@ -637,7 +652,18 @@ const PetSitterDashboard = () => {
               <Ionicons name="calendar" size={24} color="#fff" />
             </View>
             <Text style={styles.statsValueWhite}>
-              {newBookingsCount}
+              {(() => {
+                // Use dashboard metrics if available, otherwise use newBookingsCount
+                const count = typeof dashboardMetrics.upcomingBookings === 'number' 
+                  ? dashboardMetrics.upcomingBookings 
+                  : newBookingsCount;
+                console.log('📊 Upcoming Jobs count:', { 
+                  dashboardMetrics: dashboardMetrics.upcomingBookings, 
+                  newBookingsCount, 
+                  final: count 
+                });
+                return count;
+              })()}
             </Text>
             <Text style={styles.statsLabelWhite}>Upcoming Jobs</Text>
             <View style={[styles.reflection, { backgroundColor: reflectionColors.upcoming }]} />
